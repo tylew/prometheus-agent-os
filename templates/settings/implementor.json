@@ -49,7 +49,8 @@
       "Bash(report.sh *)",
       "Bash(python3 \"*/lib/registry.py\" *)",
       "Bash(make -C * lint *)",
-      "Bash(make -C * run_test *)"
+      "Bash(make -C * run_test *)",
+      "Bash(*/.claude/prometheus/projects/*/*.sh *)"
     ],
     "deny": [
       "AskUserQuestion",
