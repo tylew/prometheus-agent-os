@@ -1,7 +1,8 @@
 {
-  "$comment": "Every prometheus launch merges this via lib/launch.sh: voltus-besstie is disabled for the session so one plugin's hooks, skills and agents load (removed at cutover); the workspace's own .mcp.json servers are pre-approved so no session opens on the MCP approval dialog, which Herdr reports as idle and the dispatcher would type into. The state dir ({state_dir}, filled by launch.sh) is an additional directory for every role: briefs, event details and reports live there.",
+  "$comment": "Every prometheus launch merges this via lib/launch.sh: voltus-besstie is disabled for the session so one plugin's hooks, skills and agents load (removed at cutover); the workspace's own .mcp.json servers are pre-approved so no session opens on the MCP approval dialog, which Herdr reports as idle and the dispatcher would type into. The state dir ({state_dir}, filled by launch.sh) is an additional directory for every role: briefs, event details and reports live there. pr-review-toolkit is enabled here because a tab started in a project worktree does not load the workspace's own project settings.",
   "enabledPlugins": {
-    "voltus-besstie@brightfield-besstie-local": false
+    "voltus-besstie@brightfield-besstie-local": false,
+    "pr-review-toolkit@claude-plugins-official": true
   },
   "enableAllProjectMcpServers": true,
   "permissions": {

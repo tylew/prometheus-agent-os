@@ -47,7 +47,9 @@
       "Bash(git -C * grep *)",
       "Bash(send.sh *)",
       "Bash(report.sh *)",
-      "Bash(python3 \"*/lib/registry.py\" *)"
+      "Bash(python3 \"*/lib/registry.py\" *)",
+      "Bash(make -C * lint *)",
+      "Bash(make -C * run_test *)"
     ],
     "deny": [
       "AskUserQuestion",

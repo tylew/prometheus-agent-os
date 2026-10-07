@@ -48,7 +48,11 @@
       "Bash(git merge-base *)",
       "Bash(git -C * merge-base *)",
       "Bash(head *)",
-      "Bash(python3 \"*/lib/registry.py\" *)"
+      "Bash(python3 \"*/lib/registry.py\" *)",
+      "Bash(make -C * lint *)",
+      "Bash(make -C * run_test *)",
+      "Bash(gh api repos/*/commits/*)",
+      "Bash(gh api repos/*/compare/*)"
     ],
     "deny": [
       "AskUserQuestion",
