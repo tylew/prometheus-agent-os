@@ -5,4 +5,19 @@ description: "When to /compact an agent versus start it fresh, and how: fresh se
 
 # context-hygiene
 
-Not implemented — phase 2.
+Scripts: `$CLAUDE_PLUGIN_ROOT/skills/context-hygiene/scripts/`.
+
+```
+compact-agent.sh <pane-id> <keep-focus...>        only at the agent's prompt (idle / done)
+refresh-agent.sh <workspace-id> <label> <role> <brief-path>
+```
+
+| Situation | Do |
+|---|---|
+| a new work item | fresh implementor tab — never reuse a finished one |
+| first review · re-review after major rework · a disputed finding | fresh reviewer session (`refresh-agent.sh`) — it must not have seen the author's reasoning |
+| a long item between rounds or after a commit | `compact-agent.sh <pane> keep: <item>, <open findings>, <next step>` — never mid-edit |
+| an agent that exited | the dispatcher resumes leads (`claude --resume <session>`); a depth-3 agent is refreshed with a new brief |
+
+No state files: an agent's context is its Claude session; durable facts live in specs, Shortcut, git and
+the KB; live facts in Herdr tokens. The seat holds nothing — `/clear` on it is always safe.
