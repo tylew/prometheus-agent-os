@@ -220,7 +220,7 @@ def claude_json(prompt: str, schema: dict, *, agent: str | None = None, mcp: dic
         cfg = os.path.join(dispatch.state_dir(), "mcp-oneshot.json")
         with open(cfg, "w") as fh:
             json.dump({"mcpServers": mcp}, fh)
-        cmd += ["--strict-mcp-config", "--mcp-config", cfg]
+        cmd += ["--strict-mcp-config", "--mcp-config", cfg, "--tools", ""]  # MCP tools only: no Bash to wander into
     else:
         cmd += ["--strict-mcp-config"]
     if allowed:
