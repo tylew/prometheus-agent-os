@@ -109,5 +109,11 @@ reviewer's own loop clears it by approving once the counts reach zero; the autho
 - **Stale code docs found during a fix** are their own proposed story (planner), never folded into the fix.
 - **A settled disagreement is written down on the thread** — taken to the operator ⇒ one reply stating the
   decision, then resolve; the long thread is not continued.
+- **"Needs a person" / `HUMAN_NEEDED` = the PM guides the operator through it, never a parked wait.** The
+  person is the stakeholder (the operator); the PM is their guide. Gather what the check needs with its own
+  tools (read the change, run it on a scratch DB / local dev, read-only probes), put a human-readable
+  walkthrough to the operator one point at a time (in place when present, else via the seat), and take the
+  operator's verdict as the person's. Confirmed ⇒ say so on the PR, dated, and clear the label when the
+  setter's text says a person's say clears it; held ⇒ it stays. The verdict is the operator's, never the PM's.
 - **Do not advance past the lane** — re-request is the author side's; approve, merge and the move to
   `completed` are the reviewer's / operator's.

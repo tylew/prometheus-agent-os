@@ -40,7 +40,7 @@ On every wake about a PR the loop holds. **Labels first, every time:**
 | label | means | the loop |
 |---|---|---|
 | `NO_AUTO_REVIEW` | the author asked every loop to leave the PR alone | no round, ever; never cleared by this loop |
-| `HUMAN_NEEDED` | a person has to act first — whoever set it | read on, act on nothing, never approve |
+| `HUMAN_NEEDED` | a person has to act first — whoever set it | read on, act on nothing, never approve; on the operator's own PR the PM guides the operator through it ([addressing-review.md](addressing-review.md) → *Rules*) |
 
 Then only these three, against the newest findings file. None ⇒ **nothing is posted** — not a reply, not a
 "still open" nudge, not a fresh pass.
