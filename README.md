@@ -23,4 +23,4 @@ control workspace (operator)        panes: orchestrator, orchestrator, …
 Every tab starts at `$WORKSPACE` with `claude --plugin-dir plugins/prometheus --agent prometheus:<role>`.
 Local state: `~/.claude/prometheus/orchestrators/<id>.md`, `~/.claude/prometheus/units/<unit>.md`.
 
-`voltus-besstie` must stay enabled: the agents load its skills for procedure.
+Layout + phase status: the design's *File layout*. `voltus-besstie` must stay enabled: the agents load its skills for procedure.
