@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # ---
 # name: kb
-# description: The only write path into the knowledge base at docs/kb/. Indexes notes, resolves mentions to entities by slug/title/alias/handle, searches by type/scope/edge, creates notes, applies ingest proposals under a lock (idempotent per proposal; final facts land; tentative facts, unquoted `stated` facts, ambiguous mentions, new people/orgs, contradicted fields and every decision are held in ~/.claude/prometheus/kb-inbox/), confirms/drops/settles held items, checks schema and integrity, and migrates docs/vault/.
+# description: The only write path into the knowledge base at docs/kb/. Indexes notes, resolves mentions to entities by slug/title/alias/handle, searches by type/scope/edge, creates notes, applies ingest proposals under a lock (idempotent per proposal; final facts land; tentative facts, unquoted `stated` facts, ambiguous mentions, new people/orgs, contradicted fields and every decision are held in ~/.local/state/prometheus/kb-inbox/), confirms/drops/settles held items, checks schema and integrity, and migrates docs/vault/.
 # usage: kb.py {index|resolve <mention> [--type T]|search [--type T] [--scope S] [--text Q] [--edge E] [--links-to SLUG] [--orphans]|new <type> <title> [--scope S]|apply <proposal.json> [--dry-run]|inbox [list|confirm <id> [--as SLUG]|drop <id>|settle --story <sc-id> --state <Completed|Won't Fix>]|check|migrate [--write]} [--json]
 # ---
 from __future__ import annotations
@@ -15,6 +15,7 @@ import json
 import os
 import re
 import sys
+import time
 
 LIB = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, LIB)
@@ -37,12 +38,14 @@ def today() -> str:
 
 
 def state_dir() -> str:
-    d = os.environ.get("PROMETHEUS_STATE_DIR") or os.path.expanduser("~/.claude/prometheus")
+    d = os.environ.get("PROMETHEUS_STATE_DIR") or os.path.expanduser("~/.local/state/prometheus")
     os.makedirs(d, exist_ok=True)
     return d
 
 
 def kb_root(workspace: str | None = None) -> str:
+    if os.environ.get("PROMETHEUS_KB_ROOT") and not workspace:
+        return os.environ["PROMETHEUS_KB_ROOT"]  # trial runs write a scratch KB
     return os.path.join(workspace or env.workspace_root() or ".", KB_REL)
 
 
@@ -720,7 +723,7 @@ def main(argv: list[str]) -> int:
     n.add_argument("title")
     n.add_argument("--scope", action="append")
     a_ = sub.add_parser("apply")
-    a_.add_argument("proposal")
+    a_.add_argument("proposal", help="a proposal file, or the JSON itself (an agent needs no Write)")
     a_.add_argument("--dry-run", action="store_true")
     i = sub.add_parser("inbox")
     i.add_argument("action", nargs="?", default="list", choices=["list", "confirm", "drop", "settle"])
@@ -729,6 +732,8 @@ def main(argv: list[str]) -> int:
     i.add_argument("--story")
     i.add_argument("--state", default="Completed")
     sub.add_parser("check")
+    pp = sub.add_parser("proposal-path")
+    pp.add_argument("name")
     m = sub.add_parser("migrate")
     m.add_argument("--write", action="store_true")
     ap.add_argument("--json", action="store_true")
@@ -747,7 +752,16 @@ def main(argv: list[str]) -> int:
             with kb_lock():
                 print(_new_entity(Writer(root, False), a.type, a.title, a.scope or ["general"], [], "operator"))
         elif a.cmd == "apply":
-            res = apply(json.load(open(a.proposal)), dry=a.dry_run)
+            if a.proposal.lstrip().startswith("{"):
+                prop = json.loads(a.proposal)
+                if not a.dry_run:  # keep what was applied, beside the files agents could not write
+                    d = os.path.join(state_dir(), "kb-proposals")
+                    os.makedirs(d, exist_ok=True)
+                    with open(os.path.join(d, "%d.json" % int(time.time() * 1000)), "w") as fh:
+                        json.dump(prop, fh, indent=1)
+            else:
+                prop = json.load(open(a.proposal))
+            res = apply(prop, dry=a.dry_run)
             print(json.dumps(res, indent=1))
         elif a.cmd == "inbox":
             if a.action == "list":
@@ -761,6 +775,10 @@ def main(argv: list[str]) -> int:
                 if not a.story:
                     ap.error("settle needs --story")
                 print(settle(a.story, a.state))
+        elif a.cmd == "proposal-path":
+            d = os.path.join(state_dir(), "kb-proposals")
+            os.makedirs(d, exist_ok=True)
+            print(os.path.join(d, "%s.json" % slugify(a.name)))
         elif a.cmd == "check":
             errs, warns = check()
             for e in errs:

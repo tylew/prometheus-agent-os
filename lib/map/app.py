@@ -42,7 +42,7 @@ SPLIT_WIDTH = 32
 
 
 def state_dir():
-    return os.environ.get("PROMETHEUS_STATE_DIR") or os.path.expanduser("~/.claude/prometheus")
+    return os.environ.get("PROMETHEUS_STATE_DIR") or os.path.expanduser("~/.local/state/prometheus")
 
 
 def load_state():

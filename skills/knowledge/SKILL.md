@@ -6,7 +6,7 @@ description: "The knowledge base at docs/kb/ and the spec tree at docs/specs/. W
 # knowledge
 
 The KB (`docs/kb/`) holds only what is **true and sourced**. Specs and plans (`docs/specs/<project>/<slug>/`)
-hold the gated lifecycle. Write the KB only through `lib/kb.py`; never edit `docs/kb/` by hand.
+hold the gated lifecycle. Write the KB only through `kb.sh` (on every agent's PATH; wraps `lib/kb.py`); never edit `docs/kb/` by hand. `kb.sh proposal-path <name>` prints where to Write a proposal.
 
 ## Which type
 
@@ -24,7 +24,7 @@ Scope is frontmatter, never a folder. Widening scope edits the list; the note do
 ## The truth gate
 
 A fact lands only with a final basis — `decided` · `merged` · `stated` (with a `quote`) · `confirmed`. Everything
-else is held in `~/.claude/prometheus/kb-inbox/`: tentative facts, unquoted `stated`, ambiguous mentions, a new
+else is held in `~/.local/state/prometheus/kb-inbox/`: tentative facts, unquoted `stated`, ambiguous mentions, a new
 person or org, a field whose existing value differs, every decision. Held is not lost: `kb.py inbox` lists it,
 the operator confirms (`confirm <id> [--as <slug>]`) or drops it, and a later final source releases a held fact.
 
@@ -36,10 +36,10 @@ spec's `grounded_by` points at the decisions it rests on.
 ## Commands
 
 ```
-kb.py resolve "<mention>" [--type T]         one slug, or the candidates (exit 1)
-kb.py search [--type] [--scope] [--text] [--edge] [--links-to <slug>] [--orphans]
-kb.py apply <proposal.json> --dry-run        always first; then without --dry-run
-kb.py inbox [list | confirm <id> [--as <slug>] | drop <id>]
+kb.sh resolve "<mention>" [--type T]         one slug, or the candidates (exit 1)
+kb.sh search  [--type] [--scope] [--text] [--edge] [--links-to <slug>] [--orphans]
+kb.sh apply '<proposal json>' --dry-run      always first; then without --dry-run (a file path works too)
+kb.sh inbox [list | confirm <id> [--as <slug>] | drop <id>]
 kb.py check                                  schema, dangling edges, name collisions, facts without refs
 ```
 

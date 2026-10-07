@@ -1,5 +1,5 @@
 {
-  "$comment": "Depth-3 reviewer: never prompts a human, never edits code. Launched with --permission-mode dontAsk; anything not allowed is denied and reported to the PM. Writes only its findings file under {state_dir}/reviews/ (launch.sh fills in the real state dir). open-tab.sh appends the project's validation commands.",
+  "$comment": "Depth-3 reviewer: never prompts a human, never edits code. Launched with --permission-mode dontAsk; anything not allowed is denied and reported to the PM. Writes only its findings file under {state_dir}/reviews/ (launch.sh fills in the real state dir). open-tab.sh appends the project's validation commands. Path rules for writes are Edit(...) (they cover Write); a bare Edit deny would block the findings file too — dontAsk already denies every edit not allowed.",
   "permissions": {
     "defaultMode": "dontAsk",
     "allow": [
@@ -24,7 +24,7 @@
       "Bash(*/skills/dispatch/scripts/send.sh *)",
       "Bash(*/skills/dispatch/scripts/report.sh *)",
       "Bash(python3 */lib/registry.py *)",
-      "Write(/{state_dir}/reviews/**)",
+      "Edit(/{state_dir}/reviews/**)",
       "Bash(git -C * show *)",
       "Bash(git -C * diff *)",
       "Bash(git -C * log *)",
@@ -43,7 +43,6 @@
     ],
     "deny": [
       "AskUserQuestion",
-      "Edit",
       "Bash(git commit *)",
       "Bash(git push *)",
       "Bash(gt *)",

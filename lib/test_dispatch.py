@@ -1,3 +1,4 @@
+import copy
 import json
 import os
 import subprocess
@@ -5,6 +6,7 @@ import sys
 import tempfile
 import time
 import unittest
+import unittest.mock
 
 LIB = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, LIB)
@@ -175,6 +177,17 @@ class LibrarianReportTest(Base):
             for k in ("HERDR_BIN", "FAKE_HERDR_WORLD", "HERDR_PANE_ID"):
                 os.environ.pop(k)
 
+    def test_open_dialog_is_flagged_to_the_seat_once(self):
+        s = snap()
+        with d.locked_state() as st, unittest.mock.patch.object(d, "herdr") as h:
+            first = d.dialogs(s, st, probe=lambda p: "dialog open" if p == "wA:p3" else None)
+            again = d.dialogs(s, st, probe=lambda p: "dialog open" if p == "wA:p3" else None)
+            closed = d.dialogs(s, st, probe=lambda p: None)
+        self.assertEqual([e["pane"] for e in first], ["wA:p3"])
+        self.assertIn("reviewer@sc-1-a (wA:p3) has a question open", first[0]["line"])
+        self.assertEqual((again, closed, st["dialogs"]), ([], [], {}))
+        h.assert_called_once()
+
     def test_image_keeps_units_that_vanish(self):
         s = snap()
         s["tabs"] = [{"tab_id": "wA:t1", "label": "pm"}]
@@ -186,6 +199,35 @@ class LibrarianReportTest(Base):
             pending = d.pending_restore(gone, st)
         self.assertEqual(list(pending), ["sc-1-a"])
         self.assertEqual(pending["sc-1-a"]["agents"][0], {"label": "pm", "tokens": {"role": "pm"}, "session": "s1"})
+
+
+class MergeTest(Base):
+    def test_concurrent_send_survives_an_external_tick(self):
+        base = {"outbox": {"wA:p1": [{"line": "a"}]}, "ignored": ["x"], "proposals": [{"pid": "p1"}],
+                "cursors": {"gh": 1, "sc": 1}}
+        work = copy.deepcopy(base)
+        work["outbox"]["wA:p1"].append({"line": "from-tick"})
+        work["ignored"].append("y")
+        work["proposals"].append({"pid": "p2"})
+        work["cursors"]["gh"] = 2
+        st = copy.deepcopy(base)
+        st["outbox"]["wC:p1"] = [{"line": "from-send"}]   # written by send.sh meanwhile
+        st["proposals"] = []                              # p1 answered by proposal.sh meanwhile
+        st["cursors"]["sc"] = 5
+        d.merge_state(base, work, st)
+        self.assertEqual(st["outbox"], {"wA:p1": [{"line": "a"}, {"line": "from-tick"}],
+                                        "wC:p1": [{"line": "from-send"}]})
+        self.assertEqual((st["ignored"], st["proposals"], st["cursors"]),
+                         (["x", "y"], [{"pid": "p2"}], {"gh": 2, "sc": 5}))
+
+    def test_a_failed_send_is_requeued(self):
+        def boom(p, t):
+            raise RuntimeError("herdr down")
+        with d.locked_state() as st:
+            d.enqueue(st, "wA:p1", "[prometheus] x")
+        with d.locked_state() as st:
+            report, sends = d.take_deliveries(snap(), st, real=False)
+        self.assertEqual(d.send_all(sends, boom), sends)
 
 
 class AgentsHeartbeatTest(Base):

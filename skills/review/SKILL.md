@@ -93,7 +93,7 @@ report → drop duplicates of open threads (re-read threads now) → POST → re
 ## Findings file + report
 
 Write the round's write-up to the brief's artifact path, else
-`$HOME/.claude/prometheus/reviews/<owner>-<repo>-<pr>-r<round>.md`:
+`$HOME/.local/state/prometheus/reviews/<owner>-<repo>-<pr>-r<round>.md`:
 
 - every finding, Low/Note included, with `path:line` and tier; what re-triage dropped and why;
 - **Needs a call** — scenario gaps, unrequested behavior, disputes, non-convergence, out-of-competence

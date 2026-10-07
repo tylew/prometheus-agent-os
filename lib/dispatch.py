@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import copy
 import fcntl
 import json
 import os
@@ -30,7 +31,7 @@ INLINE_LIMIT = 400
 # ------------------------------------------------------------------------ state
 
 def state_dir() -> str:
-    d = os.environ.get("PROMETHEUS_STATE_DIR") or os.path.expanduser("~/.claude/prometheus")
+    d = os.environ.get("PROMETHEUS_STATE_DIR") or os.path.expanduser("~/.local/state/prometheus")
     os.makedirs(d, exist_ok=True)
     return d
 
@@ -243,8 +244,15 @@ def _compose(pane_id: str, items: list[dict]) -> str:
 
 def deliver(snap: dict, st: dict, prompt=None) -> dict:
     """Deliver each pane's outbox only in a safe state; coalesce to one prompt per pane."""
-    prompt = prompt or submit
-    report = {"delivered": [], "held": [], "dropped": []}
+    report, sends = take_deliveries(snap, st, real=prompt is None)
+    send_all(sends, prompt)
+    return report
+
+
+def take_deliveries(snap: dict, st: dict, real: bool = True) -> tuple[dict, list[dict]]:
+    """Under the state lock: pick what can be delivered now and take it out of the outbox. Sending
+    happens after the lock is released (send_all), so no agent waits on a slow prompt."""
+    report, sends = {"delivered": [], "held": [], "dropped": []}, []
     for pane_id, items in list(st["outbox"].items()):
         if not items:
             st["outbox"].pop(pane_id)
@@ -254,18 +262,30 @@ def deliver(snap: dict, st: dict, prompt=None) -> dict:
             report["dropped"].append(pane_id)
             st["outbox"].pop(pane_id)
             continue
-        if p.get("agent_status") not in SAFE_STATES or (prompt is submit and input_busy(pane_id)):
+        if p.get("agent_status") not in SAFE_STATES or (real and input_busy(pane_id)):
             report["held"].append(pane_id)
             continue
-        if _tokens(p).get("role") == "librarian":
-            if p.get("agent_status") == "working":
-                report["held"].append(pane_id)  # one batch per turn: never queue behind a running batch
-                continue
-            clear(pane_id) if prompt is submit else prompt(pane_id, "/clear")
-        prompt(pane_id, _compose(pane_id, items))
+        librarian = _tokens(p).get("role") == "librarian"
+        if librarian and p.get("agent_status") == "working":
+            report["held"].append(pane_id)  # one batch per turn: never queue behind a running batch
+            continue
+        sends.append({"pane": pane_id, "items": items, "clear": librarian})
         st["outbox"].pop(pane_id)
         report["delivered"].append(pane_id)
-    return report
+    return report, sends
+
+
+def send_all(sends: list[dict], prompt=None) -> list[dict]:
+    """Send taken deliveries; return the ones that failed (the caller puts them back)."""
+    failed = []
+    for d in sends:
+        try:
+            if d["clear"]:
+                clear(d["pane"]) if prompt is None else prompt(d["pane"], "/clear")
+            (prompt or submit)(d["pane"], _compose(d["pane"], d["items"]))
+        except Exception:  # noqa: BLE001 — a failed send is requeued, never lost
+            failed.append(d)
+    return failed
 
 
 def clear(pane_id: str) -> None:
@@ -306,6 +326,32 @@ def poll_agents(snap: dict, st: dict) -> list[dict]:
             events.append({**ev, "route_role": "seat",
                            "line": "[prometheus] %s of %s is blocked" % (role, label)})
     st["agents"] = seen
+    return events
+
+
+def dialogs(snap: dict, st: dict, probe=None) -> list[dict]:
+    """Herdr shows an agent waiting in a question dialog as idle / done. Flag each newly opened one on the
+    map (needs token) and tell the seat once; forget it when the dialog closes."""
+    probe = probe or input_busy
+    open_now, events = {}, []
+    for p in snap.get("panes", []):
+        role = _tokens(p).get("role")
+        if not role or role == "seat" or p.get("agent_status") not in ("idle", "done"):
+            continue
+        if probe(p["pane_id"]) != "dialog open":
+            continue
+        pid = p["pane_id"]
+        open_now[pid] = True
+        if pid in st.get("dialogs", {}):
+            continue
+        unit = unit_of_pane(snap, pid)
+        where = "%s@%s" % (role, _tokens(unit).get("unit") if unit else "control")
+        with contextlib.suppress(Exception):
+            herdr("pane", "report-metadata", pid, "--source", "prometheus", "--token", "needs=1")
+        events.append({"kind": "dialog", "pane": pid, "unit": None, "route_role": "seat",
+                       "line": "[prometheus] needs you — %s (%s) has a question open in its tab; answer it there"
+                       % (where, pid)})
+    st["dialogs"] = open_now
     return events
 
 
@@ -368,17 +414,30 @@ def tick(heartbeat_min: int = 30, prompt=None, external: bool | None = None) -> 
     snap = snapshot()
     if external is None:
         external = os.environ.get("PROMETHEUS_EXTERNAL", "1") == "1"
+    log = []
+    if external:
+        # GitHub / Shortcut / triage / unit creation are slow and can hang: run them on a copy with the
+        # lock released, then merge what they changed — send.sh and friends never wait on the network.
+        import events as ext
+        with locked_state() as st:
+            base = copy.deepcopy(st)
+        work = copy.deepcopy(base)
+        try:
+            log = ext.tick(snap, work)
+        except Exception as exc:  # noqa: BLE001 — one failed source must not stop agents being served
+            log = ["external tick failed: %s" % exc]
+        with locked_state() as st:
+            merge_state(base, work, st)
+        snap = snapshot()
     with locked_state() as st:
-        log = []
-        if external:
-            import events as ext
-            log = ext.tick(snap, st)
         update_image(snap, st)
         seats = panes_with_role(snap, "seat")
         if seats and st.get("seat_backlog"):
             for line in st.pop("seat_backlog"):
                 enqueue(st, seats[0]["pane_id"], line)
         events = poll_agents(snap, st) + heartbeat(snap, st, heartbeat_min)
+        if prompt is None:
+            events += dialogs(snap, st)
         unrouted = []
         for ev in events:
             try:
@@ -387,9 +446,42 @@ def tick(heartbeat_min: int = 30, prompt=None, external: bool | None = None) -> 
                 unrouted.append("%s (%s)" % (ev["line"], exc))
                 continue
             enqueue(st, target, ev["line"], unit=ev.get("unit"))
-        report = deliver(snap, st, prompt)
-        report.update(events=len(events), unrouted=unrouted, log=log)
-        return report
+        report, sends = take_deliveries(snap, st, real=prompt is None)
+    failed = send_all(sends, prompt)
+    if failed:
+        with locked_state() as st:
+            for d in failed:
+                st["outbox"][d["pane"]] = d["items"] + st["outbox"].get(d["pane"], [])
+                report["delivered"].remove(d["pane"])
+                report["held"].append(d["pane"])
+    report.update(events=len(events), unrouted=unrouted, log=log)
+    return report
+
+
+def merge_state(base: dict, work: dict, st: dict) -> None:
+    """Fold changes made on `work` (a copy of `base`) into the live `st`, keeping what others wrote
+    meanwhile: list additions / removals and changed dict entries apply; outbox items append."""
+    for key, new in work.items():
+        old = base.get(key)
+        if new == old:
+            continue
+        cur = st.get(key)
+        if key == "outbox":
+            for pane_id, items in new.items():
+                added = items[len((old or {}).get(pane_id, [])):]
+                if added:
+                    st["outbox"].setdefault(pane_id, []).extend(added)
+        elif isinstance(new, dict) and isinstance(cur, dict) and isinstance(old, dict):
+            for k in set(new) | set(old):
+                if new.get(k) != old.get(k):
+                    if k in new:
+                        cur[k] = new[k]
+                    else:
+                        cur.pop(k, None)
+        elif isinstance(new, list) and isinstance(cur, list) and isinstance(old, list):
+            st[key] = [x for x in cur if x in new or x not in old] + [x for x in new if x not in old and x not in cur]
+        else:
+            st[key] = new
 
 
 # ------------------------------------------------------------------------- loop

@@ -36,7 +36,7 @@ class UnitsTest(unittest.TestCase):
         pane = w["panes"][0]
         self.assertEqual(pane["tokens"], {"role": "pm"})
         self.assertIn("--agent prometheus:project-manager --name pm", pane["ran"])
-        self.assertEqual(pane["agent_name"], "sc-1-a-%s" % pane["pane_id"].replace(":", "-"))
+        self.assertEqual(pane["agent_name"], "sc-1-a-%s" % pane["pane_id"].replace(":", "-").lower())
         self.assertEqual(w["tabs"][0]["label"], "pm")
         self.assertEqual(out["lead"], "pm")
 

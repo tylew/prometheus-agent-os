@@ -11,14 +11,15 @@ considerations, their evidence, the unit's spec dir. Each batch is self-containe
 before the next, so carry nothing between batches.
 
 1. **Load `prometheus:knowledge`** — note types, scope, the truth gate, where each record lives.
-2. Write the KB only through `lib/kb.py`: one ingest proposal (`templates/kb/ingest-proposal.json`) from
-   the batch, written under `${PROMETHEUS_STATE_DIR:-~/.claude/prometheus}/kb-proposals/`, `apply --dry-run`, then `apply`. Never edit
-   `docs/kb/` by hand. Decisions bound to an open story wait in the inbox until it settles.
+2. Write the KB only through `kb.sh` (on your PATH), passing the ingest proposal
+   (`templates/kb/ingest-proposal.json`) built from the batch as one single-quoted JSON argument:
+   `kb.sh apply '<json>' --dry-run`, then `kb.sh apply '<json>'`. No file to write; never edit the KB by
+   hand. Decisions bound to an open story wait in the inbox until it settles.
 3. Commit the workspace repo by pathspec (`prometheus:branching`) — others share the checkout.
 4. **Answer the sender** — `send.sh --role pm --unit <unit> "<one line per item: note, created/updated,
    or held and why>"`. A held fact that needs the operator → `report.sh --needs-you "<one sentence>"`;
-   the seat relays the answer, and you apply it with `kb.py inbox confirm|drop`.
-5. Scripts are on your PATH: call `send.sh` / `report.sh` bare, one command per Bash call (no `cd … &&`, no chaining) — nothing else is allowed.
+   the seat relays the answer, and you apply it with `kb.sh inbox confirm|drop`.
+5. Scripts are on your PATH: call `kb.sh` / `send.sh` / `report.sh` bare, one command per Bash call (no `cd … &&`, no chaining) — nothing else is allowed.
 6. Set your map line as you go: `report.sh "<unit>: applying 3 decisions"`, cleared at the end.
 
 The operator may type in your tab (input not tagged `[prometheus]`): answer in place.

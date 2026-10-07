@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import shlex
 import subprocess
 import sys
@@ -24,7 +25,7 @@ KINDS = ("story", "story-set", "goal-set", "review")
 ROLES = ("pm", "planner", "implementor", "reviewer", "librarian")
 READY_STATES = ("idle", "done")
 BUSY_STATES = ("working", "blocked")
-PASS_ENV = ("PROMETHEUS_STATE_DIR", "PROMETHEUS_FILTER", "PROMETHEUS_EXTERNAL")
+PASS_ENV = ("PROMETHEUS_STATE_DIR", "PROMETHEUS_FILTER", "PROMETHEUS_EXTERNAL", "PROMETHEUS_KB_ROOT")
 
 
 def _h(*args: str) -> dict:
@@ -71,9 +72,10 @@ def tag_pane(pane_id: str, **tokens: str) -> None:
 
 def _env_flags(role: str) -> list[str]:
     """Tab / workspace env for the agent's shell: role, workspace root, trial isolation."""
-    scripts = os.path.join(os.path.dirname(LIB), "skills", "dispatch", "scripts")
+    skills = os.path.join(os.path.dirname(LIB), "skills")
+    scripts = os.pathsep.join(os.path.join(skills, s, "scripts") for s in ("dispatch", "knowledge"))
     pairs = {"PROMETHEUS_ROLE": role, "WORKSPACE": env.workspace_root(),
-             "PATH": scripts + os.pathsep + os.environ.get("PATH", "")}  # send.sh / report.sh, bare
+             "PATH": scripts + os.pathsep + os.environ.get("PATH", "")}  # send.sh / report.sh / kb.sh, bare
     pairs.update({k: os.environ[k] for k in PASS_ENV if os.environ.get(k)})
     out = []
     for k, v in pairs.items():
@@ -96,7 +98,7 @@ def start(pane_id: str, role: str, name: str, label: str, extra_allow: list[str]
           claude_args: list[str] | None = None) -> None:
     """Start the role's Claude in a shell pane; returns when Herdr sees it ready for input."""
     args = launch_args(role, extra_allow, ["--name", label, *(claude_args or [])])
-    agent_name = "%s-%s" % (name, pane_id.replace(":", "-"))
+    agent_name = re.sub(r"[^a-z0-9_-]+", "-", ("%s-%s" % (name, pane_id)).lower())  # Herdr: [a-z0-9_-] only
     try:
         hz.start_agent(agent_name, pane_id, args)
     except hz.HerdrError as exc:
@@ -174,8 +176,10 @@ def open_tab(workspace_id: str, label: str, role: str, item: str | None = None,
              extra_allow: list[str] | None = None, claude_args: list[str] | None = None) -> str:
     if role not in ROLES:
         raise ValueError("role must be one of %s" % ", ".join(ROLES))
+    # a tab with a worktree starts in it: under dontAsk its git / gt calls must not need cd or -C
+    cwd = worktree if worktree and os.path.isdir(worktree) else env.workspace_root()
     tab = _h("tab", "create", "--workspace", workspace_id, "--label", label,
-             "--cwd", env.workspace_root(), "--no-focus", *_env_flags(role))
+             "--cwd", cwd, "--no-focus", *_env_flags(role))
     tab_id = (tab.get("tab") or tab)["tab_id"]
     pane_id = _first_pane(workspace_id, tab_id)
     tag_pane(pane_id, role=role, item=item, pr=pr, worktree=worktree)

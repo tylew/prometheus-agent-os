@@ -140,7 +140,7 @@ def owner(path: str, workspace: str | None = None, registry: dict | None = None)
 # ----------------------------------------------------------------- live
 
 def state_dir() -> str:
-    return os.environ.get("PROMETHEUS_STATE_DIR") or os.path.expanduser("~/.claude/prometheus")
+    return os.environ.get("PROMETHEUS_STATE_DIR") or os.path.expanduser("~/.local/state/prometheus")
 
 
 def pin_path(session_id: str) -> str:

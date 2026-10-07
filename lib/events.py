@@ -30,8 +30,11 @@ NEW_PER_TICK = int(os.environ.get("PROMETHEUS_NEW_PER_TICK", 3))
 
 
 def run(cmd: list[str], timeout: int = 120, cwd: str | None = None, stdin: str | None = None) -> str:
-    out = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, cwd=cwd,
-                         input=stdin if stdin is not None else "")
+    try:
+        out = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, cwd=cwd,
+                             input=stdin if stdin is not None else "")
+    except subprocess.TimeoutExpired:
+        raise RuntimeError("%s: timed out after %ss" % (" ".join(cmd[:3]), timeout))
     if out.returncode != 0:
         raise RuntimeError("%s: %s" % (" ".join(cmd[:3]), (out.stderr or out.stdout).strip()[:300]))
     return out.stdout

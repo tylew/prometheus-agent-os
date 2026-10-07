@@ -49,7 +49,7 @@ cmd = a[:2]
 if cmd == ["api", "snapshot"]:
     res = {"snapshot": {k: w[k] for k in ("workspaces", "panes", "tabs")}}
 elif cmd == ["workspace", "create"]:
-    ws = new_id("w")
+    ws = new_id("wX")
     tab, pane = ws + ":t1", ws + ":p1"
     w["workspaces"].append({"workspace_id": ws, "label": opt("--label")})
     w["tabs"].append({"tab_id": tab, "workspace_id": ws, "label": "1"})
@@ -86,6 +86,10 @@ elif cmd == ["pane", "run"]:
     p["agent_status"] = os.environ.get("FAKE_HERDR_LAUNCH_STATE", "idle")
     p["ran"] = a[3]
 elif cmd == ["agent", "start"]:
+    import re
+    if not re.fullmatch(r"[a-z0-9_-]+", a[2]):
+        print(json.dumps({"error": {"code": "invalid_name", "message": "names use [a-z0-9_-]"}}))
+        sys.exit(1)
     p = find("panes", "pane_id", opt("--pane"))
     p.update(agent="claude", agent_name=a[2], agent_status=os.environ.get("FAKE_HERDR_LAUNCH_STATE", "idle"),
              ran=" ".join(a[a.index("--") + 1:]) if "--" in a else "")

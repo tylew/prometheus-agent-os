@@ -22,7 +22,7 @@ esac
 plugin_root=${0:A:h:h}
 workspace=$(python3 "$plugin_root/lib/env.py") || { echo "launch: workspace root not found" >&2; exit 1; }
 
-state_dir=${PROMETHEUS_STATE_DIR:-$HOME/.claude/prometheus}
+state_dir=${PROMETHEUS_STATE_DIR:-$HOME/.local/state/prometheus}
 settings_dir=$state_dir/settings
 mkdir -p "$settings_dir"
 settings=$settings_dir/$role.json
@@ -45,7 +45,7 @@ if os.path.exists(role_path):
         else:
             merged[key] = val
 merged.pop("$comment", None)
-state = os.environ.get("PROMETHEUS_STATE_DIR") or os.path.expanduser("~/.claude/prometheus")
+state = os.environ.get("PROMETHEUS_STATE_DIR") or os.path.expanduser("~/.local/state/prometheus")
 perms = merged.get("permissions") or {}
 for key in ("allow", "deny", "additionalDirectories"):
     if key in perms:
