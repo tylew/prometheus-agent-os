@@ -51,31 +51,65 @@ STATE = {
 }
 
 
-def keys(node):
-    return [c.key for c in node.children]
+def keys(nodes):
+    return [n.key for n in nodes]
 
 
 class ModelTest(unittest.TestCase):
     def build(self, **kw):
         return model.build(snap(), STATE, now=1300, **kw)
 
-    def test_root_layout(self):
+    def test_system_level_is_seat_over_units(self):
         t = self.build()
-        self.assertEqual(len(t.roots), 1)
-        root = t.roots[0]
-        self.assertEqual(root.name, "prometheus")
-        self.assertEqual(keys(root), ["proposals", "wC:p1", "dispatcher", "wC:p2", "unit:wB", "unit:wA",
-                                      "unassigned"])
-        self.assertEqual(root.status, "working")
+        hub, spokes = model.level(t, [])
+        self.assertEqual(hub.key, "wC:p1")
+        self.assertEqual(hub.kind, "seat")
+        self.assertEqual(keys(spokes), ["unit:wB", "unit:wA"])
+        self.assertNotIn("root", t.nodes)
+        self.assertNotIn("dispatcher", t.nodes)
 
-    def test_quick_runners_hang_under_the_seat(self):
+    def test_unit_stats(self):
+        unit = self.build().nodes["unit:wA"]
+        self.assertEqual(unit.name, "sc-1-a")
+        self.assertEqual(unit.sub, "story · implement")
+        self.assertEqual(unit.counts, {"working": 2, "idle": 1})
+        self.assertEqual(unit.flag, 1)
+        self.assertEqual(unit.held, 2)
+        self.assertEqual(unit.age, "5m")
+        self.assertEqual(unit.status, "working")
+        self.assertEqual(self.build().nodes["unit:wB"].status, "blocked")
+
+    def test_unit_level_is_pm_over_workers(self):
+        t = self.build()
+        hub, spokes = model.level(t, ["unit:wA"])
+        self.assertEqual(hub.key, "wA:p1")
+        self.assertEqual(keys(spokes), ["wA:p2", "wA:p3"])
+        self.assertEqual(t.nodes["wA:p2"].name, "impl sc-1")  # tab label
+        self.assertEqual(t.nodes["wA:p3"].name, "reviewer-sc-1")  # numeric tab label falls back
+
+    def test_unit_without_pm_is_its_own_hub(self):
+        s = snap()
+        s["panes"] = [p for p in s["panes"] if p["pane_id"] != "wB:p1"]
+        t = model.build(s, STATE)
+        hub, spokes = model.level(t, ["unit:wB"])
+        self.assertEqual(hub.key, "unit:wB")
+        self.assertEqual(spokes, [])
+        self.assertIsNone(model.preview_target(t, "unit:wB"))
+
+    def test_control_level(self):
+        t = self.build()
+        hub, spokes = model.level(t, [model.CONTROL])
+        self.assertEqual(hub.key, "wC:p1")
+        self.assertEqual(keys(spokes), ["wC:p2", "wX:p9", "wX:p1", "proposal:p1"])
+        self.assertEqual(hub.flag, 1)  # the proposal
+
+    def test_quick_runners_on_the_control_level(self):
         s = snap()
         s["tabs"].append({"tab_id": "wC:t5", "workspace_id": "wC", "label": "quick-battery-curves"})
         s["panes"].append(pane("wC:p5", "wC", "wC:t5", "working", role="runner", item="battery-curves"))
         t = model.build(s, STATE, now=1300)
-        self.assertEqual(keys(t.nodes["wC:p1"]), ["wC:p5"])
+        self.assertIn("wC:p5", t.control)
         self.assertEqual(t.nodes["wC:p5"].name, "quick-battery-curves")
-        self.assertNotIn("wC:p5", keys(t.nodes.get("unassigned")) if "unassigned" in t.nodes else [])
 
     def test_another_instances_control_roles_are_left_out(self):
         s = snap()
@@ -84,28 +118,17 @@ class ModelTest(unittest.TestCase):
         t = model.build(s, STATE, now=1300, own_workspace="wC")
         self.assertNotIn("wT:p1", t.nodes)
         self.assertNotIn("wT:p2", t.nodes)
-        self.assertIn("wC:p1", t.nodes)
+        self.assertEqual(t.seat, "wC:p1")
 
-    def test_dispatcher_running_and_stopped(self):
+    def test_header_stats(self):
         t = self.build()
-        d = t.nodes["dispatcher"]
-        self.assertEqual(d.status, "running")
-        self.assertIn("1 proposal", d.detail)
-        self.assertIn("2 held", d.detail)
+        self.assertEqual(t.dispatcher, "running")
+        self.assertEqual(t.held, 2)
+        self.assertEqual(t.needs, 2)
+        self.assertEqual(model.header_text(t), "dispatcher running · 8 agents · ●3 ▲1 ○4 · !2 · ?1 · ✉2")
         s = snap()
         s["workspaces"][0]["tokens"] = {}
-        self.assertEqual(model.build(s, {}).nodes["dispatcher"].status, "stopped")
-
-    def test_unit_pm_and_children(self):
-        t = self.build()
-        unit = t.nodes["unit:wA"]
-        self.assertEqual(unit.name, "sc-1-a · story · implement")
-        self.assertEqual(unit.detail, "o/r#10, o/r#11 / sc-1 · 5m ago")
-        self.assertEqual(keys(unit), ["wA:p1"])
-        pm = t.nodes["wA:p1"]
-        self.assertEqual(keys(pm), ["wA:p2", "wA:p3"])
-        self.assertEqual(t.nodes["wA:p2"].name, "impl sc-1")  # tab label
-        self.assertEqual(t.nodes["wA:p3"].name, "reviewer-sc-1")  # numeric tab label falls back
+        self.assertEqual(model.build(s, {}).dispatcher, "stopped")
 
     def test_detail_line_precedence(self):
         t = self.build()
@@ -120,70 +143,78 @@ class ModelTest(unittest.TestCase):
         self.assertFalse(t.nodes["wA:p3"].needs)  # needs=1 but working
         self.assertTrue(t.nodes["wB:p1"].needs)  # blocked
 
-    def test_needs_bubbles_to_unit_and_root(self):
+    def test_preview_targets_and_drilling(self):
         t = self.build()
-        self.assertEqual(t.nodes["wA:p1"].flag, 1)
-        self.assertEqual(t.nodes["unit:wA"].flag, 1)
-        self.assertEqual(t.nodes["unit:wB"].flag, 1)
-        self.assertEqual(t.nodes["root"].flag, 3)  # two agents + one proposal
-
-    def test_overlay_held_and_proposals(self):
-        t = self.build()
-        self.assertEqual(t.nodes["wA:p1"].held, 2)
-        self.assertEqual(t.held, 2)
-        group = t.nodes["proposals"]
-        self.assertTrue(group.needs)
-        self.assertEqual(keys(group), ["proposal:p1"])
-        self.assertEqual(t.nodes["proposal:p1"].name, "p1 sc-3-c")
-        self.assertIn("o/r#30", t.nodes["proposal:p1"].detail)
+        self.assertEqual(model.preview_target(t, "unit:wA"), "wA:p1")
+        self.assertEqual(model.preview_target(t, "wA:p3"), "wA:p3")
+        self.assertEqual(model.preview_target(t, "wC:p1"), "wC:p1")
+        self.assertIsNone(model.preview_target(t, "proposal:p1"))
+        self.assertEqual(model.drill_path(t, "unit:wA"), "unit:wA")
+        self.assertEqual(model.drill_path(t, "wC:p1"), model.CONTROL)
+        self.assertIsNone(model.drill_path(t, "wA:p3"))
+        self.assertEqual(model.unit_of(t, "wA:p3"), "unit:wA")
 
     def test_self_and_view_exclusion(self):
         t = self.build(own_pane="wC:p2")
         self.assertNotIn("wC:p2", t.nodes)
         self.assertNotIn("wC:p3", t.nodes)  # view=map
-
-    def test_unassigned_and_untagged(self):
-        t = self.build()
-        self.assertEqual(keys(t.nodes["unassigned"]), ["wX:p9", "wX:p1"])
         self.assertNotIn("wX:p2", t.nodes)  # no role, no unit workspace
-
-    def test_unit_scope(self):
-        t = self.build(unit="wA")
-        self.assertEqual([r.key for r in t.roots], ["unit:wA"])
-        self.assertNotIn("dispatcher", t.nodes)
-        self.assertEqual(model.build(snap(), STATE, unit="nope").roots, [])
 
     def test_empty_inputs(self):
         t = model.build({}, None)
-        self.assertEqual(keys(t.roots[0]), ["dispatcher"])
+        hub, spokes = model.level(t, [])
+        self.assertEqual(hub.name, "no seat")
+        self.assertEqual(spokes, [])
         self.assertEqual(t.dispatcher, "stopped")
 
-    def test_seat_workspace_is_control_without_token(self):
-        s = snap()
-        s["workspaces"][0]["tokens"] = None
-        t = model.build(s, {})
-        self.assertEqual(t.raw["dispatcher"]["workspace_id"], "wC")
-
     def test_to_text(self):
-        text = model.to_text(self.build().roots)
-        self.assertIn("├─ ? proposals (1) [waiting]  ! needs you", text)
-        self.assertIn("✉2 held", text)
+        text = model.to_text(self.build())
+        self.assertTrue(text.startswith("dispatcher running"))
+        self.assertIn("◼ sc-1-a  (story · implement)  ●2 ○1  !1  ✉2  5m ago", text)
+        self.assertIn("[sc-1-a]", text)
+        self.assertIn("[control]", text)
 
 
 class ViewsTest(unittest.TestCase):
-    def test_every_view_renders(self):
-        roots = model.build(snap(), STATE, now=1300).roots
-        for render in (views.render_compact, views.render_cards, views.render_graph):
-            canvas, boxes = render(roots, 60)
-            self.assertIn("prometheus", canvas.text())
-            self.assertIn("unit:wA", boxes)
-        canvas, _ = views.render_compact(roots, 80)
-        self.assertIn("pm !1 ✉2", canvas.text())
-        self.assertIn("!1", canvas.text())
+    def render(self, path, width, **kw):
+        t = model.build(snap(), STATE, now=1300)
+        hub, spokes = model.level(t, path)
+        return views.render_level(hub, spokes, width, **kw), hub, spokes
+
+    def assert_fits(self, canvas, width):
+        for row in canvas.text().splitlines():
+            self.assertLessEqual(len(row), width)
+
+    def test_system_level_single_row(self):
+        (canvas, boxes), hub, spokes = self.render([], 100, spark={"unit:wA": "▁▃█"})
+        text = canvas.text()
+        self.assert_fits(canvas, 100)
+        self.assertIn("┏", text)  # seat box
+        self.assertIn("╔", text)  # unit boxes
+        self.assertIn("◼ sc-1-a", text)
+        self.assertIn("●2 ○1 !1 ✉2 5m", text)
+        self.assertIn("▁▃█", text)
+        self.assertLess(boxes["wC:p1"][1], boxes["unit:wA"][0])
+        self.assertEqual(boxes["unit:wA"][0], boxes["unit:wB"][0])
+
+    def test_wraps_into_rows(self):
+        t = model.build(snap(), STATE)
+        hub, _ = model.level(t, [])
+        spokes = [views.NodeView(f"k{i}", f"agent-{i}", "claude", "idle") for i in range(7)]
+        canvas, boxes = views.render_level(hub, spokes, 60)
+        self.assert_fits(canvas, 60)
+        tops = sorted({boxes[f"k{i}"][0] for i in range(7)})
+        self.assertEqual(len(tops), 4)  # 2 per row at 60 columns
+        self.assertEqual(len(canvas.edges), 7)
+
+    def test_unit_level_and_narrow(self):
+        (canvas, boxes), hub, spokes = self.render(["unit:wA"], 40)
+        self.assert_fits(canvas, 40)
+        self.assertIn("! needs you", canvas.text())
+        self.assertIn("wA:p3", boxes)
 
     def test_animate_edges_lights_working(self):
-        roots = model.build(snap(), STATE).roots
-        canvas, _ = views.render_cards(roots, 50)
+        (canvas, _), _, _ = self.render(["unit:wA"], 80)
         self.assertTrue(views.animate_edges(canvas, {"wA:p3"}, 0))
         self.assertFalse(views.animate_edges(canvas, set(), 0))
 

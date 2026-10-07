@@ -1,9 +1,9 @@
 # ---
 # name: map.views
-# description: Pure layouts for the prometheus map — compact rows, cards, a top-down graph, live working edges and the activity plot — drawn onto a Canvas of (char, style) cells so they test as plain text.
-# usage: imported (from map import views)
+# description: Pure layout for the prometheus map — one drill-down level drawn as a hub box over a fan of spoke boxes (wrapping into rows, never wider than the screen), with distinct seat (heavy), unit workspace (double) and agent (rounded) boxes, live working edges — drawn onto a Canvas of (char, style) cells so it tests as plain text.
+# usage: imported (from map import views); views.render_level(hub, spokes, width, spark={key: str})
 # ---
-# Ported from Horchestra's views.py (https://github.com/SimoneDaniotti/horchestra),
+# Canvas and edge animation ported from Horchestra's views.py (https://github.com/SimoneDaniotti/horchestra),
 # MIT License, Copyright (c) 2026 Simone Daniotti.
 from __future__ import annotations
 
@@ -11,10 +11,8 @@ from __future__ import annotations
 KINDS = {
     "claude": ("✻", "kind:claude"),
     "shell": ("$", "dim"),
-    "root": ("◉", "accent"),
+    "seat": ("◉", "accent"),
     "unit": ("◼", "accent"),
-    "dispatcher": ("⚙", "accent"),
-    "group": ("◌", "dim"),
     "proposal": ("?", "needs"),
 }
 DEFAULT_KIND = ("▪", "kind:other")
@@ -31,49 +29,46 @@ STATUS = {
     "unknown": ("·", "?"),
 }
 
-GRAPH_GAP = 2
-GRAPH_LEVEL = 6  # 4 box rows + 2 connector rows
-CARD_INDENT = 3
+# kind -> (top-left, top, top-right, side, bottom-left, bottom-right, bottom tee, top tee)
+HEAVY_BOX = ("┏", "━", "┓", "┃", "┗", "┛", "┳", "┻")
+DOUBLE_BOX = ("╔", "═", "╗", "║", "╚", "╝", "╤", "╧")
+ROUND_BOX = ("╭", "─", "╮", "│", "╰", "╯", "┬", "┴")
+BORDERS = {"seat": HEAVY_BOX, "unit": DOUBLE_BOX}
+
+GAP = 2
+GUTTER = 3  # wrapped rows start right of the trunk
+SPOKE_MIN, SPOKE_MAX = 18, 40
+HUB_MIN, HUB_MAX = 26, 56
 
 
 class NodeView:
     """Display data for one node, independent of Herdr's JSON."""
 
     __slots__ = ("key", "name", "kind", "status", "detail", "needs", "here", "held", "flag",
-                 "selected", "collapsed", "children", "parent")
+                 "selected", "sub", "counts", "age")
 
     def __init__(self, key, name, kind, status, detail="", needs=False, here=False, held=0):
         self.key = key
-        self.name = name
+        self.name = name or key
         self.kind = kind
         self.status = status if status in STATUS else "unknown"
         self.detail = detail
         self.needs = needs
         self.here = here
         self.held = held
-        self.flag = 0  # descendants that need the operator
+        self.flag = 0  # needs-you below this node
         self.selected = False
-        self.collapsed = False
-        self.children = []
-        self.parent = None
+        self.sub = ""  # unit: kind · stage; seat: unit count
+        self.counts = {}  # unit: agent status -> n
+        self.age = ""  # unit: since the dispatcher's last change
 
     @property
     def icon(self):
         return KINDS.get(self.kind, DEFAULT_KIND)
 
-    def shown_children(self):
-        return [] if self.collapsed else self.children
-
-    def hidden_count(self):
-        return sum(1 + c.hidden_count() for c in self.children) if self.collapsed else 0
-
-
-def subtree_count(node):
-    return sum(1 + subtree_count(c) for c in node.children)
-
 
 def marks(node):
-    """Badges after a name: `!N` needs-you below, `✉N` held in the dispatcher outbox."""
+    """Badges: `!N` needs-you below, `✉N` held in the dispatcher outbox."""
     out = []
     if node.flag and not node.needs:
         out.append(f"!{node.flag}")
@@ -86,7 +81,7 @@ class Canvas:
     def __init__(self, width):
         self.width = max(1, width)
         self.rows = []
-        # [(child key, [(y, x), ...])]: each parent->child edge, parent end first.
+        # [(child key, [(y, x), ...])]: each hub->spoke edge, hub end first.
         self.edges = []
 
     def ensure(self, y):
@@ -124,7 +119,7 @@ class Canvas:
         return "\n".join("".join(c[0] for c in row).rstrip() for row in self.rows)
 
 
-def _fit(text, width):
+def fit(text, width):
     if width <= 0:
         return ""
     return text if len(text) <= width else text[: max(0, width - 1)] + "…"
@@ -138,219 +133,133 @@ def _border_style(node):
     return "here" if node.here else "border"
 
 
-# ---- compact ---------------------------------------------------------------
-
-
-def render_compact(roots, width):
-    canvas, boxes, y = Canvas(width), {}, 0
-
-    def walk(node, prefix, last, depth):
-        nonlocal y
-        if depth:
-            rail, top = 1 + len(prefix), boxes[node.parent.key][0] + 1
-            canvas.edges.append((node.key, [(ry, rail) for ry in range(top, y + 1)] + [(y, rail + 1)]))
-        lead = "" if depth == 0 else prefix + ("└─ " if last else "├─ ")
-        x = 1
-        if node.selected:
-            canvas.put(y, 0, " " * width, "selrow")
-        if node.here:
-            canvas.put(y, 0, "▌", "here")
-        canvas.put(y, x, lead, "rail")
-        x += len(lead)
-        glyph, _ = STATUS[node.status]
-        canvas.put(y, x, glyph, "status:" + node.status)
-        icon, icon_style = node.icon
-        canvas.put(y, x + 2, icon, icon_style)
-        name = node.name + (f" +{node.hidden_count()}" if node.collapsed and node.children else "")
-        canvas.put(y, x + 4, _fit(name, width - x - 4), "selname" if node.selected else "name")
-        after = x + 5 + len(name)
-        badge = marks(node)
-        if badge and width - after > len(badge):
-            canvas.put(y, after, badge, "needs" if node.flag else "accent")
-            after += len(badge) + 1
-        rest = width - after
-        if node.detail and rest > 3:
-            canvas.put(y, after, _fit(node.detail, rest), "needs" if node.needs else "dim")
-        boxes[node.key] = (y, y, 0, width - 1)
-        y += 1
-        child_prefix = "" if depth == 0 else prefix + ("   " if last else "│  ")
-        kids = node.shown_children()
-        for i, child in enumerate(kids):
-            walk(child, child_prefix, i == len(kids) - 1, depth + 1)
-
-    for root in roots:
-        walk(root, "", True, 0)
-    return canvas, boxes
-
-
-# ---- cards -----------------------------------------------------------------
-
-
-def _card(canvas, node, y, x, w):
-    style = _border_style(node)
-    inner = w - 2
-    # Line 1: icon + name on the left, badges + status on the right.
+def content(node, spark=None):
+    """[(text, style)] lines inside a node's box."""
     glyph, word = STATUS[node.status]
-    right = f"{glyph} {word}" if inner >= 20 else glyph
+    icon = node.icon[0]
+    name_style = "selname" if node.selected else "name"
     badge = marks(node)
-    if badge and inner >= 16:
-        right = badge + " " + right
-    canvas.put(y, x, "╭" + "─" * inner + "╮", style)
-    icon, icon_style = node.icon
-    canvas.put(y + 1, x, "│", style)
-    canvas.put(y + 1, x + 1, " " * inner, None)
-    canvas.put(y + 1, x + 2, icon, icon_style)
-    name_w = inner - len(right) - 5
-    canvas.put(y + 1, x + 4, _fit(node.name, name_w), "selname" if node.selected else "name")
-    canvas.put(y + 1, x + w - 1 - len(right) - 1, right, "needs" if node.flag else "status:" + node.status)
-    canvas.put(y + 1, x + w - 1, "│", style)
-    # Line 2: needs-you, reported status, item, or title.
+    if node.kind == "unit":
+        stats = " ".join(v for v in (count_line(node.counts), badge, node.age) if v) or "no agents"
+        lines = [(f"{icon} {node.name}", name_style), (node.sub or node.detail, "dim"),
+                 (stats, "needs" if node.flag else "status:" + node.status)]
+        lines.append((spark or "", "spark"))
+        return lines
+    if node.kind == "seat":
+        right = " ".join(v for v in (f"{glyph} {word}", badge) if v)
+        return [(f"{icon} {node.name}", name_style), (right, "needs" if node.flag else "status:" + node.status),
+                (node.detail or node.sub, "dim")]
+    head = f"{glyph} {node.name}"
+    if badge:
+        head += " " + badge
     detail = ("! " + node.detail) if node.needs else node.detail
-    canvas.put(y + 2, x, "│", style)
-    canvas.put(y + 2, x + 1, " " * inner, None)
-    canvas.put(y + 2, x + 2, _fit(detail, inner - 2), "needs" if node.needs else "dim")
-    canvas.put(y + 2, x + w - 1, "│", style)
-    # Bottom: a tee where the child rail leaves, or a folded count.
-    bottom = "╰" + "─" * inner + "╯"
-    if node.shown_children():
-        bottom = "╰┬" + "─" * (inner - 1) + "╯"
-    elif node.collapsed and node.children:
-        tag = f" +{node.hidden_count()} "
-        bottom = "╰─" + tag + "─" * max(0, inner - 1 - len(tag)) + "╯"
-    canvas.put(y + 3, x, bottom, style)
+    return [(head, name_style), (detail, "needs" if node.needs else "dim")]
 
 
-def render_cards(roots, width):
-    canvas, boxes = Canvas(width), {}
-
-    def walk(node, x, y):
-        w = max(12, width - x)
-        _card(canvas, node, y, x, w)
-        boxes[node.key] = (y, y + 3, x, x + w - 1)
-        y += 4
-        kids = node.shown_children()
-        rail = x + 1
-        last_join = y
-        for child in kids:
-            for ry in range(last_join, y + 1):
-                canvas.put(ry, rail, "│", "rail")
-            canvas.put(y, rail, "├─", "rail")
-            top = boxes[node.key][1]
-            canvas.edges.append((child.key, [(ry, rail) for ry in range(top, y + 1)] + [(y, rail + 1)]))
-            last_join = y + 1
-            y = walk(child, x + CARD_INDENT, y)
-        if kids:
-            # The last child's join becomes an elbow; clear the rail below it.
-            join = boxes[kids[-1].key][0]
-            canvas.put(join, rail, "└", "rail")
-            for ry in range(join + 1, y):
-                if canvas.get(ry, rail) == "│":
-                    canvas.put(ry, rail, " ", None)
-        return y
-
-    y = 0
-    for i, root in enumerate(roots):
-        if i:
-            y += 1
-        y = walk(root, 0, y)
-    return canvas, boxes
+COUNT_ORDER = ("working", "blocked", "idle", "done")
 
 
-# ---- graph -----------------------------------------------------------------
+def count_line(counts):
+    return " ".join(f"{STATUS[s][0]}{counts[s]}" for s in COUNT_ORDER if counts.get(s))
 
 
-def _graph_status(node):
-    glyph, word = STATUS[node.status]
-    status = f"{glyph} {word}"
-    if node.needs:
-        status = "! needs you"
-    elif node.collapsed and node.children:
-        status += f" +{node.hidden_count()}"
-    badge = marks(node)
-    return f"{status} {badge}" if badge else status
+def box_height(node):
+    return len(content(node)) + 2
 
 
-def _box_width(node):
-    return max(12, min(22, max(len(node.name) + 6, len(_graph_status(node)) + 4)))
-
-
-def graph_width(roots):
-    widths = [_subtree_width(r) for r in roots]
-    return sum(widths) + GRAPH_GAP * 2 * max(0, len(widths) - 1) + 2
-
-
-def _subtree_width(node):
-    kids = node.shown_children()
-    own = _box_width(node)
-    if not kids:
-        return own
-    return max(own, sum(_subtree_width(c) for c in kids) + GRAPH_GAP * (len(kids) - 1))
-
-
-def render_graph(roots, width):
-    total = graph_width(roots)
-    canvas, boxes = Canvas(max(width, total)), {}
-
-    def place(node, x0, depth):
-        sw = _subtree_width(node)
-        bw = _box_width(node)
-        bx = x0 + (sw - bw) // 2
-        y = depth * GRAPH_LEVEL
-        _graph_box(canvas, node, y, bx, bw)
-        boxes[node.key] = (y, y + 3, bx, bx + bw - 1)
-        center = bx + bw // 2
-        kids = node.shown_children()
-        if not kids:
-            return center
-        kids_w = sum(_subtree_width(c) for c in kids) + GRAPH_GAP * (len(kids) - 1)
-        cx = x0 + (sw - kids_w) // 2
-        centers = []
-        for child in kids:
-            centers.append(place(child, cx, depth + 1))
-            cx += _subtree_width(child) + GRAPH_GAP
-        canvas.put(y + 3, center, "┬", _border_style(node))
-        canvas.put(y + 4, center, "│", "rail")
-        bar = y + 5
-        lo, hi = min(centers + [center]), max(centers + [center])
-        canvas.put(bar, lo, "─" * (hi - lo + 1), "rail")
-        for c in centers:
-            canvas.put(bar, c, "┬", "rail")
-        if len(centers) == 1 and centers[0] == center:
-            canvas.put(bar, center, "│", "rail")
-        else:
-            canvas.put(bar, lo, "┌" if lo in centers else "└", "rail")
-            canvas.put(bar, hi, "┐" if hi in centers else "┘", "rail")
-            canvas.put(bar, center, "┼" if center in centers else "┴", "rail")
-        for child, c in zip(kids, centers):
-            canvas.put(boxes[child.key][0], c, "┴", _border_style(child))
-            step = 1 if c >= center else -1
-            path = [(y + 3, center), (y + 4, center)]
-            path += [(bar, bx_) for bx_ in range(center, c + step, step)]
-            canvas.edges.append((child.key, path + [(boxes[child.key][0], c)]))
-        return center
-
-    x = 1 + max(0, (canvas.width - total) // 2)
-    for root in roots:
-        place(root, x, 0)
-        x += _subtree_width(root) + GRAPH_GAP * 2
-    return canvas, boxes
-
-
-def _graph_box(canvas, node, y, x, w):
+def draw_box(canvas, node, y, x, w, spark=None, tee_top=None, tee_bottom=None):
+    tl, h, tr, side, bl, br, tb, tt = BORDERS.get(node.kind, ROUND_BOX)
     style = _border_style(node)
     inner = w - 2
-    canvas.put(y, x, "╭" + "─" * inner + "╮", style)
-    icon, icon_style = node.icon
-    name = _fit(node.name, inner - 4)
-    label_x = x + 1 + (inner - len(name) - 2) // 2
-    canvas.put(y + 1, x, "│" + " " * inner + "│", style)
-    canvas.put(y + 1, label_x, icon, icon_style)
-    canvas.put(y + 1, label_x + 2, name, "selname" if node.selected else "name")
-    status = _fit(_graph_status(node), inner)
-    canvas.put(y + 2, x, "│" + " " * inner + "│", style)
-    canvas.put(y + 2, x + 1 + (inner - len(status)) // 2, status,
-               "needs" if node.needs or node.flag else "status:" + node.status)
-    canvas.put(y + 3, x, "╰" + "─" * inner + "╯", style)
+    lines = content(node, spark)
+    canvas.put(y, x, tl + h * inner + tr, style)
+    for i, (text, text_style) in enumerate(lines):
+        row = y + 1 + i
+        canvas.put(row, x, side + " " * inner + side, style)
+        if i == 0 and node.kind not in ("unit", "seat"):
+            glyph = text[0]
+            canvas.put(row, x + 2, glyph, "status:" + node.status)
+            canvas.put(row, x + 4, fit(text[2:], inner - 3), text_style)
+        else:
+            canvas.put(row, x + 2, fit(text, inner - 2), text_style)
+    bottom = y + 1 + len(lines)
+    canvas.put(bottom, x, bl + h * inner + br, style)
+    if tee_top is not None:
+        canvas.put(y, tee_top, tt, style)
+    if tee_bottom is not None:
+        canvas.put(bottom, tee_bottom, tb, style)
+    return bottom
+
+
+def spoke_width(spokes, width):
+    longest = max((len(s.name) + 6 for s in spokes), default=SPOKE_MIN)
+    return max(10, min(max(SPOKE_MIN, min(SPOKE_MAX, longest)), width - GUTTER - 1))
+
+
+def per_row(spokes, width):
+    bw = spoke_width(spokes, width)
+    return max(1, (width - GUTTER + GAP) // (bw + GAP))
+
+
+def render_level(hub, spokes, width, spark=None):
+    """Hub box over its spokes. One row of spokes fans out centered under the hub; more wrap into
+    left-aligned rows fed by a trunk down the left gutter. Returns (canvas, boxes: key -> (y0, y1, x0, x1))."""
+    spark = spark or {}
+    canvas, boxes = Canvas(width), {}
+    bw = spoke_width(spokes, width)
+    n = per_row(spokes, width)
+    rows = [spokes[i:i + n] for i in range(0, len(spokes), n)]
+    hub_w = min(width - 2, HUB_MAX, max(HUB_MIN, len(hub.name) + 8, len(hub.detail or "") + 6))
+    single = len(rows) <= 1
+    if single:
+        row_w = len(spokes) * bw + GAP * max(0, len(spokes) - 1)
+        span = max(row_w, hub_w)
+        left = max(0, (width - span) // 2)
+        hub_x = left + (span - hub_w) // 2
+        trunk = hub_x + hub_w // 2
+        first_x = left + (span - row_w) // 2
+    else:
+        hub_x, trunk, first_x = 0, 1, GUTTER
+    hub_bottom = draw_box(canvas, hub, 0, hub_x, hub_w, spark.get(hub.key),
+                          tee_bottom=trunk if spokes else None)
+    boxes[hub.key] = (0, hub_bottom, hub_x, hub_x + hub_w - 1)
+    if not spokes:
+        return canvas, boxes
+    canvas.put(hub_bottom + 1, trunk, "│", "rail")
+    y = hub_bottom + 2  # first bus line
+    trunk_path = [(hub_bottom, trunk), (hub_bottom + 1, trunk)]
+    for r, row in enumerate(rows):
+        centers = [first_x + i * (bw + GAP) + bw // 2 for i in range(len(row))]
+        lo, hi = min(centers + [trunk]), max(centers + [trunk])
+        canvas.put(y, lo, "─" * (hi - lo + 1), "rail")
+        for c in centers:
+            canvas.put(y, c, "┬", "rail")
+        last_row = r == len(rows) - 1
+        if single:
+            if len(centers) == 1 and centers[0] == trunk:
+                canvas.put(y, trunk, "│", "rail")
+            else:
+                canvas.put(y, lo, "┌" if lo in centers else "└", "rail")
+                canvas.put(y, hi, "┐" if hi in centers else "┘", "rail")
+                canvas.put(y, trunk, "┼" if trunk in centers else "┴", "rail")
+        else:
+            canvas.put(y, trunk, "└" if last_row else "├", "rail")
+            canvas.put(y, hi, "┐", "rail")
+        height = 0
+        for node, c in zip(row, centers):
+            x = c - bw // 2
+            bottom = draw_box(canvas, node, y + 1, x, bw, spark.get(node.key), tee_top=c)
+            boxes[node.key] = (y + 1, bottom, x, x + bw - 1)
+            height = max(height, bottom - y)
+            step = 1 if c >= trunk else -1
+            path = trunk_path + [(y, bx) for bx in range(trunk, c + step, step)] + [(y + 1, c)]
+            canvas.edges.append((node.key, path))
+        if not last_row:
+            for ry in range(y + 1, y + height + 1):
+                canvas.put(ry, trunk, "│", "rail")
+            trunk_path = trunk_path + [(ry, trunk) for ry in range(y, y + height + 1)]
+        y += height + 1
+    return canvas, boxes
 
 
 # ---- live edges ------------------------------------------------------------
@@ -361,7 +270,7 @@ PULSE_LENGTH = 2
 
 
 def animate_edges(canvas, active, frame):
-    """Light up the edges into `active` child keys; a pulse runs parent -> child.
+    """Light up the edges into `active` spoke keys; a pulse runs hub -> spoke.
 
     Edge cells take the "flow" style; every PULSE_PERIOD cells a short run
     turns heavy in "pulse" style, shifted one cell per frame.
@@ -376,53 +285,7 @@ def animate_edges(canvas, active, frame):
     for (y, x), pulse in lit.items():
         if 0 <= y < len(canvas.rows) and 0 <= x < canvas.width:
             ch = canvas.rows[y][x][0]
-            if ch == " ":
+            if ch == " " or canvas.rows[y][x][1] not in ("rail", "flow", "pulse"):
                 continue
             canvas.rows[y][x] = [ch.translate(HEAVY), "pulse"] if pulse else [ch, "flow"]
     return bool(lit)
-
-
-# ---- activity plot ---------------------------------------------------------
-
-
-def render_activity(lanes, width, window_text, spark):
-    """One row per lane: status, name, and an activity sparkline.
-
-    `lanes` is [(node, counts or None)]: None means no history for that agent.
-    `spark(counts, peak)` turns counts into characters; one peak is shared by
-    every lane so their heights compare. Returns the canvas and lane boxes.
-    """
-    canvas, boxes = Canvas(width), {}
-    canvas.put(0, 1, "ACTIVITY", "accent")
-    hint = f"last {window_text}  [ ]"
-    canvas.put(0, max(10, width - len(hint) - 1), hint, "dim")
-    name_w, spark_x, spark_w = _activity_columns(lanes, width)
-    peak = max([max(c) for _, c in lanes if c] + [0])
-    for i, (node, counts) in enumerate(lanes):
-        y = 1 + i
-        glyph, _ = STATUS[node.status]
-        canvas.put(y, 1, glyph, "status:" + node.status)
-        canvas.put(y, 3, _fit(node.name, name_w), "selname" if node.selected else "name")
-        if counts is None:
-            canvas.put(y, spark_x, _fit("no history yet", spark_w), "dim")
-        elif spark_w:
-            canvas.put(y, spark_x, spark(counts[-spark_w:], peak), node.icon[1])
-        boxes[node.key] = (y, y, 0, width - 1)
-    axis = 1 + len(lanes)
-    if spark_w >= 10:
-        canvas.put(axis, spark_x, "-" + window_text, "dim")
-        canvas.put(axis, spark_x + spark_w - 3, "now", "dim")
-    return canvas, boxes
-
-
-def _activity_columns(lanes, width):
-    """(name width, sparkline x, sparkline width) for render_activity."""
-    names = [len(node.name) for node, _ in lanes] or [4]
-    name_w = max(4, min(max(names), 14, max(6, width // 4)))
-    spark_x = 3 + name_w + 1
-    return name_w, spark_x, max(0, width - spark_x - 1)
-
-
-def activity_spark_width(lanes, width):
-    """How many slices render_activity draws per lane at this width."""
-    return _activity_columns(lanes, width)[2]

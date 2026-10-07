@@ -14,7 +14,7 @@ Scripts: `$CLAUDE_PLUGIN_ROOT/skills/dispatch/scripts/` (thin wrappers over `lib
 begin.sh                 librarian + map tabs beside the seat, restore, then one dispatcher per Herdr session
 stop.sh                  stop it; unit workspaces untouched
 restore.sh [--list] [--unit <name>] [--forget <name>]   units a Herdr restart took
-map.sh [--unit <ws>] [--split]                           the map, here or beside the caller
+map.sh [--unit <ws>] [--split]                           the map (drill-down + live preview), here or beside the caller
 ../../../lib/dispatch.py status
 ```
 Env: `INTERVAL` (s, default 60), `HEARTBEAT` (min, 30), `SHORTCUT_INTERVAL` (s, 300),

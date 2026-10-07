@@ -1,7 +1,7 @@
 # ---
 # name: map.model
-# description: Pure tree for the prometheus map — a Herdr snapshot (workspace + pane tokens from source prometheus) plus a read-only dispatch.json overlay (outbox held counts, proposals, last_change ages) → NodeView roots. No I/O.
-# usage: imported (from map import model); model.build(snapshot, state, own_pane=..., unit=...) → Tree
+# description: Pure model for the prometheus map — a Herdr snapshot (workspace + pane tokens from source prometheus) plus a read-only dispatch.json overlay (outbox held counts, proposals, last_change ages) → a Tree of NodeViews with per-unit activity stats, and drill-down levels (system: seat → units · unit: PM → its agents · control: seat → librarian, runners, proposals, strays). No I/O.
+# usage: imported (from map import model); tree = model.build(snapshot, state, own_pane=...); model.level(tree, path) → (hub, spokes)
 # ---
 # Tree building adapted from Horchestra's agentmap.py (https://github.com/SimoneDaniotti/horchestra),
 # MIT License, Copyright (c) 2026 Simone Daniotti.
@@ -9,22 +9,29 @@ from __future__ import annotations
 
 import time
 
-from .views import STATUS, NodeView
+from .views import STATUS, NodeView, count_line
 
 TOP_ROLES = ("seat", "librarian")
 CHILD_ROLES = ("planner", "implementor", "reviewer")
 ROLE_ORDER = {r: i for i, r in enumerate(("seat", "librarian", "pm") + CHILD_ROLES)}
+CONTROL = "control"  # path element for the seat's own level
 
 
 class Tree:
     def __init__(self):
-        self.roots = []
         self.nodes = {}  # key -> NodeView
         self.raw = {}  # key -> source dict (pane, workspace, proposal, ...)
         self.panes = []  # agent panes shown, for activity / watching
+        self.seat = None  # seat pane key
+        self.units = []  # unit node keys, in display order
+        self.pm = {}  # unit key -> PM pane key
+        self.workers = {}  # unit key -> [pane keys under the PM]
+        self.control = []  # keys on the seat's level
         self.proposals = []
         self.dispatcher = "stopped"
         self.held = 0
+        self.counts = {}  # agent status -> n, over every shown agent
+        self.needs = 0
 
 
 def tokens(item):
@@ -73,34 +80,27 @@ def agent_name(pane, tab_label):
     return role
 
 
-def _order(node, raw):
-    role = tokens(raw.get(node.key)).get("role")
-    return (ROLE_ORDER.get(role, 99), node.name.lower(), node.key)
-
-
-def build(snap, state=None, own_pane="", unit=None, here_tab="", now=None, own_workspace=""):
-    """Snapshot + dispatcher state → Tree. `unit` (a workspace id) scopes it to that unit."""
+def build(snap, state=None, own_pane="", here_tab="", now=None, own_workspace=""):
+    """Snapshot + dispatcher state → Tree."""
     now = time.time() if now is None else now
     state = state if isinstance(state, dict) else {}
     outbox = state.get("outbox") if isinstance(state.get("outbox"), dict) else {}
     last_change = state.get("last_change") if isinstance(state.get("last_change"), dict) else {}
-    proposals = [p for p in state.get("proposals") or [] if isinstance(p, dict)]
     tree = Tree()
-    tree.proposals = proposals
+    tree.proposals = [p for p in state.get("proposals") or [] if isinstance(p, dict)]
 
     workspaces = [w for w in snap.get("workspaces") or [] if isinstance(w, dict)]
     ws_by_id = {w.get("workspace_id"): w for w in workspaces}
     tab_label = {t.get("tab_id"): t.get("label") or "" for t in snap.get("tabs") or [] if isinstance(t, dict)}
     units = {w["workspace_id"]: w for w in workspaces if tokens(w).get("unit")}
 
+    def role_of(p):
+        return tokens(p).get("role")
+
     def add(node, raw):
         tree.nodes[node.key] = node
         tree.raw[node.key] = raw
         return node
-
-    def attach(parent, child):
-        child.parent = parent
-        parent.children.append(child)
 
     panes = []
     for p in snap.get("panes") or []:
@@ -111,21 +111,6 @@ def build(snap, state=None, own_pane="", unit=None, here_tab="", now=None, own_w
             continue
         if t.get("role") or (p.get("agent") and p.get("workspace_id") in units):
             panes.append(p)
-    tree.panes = panes
-
-    agent_nodes = {}
-    for p in panes:
-        needs = needs_you(p)
-        held = outbox.get(p["pane_id"])
-        node = NodeView(p["pane_id"], agent_name(p, tab_label.get(p.get("tab_id"))),
-                        p.get("agent") or "shell", p.get("agent_status"), detail_of(p, needs),
-                        needs=needs, here=bool(here_tab) and p.get("tab_id") == here_tab,
-                        held=len(held) if isinstance(held, list) else 0)
-        agent_nodes[p["pane_id"]] = add(node, p)
-    tree.held = sum(n.held for n in agent_nodes.values())
-
-    def role_of(p):
-        return tokens(p).get("role")
 
     # control workspace: the map's own when it holds a seat, else the running dispatcher's, else a seat's.
     # Another instance's control roles (a trial beside the real one) are left out.
@@ -138,133 +123,181 @@ def build(snap, state=None, own_pane="", unit=None, here_tab="", now=None, own_w
     if control is not None:
         cid = control.get("workspace_id")
         panes = [p for p in panes if role_of(p) not in TOP_ROLES + ("runner",) or p.get("workspace_id") == cid]
-        tree.panes = panes
-        keep = {p["pane_id"] for p in panes}
-        for k in [k for k in agent_nodes if k not in keep]:
-            del agent_nodes[k], tree.nodes[k], tree.raw[k]
-        tree.held = sum(n.held for n in agent_nodes.values())
+    tree.panes = panes
     tree.dispatcher = "running" if tokens(control).get("dispatcher") == "running" else "stopped"
 
-    def unit_node(wid):
+    for p in panes:
+        needs = needs_you(p)
+        held = outbox.get(p["pane_id"])
+        kind = "seat" if role_of(p) == "seat" else (p.get("agent") or "shell")
+        node = NodeView(p["pane_id"], agent_name(p, tab_label.get(p.get("tab_id"))), kind,
+                        p.get("agent_status"), detail_of(p, needs), needs=needs,
+                        here=bool(here_tab) and p.get("tab_id") == here_tab,
+                        held=len(held) if isinstance(held, list) else 0)
+        add(node, p)
+        tree.counts[node.status] = tree.counts.get(node.status, 0) + 1
+        tree.needs += needs
+        tree.held += node.held
+
+    def order(p):
+        return (ROLE_ORDER.get(role_of(p), 99), tree.nodes[p["pane_id"]].name.lower(), p["pane_id"])
+
+    seat = next((p for p in sorted(panes, key=order) if role_of(p) == "seat"), None)
+    tree.seat = seat["pane_id"] if seat else None
+
+    for wid in sorted(units, key=lambda w: (tokens(units[w]).get("unit") or "", w)):
         w = units[wid]
         t = tokens(w)
-        label = " · ".join(v for v in (t.get("unit"), t.get("kind"), t.get("stage")) if v)
-        detail = " / ".join(v for v in (", ".join(csv(t.get("prs"))), ", ".join(csv(t.get("stories")))) if v)
+        key = "unit:" + wid
+        mine = sorted((p for p in panes if p.get("workspace_id") == wid and role_of(p) not in TOP_ROLES),
+                      key=order)
+        pm = next((p for p in mine if role_of(p) == "pm"), None)
+        agents = [tree.nodes[p["pane_id"]] for p in mine]
+        counts = {}
+        for a in agents:
+            counts[a.status] = counts.get(a.status, 0) + 1
+        status = "working" if counts.get("working") else "blocked" if counts.get("blocked") else \
+            "idle" if agents else "unknown"
+        node = NodeView(key, t.get("unit"), "unit", status,
+                        " / ".join(v for v in (", ".join(csv(t.get("prs"))), ", ".join(csv(t.get("stories"))))
+                                   if v))
+        node.sub = " · ".join(v for v in (t.get("kind"), t.get("stage")) if v)
+        node.counts = counts
+        node.flag = sum(a.needs for a in agents)
+        node.held = sum(a.held for a in agents)
         changed = last_change.get(t.get("unit"))
         if isinstance(changed, (int, float)):
-            detail = (detail + " · " if detail else "") + ago(now - changed) + " ago"
-        status = w.get("agent_status")
-        node = add(NodeView("unit:" + wid, label, "unit", status if status in STATUS else "unknown", detail,
-                            here=False), w)
-        mine = sorted((p for p in panes if p.get("workspace_id") == wid and role_of(p) not in TOP_ROLES),
-                      key=lambda p: _order(agent_nodes[p["pane_id"]], tree.raw))
-        pm = next((p for p in mine if role_of(p) == "pm"), None)
-        lead = agent_nodes[pm["pane_id"]] if pm else node
-        if pm:
-            attach(node, lead)
-        for p in mine:
-            if p is pm:
-                continue
-            attach(lead if role_of(p) in CHILD_ROLES else node, agent_nodes[p["pane_id"]])
-        return node
+            node.age = ago(now - changed)
+        add(node, w)
+        tree.units.append(key)
+        tree.pm[key] = pm["pane_id"] if pm else None
+        tree.workers[key] = [p["pane_id"] for p in mine if p is not pm]
 
-    if unit:
-        if unit in units:
-            tree.roots = [unit_node(unit)]
-    else:
-        root = add(NodeView("root", "prometheus", "root", "idle"), {})
-        if proposals:
-            group = add(NodeView("proposals", f"proposals ({len(proposals)})", "group", "waiting",
-                                 "waiting on the operator", needs=True), {"proposals": proposals})
-            attach(root, group)
-            for prop in proposals:
-                pid = prop.get("pid") or prop.get("id") or "?"
-                what = " · ".join(v for v in (prop.get("kind"), prop.get("project")) if v)
-                subj = ", ".join((prop.get("prs") or []) + (prop.get("stories") or []))
-                node = NodeView("proposal:" + str(pid), f"{pid} {prop.get('name') or prop.get('id') or ''}".strip(),
-                                "proposal", "waiting", " — ".join(v for v in (what, subj) if v), needs=True)
-                attach(group, add(node, prop))
-        top = sorted((agent_nodes[p["pane_id"]] for p in panes if role_of(p) in TOP_ROLES),
-                     key=lambda n: _order(n, tree.raw))
-        seats = [n for n in top if tokens(tree.raw[n.key]).get("role") == "seat"]
-        for n in seats:
-            attach(root, n)
-        # quick-work runners hang under the seat that opened them
-        runners = sorted((agent_nodes[p["pane_id"]] for p in panes if role_of(p) == "runner"),
-                         key=lambda n: n.name)
-        for n in runners:
-            attach(seats[0] if seats else root, n)
-        detail = f"{len(proposals)} proposal{'s' * (len(proposals) != 1)} · {tree.held} held"
-        attach(root, add(NodeView("dispatcher", "dispatcher", "dispatcher", tree.dispatcher, detail),
-                         control or {}))
-        for n in top:
-            if n not in seats:
-                attach(root, n)
-        for wid in sorted(units, key=lambda w: (tokens(units[w]).get("unit") or "", w)):
-            attach(root, unit_node(wid))
-        stray = [agent_nodes[p["pane_id"]] for p in panes
-                 if p.get("workspace_id") not in units and role_of(p) not in TOP_ROLES + ("runner",)]
-        if stray:
-            group = add(NodeView("unassigned", "unassigned", "group", "unknown",
-                                 f"{len(stray)} pane{'s' * (len(stray) != 1)} without a unit"), {})
-            attach(root, group)
-            for n in sorted(stray, key=lambda n: _order(n, tree.raw)):
-                attach(group, n)
-        working = any(n.status == "working" for n in agent_nodes.values())
-        root.status = "working" if working else "idle"
-        n = len(agent_nodes)
-        root.detail = f"{len(units)} unit{'s' * (len(units) != 1)} · {n} agent{'s' * (n != 1)}"
-        tree.roots = [root]
+    for p in sorted(panes, key=order):
+        role = role_of(p)
+        if p is seat:
+            continue
+        if role in TOP_ROLES + ("runner",) or p.get("workspace_id") not in units:
+            tree.control.append(p["pane_id"])
+    for prop in tree.proposals:
+        pid = prop.get("pid") or prop.get("id") or "?"
+        what = " · ".join(v for v in (prop.get("kind"), prop.get("project")) if v)
+        subj = ", ".join((prop.get("prs") or []) + (prop.get("stories") or []))
+        node = NodeView("proposal:" + str(pid), f"{pid} {prop.get('name') or prop.get('id') or ''}".strip(),
+                        "proposal", "waiting", " — ".join(v for v in (what, subj) if v), needs=True)
+        add(node, prop)
+        tree.control.append(node.key)
 
-    for r in tree.roots:
-        _bubble(r)
+    if seat:
+        node = tree.nodes[tree.seat]
+        node.flag = sum(tree.nodes[k].needs for k in tree.control)
+        n = len(units)
+        node.sub = f"{n} unit{'s' * (n != 1)}"
+        node.detail = tokens(seat).get("status") or node.sub
     return tree
 
 
-def _bubble(node):
-    """Count needs-you descendants onto every ancestor (`flag`)."""
-    total = 0
-    for c in node.children:
-        total += _bubble(c) + (1 if c.needs and c.kind != "group" else 0)
-    node.flag = total
-    return total
+def seat_node(tree):
+    """The system hub: the seat, or a stand-in when no seat is running."""
+    if tree.seat:
+        return tree.nodes[tree.seat]
+    node = tree.nodes.get(CONTROL)
+    if node is None:
+        node = NodeView(CONTROL, "no seat", "seat", "unknown", "start one with launch.sh seat")
+        tree.nodes[CONTROL] = node
+        tree.raw[CONTROL] = {}
+    node.flag = sum(tree.nodes[k].needs for k in tree.control)
+    return node
 
 
-def visible_order(roots):
-    out = []
+def level(tree, path):
+    """(hub, spokes) for a breadcrumb path: [] system · [CONTROL] the seat's level · ["unit:<ws>"] a unit."""
+    if not path:
+        return seat_node(tree), [tree.nodes[k] for k in tree.units]
+    top = path[-1]
+    if top == CONTROL:
+        return seat_node(tree), [tree.nodes[k] for k in tree.control]
+    if top in tree.units:
+        pm = tree.pm.get(top)
+        hub = tree.nodes[pm] if pm else tree.nodes[top]
+        return hub, [tree.nodes[k] for k in tree.workers[top]]
+    return None, []
 
-    def walk(node):
-        out.append(node)
-        for child in node.shown_children():
-            walk(child)
 
-    for root in roots:
-        walk(root)
-    return out
+def drill_path(tree, key):
+    """The path that drilling into `key` opens, or None for a leaf."""
+    if key in tree.units:
+        return key
+    if key == CONTROL or (key and key == tree.seat):
+        return CONTROL
+    return None
 
 
-def to_text(roots):
-    """The tree as plain indented text (for --dump and tests)."""
-    lines = []
+def preview_target(tree, key):
+    """The pane a node previews: an agent itself, a unit its PM, the seat itself."""
+    if key in tree.units:
+        return tree.pm.get(key)
+    if key in tree.nodes and key not in (CONTROL,) and not key.startswith("proposal:"):
+        return key
+    return None
 
-    def walk(node, prefix, last, depth):
-        lead = "" if depth == 0 else prefix + ("└─ " if last else "├─ ")
+
+def unit_of(tree, key):
+    return next((u for u in tree.units if key == tree.pm.get(u) or key in tree.workers[u]), None)
+
+
+def to_text(tree):
+    """Every level as plain indented text (for --dump and tests)."""
+    lines = [header_text(tree)]
+
+    def row(node, lead):
         glyph, word = STATUS[node.status]
-        bits = [f"{lead}{glyph} {node.name} [{word}]"]
-        if node.needs:
-            bits.append("! needs you")
-        if node.flag:
-            bits.append(f"!{node.flag} below")
+        if node.kind == "unit":
+            bits = [f"{lead}◼ {node.name}"]
+            if node.sub:
+                bits.append(f"({node.sub})")
+            if node.counts:
+                bits.append(count_line(node.counts))
+        else:
+            bits = [f"{lead}{glyph} {node.name} [{word}]"]
+            if node.needs:
+                bits.append("! needs you")
+        if node.flag and not node.needs:
+            bits.append(f"!{node.flag}")
         if node.held:
-            bits.append(f"✉{node.held} held")
+            bits.append(f"✉{node.held}")
+        if node.age:
+            bits.append(f"{node.age} ago")
         if node.detail:
             bits.append("— " + node.detail)
         lines.append("  ".join(bits))
-        kids = node.children
-        child_prefix = "" if depth == 0 else prefix + ("   " if last else "│  ")
-        for i, c in enumerate(kids):
-            walk(c, child_prefix, i == len(kids) - 1, depth + 1)
 
-    for r in roots:
-        walk(r, "", True, 0)
+    def block(hub, spokes, title=None):
+        if title:
+            lines.append("")
+            lines.append(title)
+        row(hub, "")
+        for i, s in enumerate(spokes):
+            row(s, "└─ " if i == len(spokes) - 1 else "├─ ")
+
+    block(*level(tree, []))
+    hub, spokes = level(tree, [CONTROL])
+    if spokes:
+        block(hub, spokes, "[control]")
+    for u in tree.units:
+        block(*level(tree, [u]), f"[{tree.nodes[u].name}]")
     return "\n".join(lines)
+
+
+def header_text(tree):
+    agents = sum(tree.counts.values())
+    bits = [f"dispatcher {tree.dispatcher}", f"{agents} agent{'s' * (agents != 1)}"]
+    if tree.counts:
+        bits.append(count_line(tree.counts))
+    if tree.needs:
+        bits.append(f"!{tree.needs}")
+    if tree.proposals:
+        bits.append(f"?{len(tree.proposals)}")
+    if tree.held:
+        bits.append(f"✉{tree.held}")
+    return " · ".join(bits)

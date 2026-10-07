@@ -1,6 +1,6 @@
 # ---
 # name: map.app
-# description: The prometheus map's curses front end — header counts, cards / graph / compact views with live working edges, details box, activity plot, key + mouse input, Enter to focus an agent / unit; redraws on Herdr events (herdr.Watcher) with a 2s poll fallback. Also --dump (tree as text, no curses) and --split (open the map in a ~32-column pane right of the caller).
+# description: The prometheus map's curses front end — the primary view and navigation: header stats top-right (dispatcher, agents, status counts, needs-you, proposals, held), one drill-down level at a time (seat → units · unit PM → its agents · seat → control), a live preview of the selected agent (a unit previews its PM) mirrored from `herdr pane read --ansi`, and an interact mode that forwards keystrokes to the previewed pane. Redraws on Herdr events (herdr.Watcher) with a poll fallback. Also --dump (every level as text, no curses) and --split (map only, ~32 columns right of the caller).
 # usage: python3 lib/map [--unit <workspace_id>] [--dump | --split]
 # ---
 # Ported from Horchestra's agentmap.py (https://github.com/SimoneDaniotti/horchestra),
@@ -12,7 +12,6 @@ import curses
 import json
 import locale
 import os
-import re
 import shlex
 import sys
 import time
@@ -22,23 +21,29 @@ if LIB not in sys.path:
     sys.path.insert(0, LIB)
 import herdr  # noqa: E402
 
-from . import activity, model, views  # noqa: E402
+from . import activity, model, screen, views  # noqa: E402
 
 POLL_SECONDS = 2.0
 DEBOUNCE_SECONDS = 0.15
-HEADER_ROWS = 4
-FOOTER_ROWS = 2
-DETAILS_ROWS = 8
-GRAPH_MIN_WIDTH = 60
-MODES = ["auto", "cards", "graph", "compact"]
-FRAME_SECONDS = 0.12  # edge animation step
-MAP_MIN_ROWS = 8  # the activity plot never squeezes the map below this
-MIN_LANES = 2
+FRAME_SECONDS = 0.12  # edge animation step and input timeout
+PREVIEW_SECONDS = 0.25
+INTERACT_SECONDS = 0.1
+HEADER_ROWS = 2
+FOOTER_ROWS = 1
+SIDE_BY_SIDE = 110  # columns from which the preview sits right of the map
+MAP_MIN_WIDTH = 48
+MAP_MIN_ROWS = 10
 NOTICE_SECONDS = 6.0
 SPLIT_WIDTH = 32
-
-
-# ---- data -----------------------------------------------------------------
+SPARK_WINDOW = 600
+CTRL_RBRACKET = 29
+SPECIAL_KEYS = {
+    curses.KEY_UP: "up", curses.KEY_DOWN: "down", curses.KEY_LEFT: "left", curses.KEY_RIGHT: "right",
+    curses.KEY_BACKSPACE: "backspace", curses.KEY_ENTER: "enter", curses.KEY_DC: "delete",
+    curses.KEY_HOME: "home", curses.KEY_END: "end", curses.KEY_PPAGE: "pageup", curses.KEY_NPAGE: "pagedown",
+    curses.KEY_BTAB: "shift+tab",
+}
+CONTROL_CHARS = {"\n": "enter", "\r": "enter", "\t": "tab", "\x1b": "esc", "\x7f": "backspace", "\x08": "backspace"}
 
 
 def state_dir():
@@ -61,63 +66,24 @@ def animation_enabled():
 
 def help_lines():
     return [
-        ("KEYS IN THIS MAP", None),
-        ("w s  ↑ ↓  k j", "move selection"),
-        ("a d  ← →  h l", "parent / child"),
-        ("g G  Home End", "first / last"),
-        ("Enter, 2×click", "focus agent's pane / unit's space"),
-        ("click, wheel", "select / move"),
-        ("Space", "fold / unfold"),
-        ("v", "cycle views: auto cards graph compact"),
-        ("i", "details box"),
-        ("t", "activity plot"),
-        ("[ ]", "activity: shorter / longer"),
+        ("MAP", None),
+        ("arrows  hjkl", "move between nodes"),
+        ("Tab", "next node"),
+        ("Enter, 2×click", "drill into a unit / the seat"),
+        ("Esc  Bksp  u", "back up a level"),
+        ("i, click preview", "interact with the previewed agent"),
+        ("ctrl-]", "leave interact"),
+        ("o", "open the agent's own tab"),
+        ("p", "preview on / off"),
         ("r", "refresh"),
-        ("q", "close this map"),
-        ("?", "show / hide help"),
+        ("q", "quit"),
         ("", None),
         ("MARKS", None),
         ("! / !N", "needs you / N below"),
-        ("✉N", "N held in dispatcher outbox"),
-        ("▌", "in this map's tab"),
+        ("✉N", "held in dispatcher outbox"),
+        ("?N", "proposals waiting"),
+        ("╔═╗ ┏━┓ ╭─╮", "unit · seat · agent"),
     ]
-
-
-CHROME = re.compile(r"^(❯|>|⏵|\?|esc|ctrl|shift|tab to|↑|↓|─|━|═|\$|%)", re.I)
-SHELL_PROMPT = re.compile(r"^\S+@\S+.*[%$#]\s*$")
-
-
-def last_message(text):
-    """Best-effort last thing the agent said, from its recent screen."""
-    lines = [l.strip() for l in text.splitlines() if l.strip()]
-    for line in reversed(lines):
-        if line[:1] in ("⏺", "•", "●") and len(line) > 2:
-            return line[1:].strip()
-    for line in reversed(lines):
-        letters = sum(ch.isalnum() for ch in line)
-        if letters >= 8 and letters / max(1, len(line)) > 0.5 and not CHROME.match(line) \
-                and not SHELL_PROMPT.match(line) and "tokens" not in line.lower():
-            return line
-    return ""
-
-
-def wrap(text, width, lines):
-    words, out, cur = text.split(), [], ""
-    for word in words:
-        if not cur:
-            cur = word if len(word) <= width else word[: max(1, width - 1)] + "…"
-        elif len(cur) + len(word) + 1 <= width:
-            cur = f"{cur} {word}"
-        else:
-            out.append(cur)
-            cur = word[:width]
-        if len(out) == lines:
-            break
-    if cur and len(out) < lines:
-        out.append(cur)
-    if len(out) == lines and len(" ".join(out)) < len(text):
-        out[-1] = out[-1][: max(0, width - 1)] + "…"
-    return out
 
 
 def mark_view(pane_id, on):
@@ -131,42 +97,68 @@ def mark_view(pane_id, on):
         pass
 
 
-# ---- app --------------------------------------------------------------------
+def wrap(text, width, lines):
+    words, out, cur = text.split(), [], ""
+    for word in words:
+        if not cur:
+            cur = word[:width]
+        elif len(cur) + len(word) + 1 <= width:
+            cur = f"{cur} {word}"
+        else:
+            out.append(cur)
+            cur = word[:width]
+        if len(out) == lines:
+            break
+    if cur and len(out) < lines:
+        out.append(cur)
+    return out
+
+
+def runs(row):
+    """[(column, text, attr)] for a parsed screen row; a wide character's empty second cell is skipped."""
+    out = []
+    for col, (ch, cell) in enumerate(row):
+        if ch == "":
+            continue
+        if out and out[-1][2] == cell and out[-1][0] + out[-1][3] == col:
+            out[-1][1] += ch
+        else:
+            out.append([col, ch, cell, 0])
+        out[-1][3] += 2 if col + 1 < len(row) and row[col + 1][0] == "" else 1
+    return [(c, t, a) for c, t, a, _ in out]
 
 
 class App:
-    def __init__(self, screen, unit=None):
-        self.screen = screen
-        self.unit = unit
+    def __init__(self, screen_, unit=None, preview=True):
+        self.screen = screen_
         self.show_help = False
         self.own_pane = os.environ.get("HERDR_PANE_ID", "")
         self.tab_id = os.environ.get("HERDR_TAB_ID", "")
-        self.label = ""
         self.tree = model.Tree()
         self.tabs = {}
-        self.order = []
-        self.selected = None
-        self.collapsed = set()
-        self.mode = "auto"
-        self.show_details = True
+        self.path = ["unit:" + unit] if unit else []
+        self.selection = {}  # tuple(path) -> selected key
+        self.hub, self.spokes = None, []
+        self.boxes = {}
+        self.preview_on = preview
+        self.interact = None  # pane id keys go to
+        self.typed = []
+        self.preview = {"key": None, "at": 0.0, "rows": [], "clipped": False}
+        self.preview_rect = None  # (y0, x0, y1, x1)
+        self.pairs = {}
         self.scroll_y = 0
-        self.scroll_x = 0
         self.hits = []  # [(y0, y1, x0, x1, key)] in screen coordinates
         self.error = ""
         self.last_refresh = 0.0
         self.last_click = (0.0, None)
         self.since = {}  # pane_id -> (status, monotonic time first seen)
-        self.messages = {}  # pane_id -> (monotonic time, text)
         self.styles = {}
         self.watcher = herdr.Watcher()
         self.activity = activity.Activity()
-        self.show_activity = True
-        self.window = 1  # index into activity.WINDOWS
         self.animate = animation_enabled()
         self.animating = False
         self.last_draw = 0.0
         self.notice = (0.0, "")
-        self._lanes_cache = (None, [])
 
     # ---- data ---------------------------------------------------------------
 
@@ -182,14 +174,8 @@ class App:
         if me:
             self.tab_id = me.get("tab_id") or self.tab_id
         self.tabs = {t.get("tab_id"): t.get("label") or "" for t in snap.get("tabs") or []}
-        self.tree = model.build(snap, load_state(), own_pane=self.own_pane, unit=self.unit,
-                                own_workspace=os.environ.get("HERDR_WORKSPACE_ID", ""),
-                                here_tab=self.tab_id)
-        if self.unit:
-            ws = next((w for w in snap.get("workspaces") or [] if w.get("workspace_id") == self.unit), {})
-            self.label = model.tokens(ws).get("unit") or ws.get("label") or self.unit
-        else:
-            self.label = f"dispatcher {self.tree.dispatcher}"
+        self.tree = model.build(snap, load_state(), own_pane=self.own_pane,
+                                own_workspace=os.environ.get("HERDR_WORKSPACE_ID", ""), here_tab=self.tab_id)
         now = time.monotonic()
         for pane in self.tree.panes:
             key, status = pane.get("pane_id"), pane.get("agent_status")
@@ -199,57 +185,83 @@ class App:
         try:
             self.activity.update(self.tree.panes)
         except (OSError, ValueError, TypeError):
-            pass  # the plot is a nicety; never let it take the map down
-        self.messages.pop(self.selected, None)
+            pass  # the sparkline is a nicety; never let it take the map down
+        self.preview["at"] = 0.0
         self.rebuild()
 
     def rebuild(self):
-        for key, node in self.tree.nodes.items():
-            node.collapsed = key in self.collapsed
-            node.selected = key == self.selected
-        self.order = model.visible_order(self.tree.roots)
-        keys = [n.key for n in self.order]
-        if self.selected not in keys:
-            here = [n.key for n in self.order if n.here]
-            self.select((here or keys or [None])[0])
+        hub, spokes = model.level(self.tree, self.path)
+        while hub is None and self.path:
+            self.path.pop()  # the unit closed under us
+            hub, spokes = model.level(self.tree, self.path)
+        self.hub, self.spokes = hub, spokes
+        keys = [n.key for n in self.order()]
+        sel = self.selection.get(tuple(self.path))
+        if sel not in keys:
+            sel = spokes[0].key if spokes else hub.key
+        self.select(sel)
+        if self.interact and self.interact not in self.tree.nodes:
+            self.interact = None
+            self.flash("agent closed; interact ended")
+
+    def order(self):
+        return ([self.hub] if self.hub else []) + self.spokes
 
     def node(self, key):
-        return next((n for n in self.order if n.key == key), None)
+        return self.tree.nodes.get(key)
 
-    def is_agent(self, key):
-        return bool(key) and key in {p["pane_id"] for p in self.tree.panes}
+    def selected(self):
+        return self.selection.get(tuple(self.path))
 
-    def message_for(self, key):
-        cached = self.messages.get(key)
-        if cached and time.monotonic() - cached[0] < POLL_SECONDS:
-            return cached[1]
-        try:
-            text = last_message(herdr.read(key))
-        except Exception:
-            text = ""
-        self.messages[key] = (time.monotonic(), text)
-        return text
+    def select(self, key):
+        self.selection[tuple(self.path)] = key
+        for n in self.order():
+            n.selected = n.key == key
 
-    def lanes(self, width):
-        """[(node, counts or None)] for the activity plot: one lane per agent."""
-        window = activity.WINDOWS[self.window]
+    def sparks(self, width):
+        """Unit key -> a sparkline of its agents' activity over SPARK_WINDOW."""
+        if self.path:
+            return {}
+        count = max(4, views.spoke_width(self.spokes, width) - 4)
         now = time.time()
-        stamp = (window, width, int(now), id(self.tree), self.selected)
-        if self._lanes_cache[0] == stamp:
-            return self._lanes_cache[1]
-        nodes = [n for n in self.order if self.is_agent(n.key)]
-        count = views.activity_spark_width([(n, None) for n in nodes], width) or 1
-        out = []
-        for node in nodes:
-            if not self.activity.has_history(node.key):
-                out.append((node, None))
-                continue
-            out.append((node, activity.buckets(self.activity.times(node.key), now, window, count)))
-        self._lanes_cache = (stamp, out)
+        out = {}
+        for key in self.tree.units:
+            panes = [self.tree.pm.get(key)] + self.tree.workers[key]
+            times = [t for p in panes if p for t in self.activity.times(p)]
+            counts = activity.buckets(times, now, SPARK_WINDOW, count)
+            out[key] = activity.sparkline(counts, max(counts + [1]))
         return out
 
     def flash(self, text):
         self.notice = (time.monotonic(), text)
+
+    # ---- preview ------------------------------------------------------------
+
+    def preview_key(self):
+        if self.interact:
+            return self.interact
+        return model.preview_target(self.tree, self.selected())
+
+    def read_preview(self, width, height, force=False):
+        key = self.preview_key()
+        pv = self.preview
+        interval = INTERACT_SECONDS if self.interact else PREVIEW_SECONDS
+        now = time.monotonic()
+        if not force and key == pv["key"] and now - pv["at"] < interval and pv.get("size") == (width, height):
+            return
+        rows, clipped = [], False
+        if key:
+            try:
+                rows, clipped = screen.parse(herdr.read_ansi(key), width, height)
+            except herdr.HerdrError:
+                rows = []
+        pv.update(key=key, at=now, rows=rows, clipped=clipped, size=(width, height))
+
+    def preview_due(self):
+        if not self.preview_on or not self.preview_rect:
+            return False
+        interval = INTERACT_SECONDS if self.interact else PREVIEW_SECONDS
+        return self.preview_key() and time.monotonic() - self.preview["at"] >= interval
 
     # ---- drawing ------------------------------------------------------------
 
@@ -263,275 +275,314 @@ class App:
         except curses.error:
             pass
 
-    def effective_mode(self, width):
-        if self.mode != "auto":
-            return self.mode
-        if width >= GRAPH_MIN_WIDTH and views.graph_width(self.tree.roots) <= width:
-            return "graph"
-        return "cards"
+    def layout(self, h, w):
+        """(map rect, preview rect or None) as (y0, x0, y1, x1), end-exclusive."""
+        top, bottom = HEADER_ROWS, h - FOOTER_ROWS
+        if not self.preview_on or self.show_help:
+            return (top, 0, bottom, w), None
+        if w >= SIDE_BY_SIDE:
+            mw = max(MAP_MIN_WIDTH, int(w * 0.45))
+            return (top, 0, bottom, mw), (top, mw, bottom, w)
+        mh = max(MAP_MIN_ROWS, (bottom - top) // 2)
+        if bottom - top - mh < 6:
+            return (top, 0, bottom, w), None
+        return (top, 0, top + mh, w), (top + mh, 0, bottom, w)
 
     def draw(self):
         self.screen.erase()
         h, w = self.screen.getmaxyx()
         attr = self.styles
-        mode = self.effective_mode(w)
-
-        self.put(0, 1, "PROMETHEUS", curses.A_BOLD)
-        tag = f"[{mode}]" if self.mode == "auto" else f"[{mode}*]"
-        self.put(0, w - len(tag) - 1, tag, attr["dim"])
-        self.put(1, 1, self.label, attr["accent"] | curses.A_BOLD)
-        x = 1
-        agents = [n for n in self.order if self.is_agent(n.key)]
-        counts = {}
-        for node in agents:
-            counts[node.status] = counts.get(node.status, 0) + 1
-        needs = sum(1 for n in agents if n.needs)
-        badges = [(f"?{len(self.tree.proposals)}", "needs", self.tree.proposals),
-                  (f"!{needs}", "needs", needs), (f"✉{self.tree.held}", "accent", self.tree.held)]
-        for text, style, shown in badges:
-            if shown:
-                self.put(2, x, text, attr[style])
-                x += len(text) + 1
-        for status in ("blocked", "working", "done", "idle"):
-            if counts.get(status):
-                text = f"{views.STATUS[status][0]}{counts[status]}"
-                self.put(2, x, text, attr["status:" + status])
-                x += len(text) + 1
-        self.put(3, 0, "─" * w, attr["dim"])
-
-        details = DETAILS_ROWS if self.show_details and h >= HEADER_ROWS + FOOTER_ROWS + DETAILS_ROWS + 8 else 0
-        footer = FOOTER_ROWS if h > 12 else 0
-        lanes, plot = [], 0
-        if self.show_activity and self.order and not self.show_help and not self.error:
-            lanes = self.lanes(w)
-            spare = h - HEADER_ROWS - footer - details - MAP_MIN_ROWS - 3
-            if lanes and spare >= min(MIN_LANES, len(lanes)):
-                lanes = self._lane_window(lanes, spare)
-                plot = len(lanes) + 3
-            else:
-                lanes = []
-        top, bottom = HEADER_ROWS, h - footer - details - plot
-        view_h = max(0, bottom - top)
         self.hits = []
         self.animating = False
+        crumbs = ["PROMETHEUS"] + [("control" if p == model.CONTROL else self.node(p).name if self.node(p) else p)
+                                   for p in self.path]
+        self.put(0, 1, crumbs[0], curses.A_BOLD)
+        x = 1 + len(crumbs[0])
+        for c in crumbs[1:]:
+            self.put(0, x, " › ", attr["dim"])
+            self.put(0, x + 3, c, attr["accent"] | curses.A_BOLD)
+            x += 3 + len(c)
+        self.draw_stats(0, x + 2, w)
+        self.put(1, 0, "─" * w, attr["dim"])
 
+        map_rect, preview_rect = self.layout(h, w)
+        self.preview_rect = preview_rect
         if self.show_help:
-            details = 0
-            self.draw_help(top, h - footer, w)
+            self.draw_help(map_rect)
         elif self.error:
-            self.put(top, 1, "herdr unavailable, retrying…", attr["status:blocked"])
-            self.put(top + 1, 1, self.error, attr["dim"])
-        elif not self.order:
-            self.put(top, 1, f"no unit {self.unit}" if self.unit else "nothing to show", attr["dim"])
-        else:
-            renderer = {"cards": views.render_cards, "graph": views.render_graph,
-                        "compact": views.render_compact}[mode]
-            canvas, boxes = renderer(self.tree.roots, w)
-            if self.animate:
-                frame = int(time.monotonic() / FRAME_SECONDS)
-                working = {n.key for n in self.order if n.status == "working" and self.is_agent(n.key)}
-                self.animating = views.animate_edges(canvas, working, frame)
-            self.blit(canvas, boxes, top, view_h, w)
-
-        if plot:
-            self.draw_activity(lanes, bottom, w)
-        if details and not self.show_help:
-            self.draw_details(h - footer - details, details, w)
-        if footer:
-            self.put(h - 2, 0, "─" * w, attr["dim"])
-            stamp, notice = self.notice
-            if notice and time.monotonic() - stamp < NOTICE_SECONDS:
-                self.put(h - 1, 1, notice, attr["status:blocked"])
-            else:
-                live = "live" if self.watcher.connected else "poll"
-                self.put(h - 1, 1, f"? keys  v view  ⏎ focus  {live}", attr["dim"])
+            self.put(map_rect[0], 1, "herdr unavailable, retrying…", attr["status:blocked"])
+            self.put(map_rect[0] + 1, 1, self.error, attr["dim"])
+        elif self.hub:
+            self.draw_map(map_rect)
+        if preview_rect:
+            self.draw_preview(preview_rect)
+        self.draw_footer(h, w)
         self.last_draw = time.monotonic()
         self.screen.noutrefresh()
         curses.doupdate()
 
-    def blit(self, canvas, boxes, top, view_h, w):
-        """Draw the canvas, scrolled so the selected node is visible."""
-        box = boxes.get(self.selected)
-        if box:
-            y0, y1, x0, x1 = box
-            if y0 < self.scroll_y:
-                self.scroll_y = y0
-            elif y1 >= self.scroll_y + view_h:
-                self.scroll_y = y1 - view_h + 1
-            if x0 < self.scroll_x:
-                self.scroll_x = x0
-            elif x1 >= self.scroll_x + w:
-                self.scroll_x = x1 - w + 1
-        self.scroll_y = max(0, min(self.scroll_y, max(0, len(canvas.rows) - view_h)))
-        self.scroll_x = max(0, min(self.scroll_x, max(0, canvas.width - w)))
-        for row in range(view_h):
-            cy = self.scroll_y + row
-            for x, text, style in canvas.runs(cy, self.scroll_x, self.scroll_x + w):
-                self.put(top + row, x - self.scroll_x, text, self.styles.get(style, 0))
-        for key, (y0, y1, x0, x1) in boxes.items():
-            self.hits.append((top + y0 - self.scroll_y, top + y1 - self.scroll_y,
-                              x0 - self.scroll_x, x1 - self.scroll_x, key))
-
-    def _lane_window(self, lanes, rows):
-        """At most `rows` lanes, keeping the selected one in view."""
-        if len(lanes) <= rows:
-            return lanes
-        keys = [n.key for n, _ in lanes]
-        i = keys.index(self.selected) if self.selected in keys else 0
-        start = max(0, min(i - rows // 2, len(lanes) - rows))
-        return lanes[start:start + rows]
-
-    def draw_activity(self, lanes, y, w):
-        self.put(y, 0, "─" * w, self.styles["dim"])
-        canvas, boxes = views.render_activity(
-            lanes, w, activity.window_label(activity.WINDOWS[self.window]), activity.sparkline)
-        for row in range(len(canvas.rows)):
-            for x, text, style in canvas.runs(row):
-                self.put(y + 1 + row, x, text, self.styles.get(style, 0))
-        for key, (y0, y1, x0, x1) in boxes.items():
-            self.hits.append((y + 1 + y0, y + 1 + y1, x0, x1, key))
-
-    def draw_help(self, top, bottom, w):
-        """Key list; descriptions that do not fit beside a key wrap below it."""
+    def draw_stats(self, y, min_x, w):
+        """Header stats, right-aligned; dropped from the left when they do not fit."""
         attr = self.styles
-        lines = help_lines()
-        key_w = max(len(k) for k, t in lines if t) + 2
-        desc_x = 2 + key_w
-        row = top
-        for key, text in lines:
-            if row >= bottom:
+        t = self.tree
+        n = sum(t.counts.values())
+        parts = [(f"{views.STATUS[t.dispatcher][0]} dispatcher {t.dispatcher}", "status:" + t.dispatcher),
+                 (f"{n} agent{'s' * (n != 1)}", "name")]
+        for status in views.COUNT_ORDER:
+            if t.counts.get(status):
+                parts.append((f"{views.STATUS[status][0]}{t.counts[status]}", "status:" + status))
+        if t.needs:
+            parts.append((f"!{t.needs}", "needs"))
+        if t.proposals:
+            parts.append((f"?{len(t.proposals)}", "needs"))
+        if t.held:
+            parts.append((f"✉{t.held}", "accent"))
+        while parts and sum(len(p) + 3 for p, _ in parts) - 3 > w - 1 - min_x:
+            parts.pop()
+        x = w - 1 - (sum(len(p) + 3 for p, _ in parts) - 3)
+        for i, (text, style) in enumerate(parts):
+            if i:
+                self.put(y, x, " · ", attr["dim"])
+                x += 3
+            self.put(y, x, text, attr.get(style, 0))
+            x += len(text)
+
+    def draw_map(self, rect):
+        y0, x0, y1, x1 = rect
+        width, view_h = x1 - x0 - 1, y1 - y0
+        canvas, boxes = views.render_level(self.hub, self.spokes, width, spark=self.sparks(width))
+        self.boxes = boxes
+        if self.animate:
+            frame = int(time.monotonic() / FRAME_SECONDS)
+            working = {n.key for n in self.spokes if n.status == "working"}
+            self.animating = views.animate_edges(canvas, working, frame)
+        box = boxes.get(self.selected())
+        if box:
+            if box[0] < self.scroll_y:
+                self.scroll_y = box[0]
+            elif box[1] >= self.scroll_y + view_h:
+                self.scroll_y = box[1] - view_h + 1
+        self.scroll_y = max(0, min(self.scroll_y, max(0, len(canvas.rows) - view_h)))
+        for row in range(view_h):
+            for x, text, style in canvas.runs(self.scroll_y + row):
+                self.put(y0 + row, x0 + x, text, self.styles.get(style, 0))
+        for key, (by0, by1, bx0, bx1) in boxes.items():
+            self.hits.append((y0 + by0 - self.scroll_y, y0 + by1 - self.scroll_y, x0 + bx0, x0 + bx1, key))
+        if not self.spokes:
+            empty = "no units open" if not self.path else "no agents below"
+            self.put(y0 + boxes[self.hub.key][1] + 2, x0 + 2, empty, self.styles["dim"])
+
+    def preview_title(self, key):
+        node = self.node(key)
+        if not node:
+            return ""
+        raw = self.tree.raw.get(key) or {}
+        t = model.tokens(raw)
+        _, since = self.since.get(key, (node.status, time.monotonic()))
+        bits = [node.name, f"{views.STATUS[node.status][1]} {model.ago(time.monotonic() - since)}"]
+        tab = self.tabs.get(raw.get("tab_id"), "") or raw.get("tab_id", "")
+        if tab:
+            bits.append(f"tab {tab}")
+        bits += [t[k] for k in ("item", "pr") if t.get(k)]
+        if node.held:
+            bits.append(f"✉{node.held}")
+        return " · ".join(bits)
+
+    def draw_preview(self, rect):
+        y0, x0, y1, x1 = rect
+        attr = self.styles
+        border = attr["accent"] | curses.A_BOLD if self.interact else attr["dim"]
+        w, h = x1 - x0, y1 - y0
+        self.put(y0, x0, "┌" + "─" * (w - 2) + "┐", border)
+        for y in range(y0 + 1, y1 - 1):
+            self.put(y, x0, "│", border)
+            self.put(y, x1 - 1, "│", border)
+        self.put(y1 - 1, x0, "└" + "─" * (w - 2) + "┘", border)
+        self.hits.append((y0, y1 - 1, x0, x1 - 1, "@preview"))
+        inner_w, inner_h = w - 4, h - 2
+        key = self.preview_key()
+        if not key:
+            self.draw_preview_fallback(y0 + 1, x0 + 2, inner_w, inner_h)
+            return
+        title = f" {'INTERACT ' if self.interact else ''}{self.preview_title(key)} "
+        self.put(y0, x0 + 2, views.fit(title, w - 4), border)
+        self.read_preview(inner_w, inner_h)
+        pv = self.preview
+        if pv["clipped"]:
+            self.put(y1 - 1, x1 - 4, "»", attr["accent"])
+        for i, row in enumerate(pv["rows"][:inner_h]):
+            for col, text, cell in runs(row):
+                self.put(y0 + 1 + i, x0 + 2 + col, text, self.cell_attr(cell))
+        if not pv["rows"]:
+            self.put(y0 + 1, x0 + 2, "no screen yet", attr["dim"])
+
+    def draw_preview_fallback(self, y, x, w, h):
+        attr = self.styles
+        key = self.selected()
+        node = self.node(key)
+        raw = self.tree.raw.get(key) or {}
+        if node and node.kind == "proposal":
+            pid = raw.get("pid", "")
+            lines = [("proposal · waiting on the operator", "accent"), (raw.get("reason") or "", None),
+                     (raw.get("event") or "", "dim"), (f"proposal.sh approve {pid} | decline {pid}", "accent")]
+        elif key in self.tree.units:
+            lines = [("no PM in this unit yet", "dim"), (node.detail, None)]
+        else:
+            lines = [("nothing to preview", "dim")]
+        row = y
+        for text, style in lines:
+            for part in wrap(text or "", w, 3):
+                if row >= y + h:
+                    return
+                self.put(row, x, part, attr.get(style, 0) if style else 0)
+                row += 1
+
+    def cell_attr(self, cell):
+        if cell is None:
+            return 0
+        a = 0
+        if cell.bold:
+            a |= curses.A_BOLD
+        if cell.dim:
+            a |= curses.A_DIM
+        if cell.underline:
+            a |= curses.A_UNDERLINE
+        if cell.reverse:
+            a |= curses.A_REVERSE
+        if cell.italic:
+            a |= getattr(curses, "A_ITALIC", 0)
+        if cell.fg is None and cell.bg is None:
+            return a
+        return a | self.pair(self.color(cell.fg), self.color(cell.bg))
+
+    def color(self, c):
+        if c is None:
+            return -1
+        if isinstance(c, tuple):
+            c = screen.nearest256(c)
+        return c if c < curses.COLORS else c % 8
+
+    def pair(self, fg, bg):
+        key = (fg, bg)
+        if key not in self.pairs:
+            n = 16 + len(self.pairs)
+            if n >= curses.COLOR_PAIRS:
+                return 0
+            try:
+                curses.init_pair(n, fg, bg)
+            except curses.error:
+                return 0
+            self.pairs[key] = n
+        return curses.color_pair(self.pairs[key])
+
+    def draw_help(self, rect):
+        y0, x0, y1, _ = rect
+        attr = self.styles
+        row = y0
+        for key, text in help_lines():
+            if row >= y1:
                 break
             if text is None:
-                self.put(row, 1, key, attr["accent"] | curses.A_BOLD)
-                row += 1
-                continue
-            self.put(row, 2, key, curses.A_BOLD)
-            if len(text) <= w - desc_x - 1:
-                self.put(row, desc_x, text, attr["dim"])
-                row += 1
-                continue
+                self.put(row, x0 + 1, key, attr["accent"] | curses.A_BOLD)
+            else:
+                self.put(row, x0 + 2, key, curses.A_BOLD)
+                self.put(row, x0 + 20, text, attr["dim"])
             row += 1
-            for part in wrap(text, max(8, w - 7), 2):
-                if row >= bottom:
-                    break
-                self.put(row, 6, part, attr["dim"])
-                row += 1
 
-    def fields_for(self, node):
-        """(subtitle, [(label, text, style)]) for the details box."""
-        raw = self.tree.raw.get(node.key) or {}
-        t = model.tokens(raw)
-        if self.is_agent(node.key):
-            status, since = self.since.get(node.key, (node.status, time.monotonic()))
-            tab = self.tabs.get(raw.get("tab_id"), "") or raw.get("tab_id", "")
-            sub = f"{t.get('role') or raw.get('agent') or 'pane'} · {views.STATUS[node.status][1]} " \
-                  f"{model.ago(time.monotonic() - since)} · tab {tab}"
-            fields = []
-            if node.needs:
-                fields.append(("needs", t.get("status") or "needs you", "needs"))
-            elif t.get("status"):
-                fields.append(("status", t["status"], "name"))
-            for k in ("item", "pr", "worktree"):
-                if t.get(k):
-                    fields.append((k, t[k], None))
-            held = (load_state().get("outbox") or {}).get(node.key) or []
-            if held:
-                fields.append(("held", f"{len(held)}: " + " | ".join(str(i.get("line", "")) for i in held[-3:]),
-                               "accent"))
-            message = self.message_for(node.key)
-            if message:
-                fields.append(("last", message, None))
-            return sub, fields
-        if node.kind == "unit":
-            sub = " · ".join(v for v in (t.get("kind"), t.get("project"), t.get("stage")) if v)
-            fields = [(k, ", ".join(model.csv(t.get(k))), None) for k in ("stories", "prs") if t.get(k)]
-            if node.detail:
-                fields.append(("change", node.detail.rsplit(" · ", 1)[-1], "dim"))
-            return sub + " · Enter to open", fields
-        if node.kind == "proposal":
-            pid = raw.get("pid", "")
-            return "proposal · waiting on the operator", [
-                ("why", raw.get("reason") or "", None),
-                ("event", raw.get("event") or "", "dim"),
-                ("answer", f"proposal.sh approve {pid} | decline {pid}", "accent"),
-            ]
-        if node.kind == "dispatcher":
-            return f"{self.tree.dispatcher} · state {state_dir()}", [("queue", node.detail, None)]
-        return node.detail, []
-
-    def draw_details(self, y, rows, w):
+    def draw_footer(self, h, w):
         attr = self.styles
-        node = self.node(self.selected)
-        self.put(y, 0, "─" * w, attr["dim"])
-        self.put(y, 2, f" {node.name} " if node else " ", attr["accent"] | curses.A_BOLD)
-        if not node:
+        stamp, notice = self.notice
+        if self.interact:
+            node = self.node(self.interact)
+            self.put(h - 1, 0, " " * (w - 1), attr["interact"])
+            self.put(h - 1, 1, f"INTERACT {node.name if node else ''} — keys go to the agent · ctrl-] to leave",
+                     attr["interact"])
+        elif notice and time.monotonic() - stamp < NOTICE_SECONDS:
+            self.put(h - 1, 1, notice, attr["status:blocked"])
+        else:
+            live = "live" if self.watcher.connected else "poll"
+            back = "  esc back" if self.path else ""
+            self.put(h - 1, 1, f"? keys  ⏎ drill{back}  i interact  o open  p preview  {live}", attr["dim"])
+
+    # ---- navigation ---------------------------------------------------------
+
+    def move(self, dy, dx):
+        """Select the nearest box in a direction, by the boxes last drawn."""
+        cur = self.boxes.get(self.selected())
+        if not cur:
             return
-        sub, fields = self.fields_for(node)
-        self.put(y + 1, 1, sub[: w - 2], attr["dim"])
-        row = y + 2
-        label_w = 7
-        for label, text, style in fields:
-            budget = y + rows - row
-            if budget <= 0 or not text:
+        cy, cx = (cur[0] + cur[1]) / 2, (cur[2] + cur[3]) / 2
+        best = None
+        for key, (y0, y1, x0, x1) in self.boxes.items():
+            if key == self.selected():
                 continue
-            chunk = wrap(text, max(8, w - label_w - 2), min(2, budget))
-            self.put(row, 1, label[:label_w - 1], attr["dim"])
-            for i, part in enumerate(chunk):
-                self.put(row + i, label_w + 1, part, attr.get(style, 0) if style else 0)
-            row += len(chunk)
+            ny, nx = (y0 + y1) / 2, (x0 + x1) / 2
+            along = (ny - cy) * dy + (nx - cx) * dx
+            if along <= 0:
+                continue
+            across = abs((nx - cx) * dy) + abs((ny - cy) * dx)
+            score = along + across * 3
+            if best is None or score < best[0]:
+                best = (score, key)
+        if best:
+            self.select(best[1])
 
-    # ---- input --------------------------------------------------------------
-
-    def select(self, key):
-        self.selected = key
-        for node in self.order:
-            node.selected = node.key == key
-
-    def move(self, delta):
-        keys = [n.key for n in self.order]
+    def cycle(self):
+        keys = [n.key for n in self.order()]
         if keys:
-            i = keys.index(self.selected) if self.selected in keys else 0
-            self.select(keys[max(0, min(len(keys) - 1, i + delta))])
+            i = keys.index(self.selected()) if self.selected() in keys else -1
+            self.select(keys[(i + 1) % len(keys)])
 
-    def toggle_fold(self):
-        node = self.node(self.selected)
-        if node and node.children:
-            self.collapsed ^= {node.key}
+    def drill(self, key=None):
+        key = key or self.selected()
+        nxt = model.drill_path(self.tree, key)
+        if nxt is None:
+            if self.path:
+                self.flash("no level below an agent · i to interact, o to open its tab")
+            return
+        if nxt in self.path:
+            return
+        self.path.append(nxt)
+        self.scroll_y = 0
+        self.rebuild()
+
+    def up(self):
+        if self.path:
+            came_from = self.path.pop()
+            self.scroll_y = 0
+            if came_from == model.CONTROL and self.tree.seat:
+                came_from = self.tree.seat
+            self.selection[tuple(self.path)] = came_from
             self.rebuild()
 
-    def to_parent(self):
-        node = self.node(self.selected)
-        if node and node.parent:
-            self.select(node.parent.key)
-
-    def to_child(self):
-        node = self.node(self.selected)
-        if node and node.collapsed:
-            self.toggle_fold()
-        elif node and node.children:
-            self.select(node.children[0].key)
-
-    def activate(self):
-        node = self.node(self.selected)
-        if not node:
+    def start_interact(self):
+        key = self.preview_key()
+        if not key or not self.preview_on:
+            self.flash("nothing to interact with here")
             return
-        raw = self.tree.raw.get(node.key) or {}
-        if node.kind == "proposal":
-            self.flash(f"answer: proposal.sh approve|decline {raw.get('pid', '')}")
-            return
+        self.interact = key
+        self.preview["at"] = 0.0
+
+    def open_pane(self):
+        key = self.selected()
+        raw = self.tree.raw.get(key) or {}
+        target = model.preview_target(self.tree, key)
         try:
-            if self.is_agent(node.key):
+            if target:
                 try:
-                    herdr.call("agent", "focus", node.key)
+                    herdr.call("agent", "focus", target)
                 except herdr.HerdrError:
-                    herdr.call("workspace", "focus", raw["workspace_id"])
-                    herdr.call("tab", "focus", raw["tab_id"])
+                    praw = self.tree.raw.get(target) or {}
+                    herdr.call("workspace", "focus", praw["workspace_id"])
+                    herdr.call("tab", "focus", praw["tab_id"])
             elif raw.get("workspace_id"):
                 herdr.call("workspace", "focus", raw["workspace_id"])
             else:
-                self.flash("nothing to focus")
+                self.flash("nothing to open")
         except (herdr.HerdrError, KeyError) as exc:
-            self.flash(f"could not focus: {exc}"[:80])
+            self.flash(f"could not open: {exc}"[:80])
+
+    # ---- input --------------------------------------------------------------
 
     def on_mouse(self):
         try:
@@ -539,66 +590,103 @@ class App:
         except curses.error:
             return
         if bstate & getattr(curses, "BUTTON4_PRESSED", 0):
-            self.move(-1)
+            self.scroll_y = max(0, self.scroll_y - 2)
             return
         if bstate & getattr(curses, "BUTTON5_PRESSED", 0):
-            self.move(1)
+            self.scroll_y += 2
             return
         if not bstate & (curses.BUTTON1_PRESSED | curses.BUTTON1_CLICKED | curses.BUTTON1_DOUBLE_CLICKED):
             return
         key = next((k for y0, y1, x0, x1, k in self.hits if y0 <= my <= y1 and x0 <= mx <= x1), None)
+        if key == "@preview":
+            if not self.interact:
+                self.start_interact()
+            return
         if key is None:
             return
+        self.interact = None
         now = time.monotonic()
         repeat = self.last_click[1] == key and now - self.last_click[0] < 0.4
         self.select(key)
         self.last_click = (now, key)
         if bstate & curses.BUTTON1_DOUBLE_CLICKED or repeat:
-            self.activate()
+            self.drill(key)
 
-    def handle(self, key):
-        if self.show_help and key in (ord("?"), ord("q"), 27):
+    def handle(self, ch):
+        """One key from get_wch (str or int) in map mode; False quits."""
+        if ch == curses.KEY_MOUSE:
+            self.on_mouse()
+            return True
+        if ch == curses.KEY_RESIZE:
+            self.sync_size()
+            return True
+        if self.show_help:
             self.show_help = False
             return True
-        if key == ord("?"):
+        if ch == "?":
             self.show_help = True
-            return True
-        if key == ord("q"):
+        elif ch == "q":
             return False
-        if key in (curses.KEY_UP, ord("w"), ord("k")):
-            self.move(-1)
-        elif key in (curses.KEY_DOWN, ord("s"), ord("j")):
-            self.move(1)
-        elif key in (curses.KEY_LEFT, ord("a"), ord("h")):
-            self.to_parent()
-        elif key in (curses.KEY_RIGHT, ord("d"), ord("l")):
-            self.to_child()
-        elif key in (curses.KEY_HOME, ord("g")):
-            self.move(-len(self.order))
-        elif key in (curses.KEY_END, ord("G")):
-            self.move(len(self.order))
-        elif key in (curses.KEY_ENTER, 10, 13):
-            self.activate()
-        elif key == ord(" "):
-            self.toggle_fold()
-        elif key == ord("v"):
-            self.mode = MODES[(MODES.index(self.mode) + 1) % len(MODES)]
-            self.scroll_x = self.scroll_y = 0
-        elif key == ord("i"):
-            self.show_details = not self.show_details
-        elif key == ord("t"):
-            self.show_activity = not self.show_activity
-        elif key == ord("["):
-            self.window = max(0, self.window - 1)
-        elif key == ord("]"):
-            self.window = min(len(activity.WINDOWS) - 1, self.window + 1)
-        elif key == ord("r"):
+        elif ch in (curses.KEY_UP, "k", "w"):
+            self.move(-1, 0)
+        elif ch in (curses.KEY_DOWN, "j", "s"):
+            self.move(1, 0)
+        elif ch in (curses.KEY_LEFT, "h", "a"):
+            self.move(0, -1)
+        elif ch in (curses.KEY_RIGHT, "l", "d"):
+            self.move(0, 1)
+        elif ch == "\t":
+            self.cycle()
+        elif ch in (curses.KEY_ENTER, "\n", "\r"):
+            self.drill()
+        elif ch in ("\x1b", curses.KEY_BACKSPACE, "\x7f", "\x08", "u"):
+            self.up()
+        elif ch == "i":
+            self.start_interact()
+        elif ch == "o":
+            self.open_pane()
+        elif ch == "p":
+            self.preview_on = not self.preview_on
+            self.interact = None
+        elif ch == "r":
             self.refresh()
-        elif key == curses.KEY_MOUSE:
-            self.on_mouse()
-        elif key == curses.KEY_RESIZE:
-            self.sync_size()
         return True
+
+    def forward(self, ch):
+        """One key in interact mode: printable text is buffered, everything else flushes and is sent."""
+        if ch == curses.KEY_MOUSE:
+            self.flush_typed()
+            self.on_mouse()
+            return
+        if ch == curses.KEY_RESIZE:
+            self.sync_size()
+            return
+        if ch == chr(CTRL_RBRACKET):
+            self.flush_typed()
+            self.interact = None
+            return
+        if isinstance(ch, str) and ch >= " " and ch != "\x7f":
+            self.typed.append(ch)
+            return
+        name = SPECIAL_KEYS.get(ch) if isinstance(ch, int) else CONTROL_CHARS.get(ch)
+        if name is None and isinstance(ch, str) and "\x01" <= ch <= "\x1a":
+            name = "ctrl+" + chr(ord(ch) + 96)
+        if name is None:
+            return
+        self.flush_typed()
+        self.send("send-keys", name)
+
+    def flush_typed(self):
+        if self.typed:
+            text, self.typed = "".join(self.typed), []
+            self.send("send-text", text)
+
+    def send(self, verb, arg):
+        try:
+            herdr.call("pane", verb, self.interact, arg, timeout=5)
+        except herdr.HerdrError as exc:
+            self.flash(f"send failed: {exc}"[:80])
+        self.preview["at"] = 0.0
 
     # ---- loop ---------------------------------------------------------------
 
@@ -613,28 +701,39 @@ class App:
         curses.resizeterm(size.lines, size.columns)
         return True
 
+    def getkey(self):
+        try:
+            return self.screen.get_wch()
+        except curses.error:
+            return None
+
     def run(self):
         self.watcher.start()
         self.refresh()
         self.draw()
         while True:
-            key = self.screen.getch()
-            if key != -1:
-                if not self.handle(key):
+            ch = self.getkey()
+            if ch is not None:
+                if self.interact:
+                    self.forward(ch)
+                elif not self.handle(ch):
                     return
-                self.draw()
+                if not self.typed:
+                    self.draw()
                 continue
-            if self.sync_size():
-                self.draw()
+            self.flush_typed()
+            redraw = self.sync_size() or self.preview_due()
             if self.animating and time.monotonic() - self.last_draw >= FRAME_SECONDS:
-                self.draw()
+                redraw = True
             if self.watcher.changed.is_set():
                 time.sleep(DEBOUNCE_SECONDS)
                 self.watcher.changed.clear()
                 self.refresh()
-                self.draw()
+                redraw = True
             elif time.monotonic() - self.last_refresh >= POLL_SECONDS:
                 self.refresh()
+                redraw = True
+            if redraw:
                 self.draw()
 
 
@@ -651,19 +750,21 @@ def make_styles():
     }
     for pair, color in palette.items():
         curses.init_pair(pair, color, -1)
+    curses.init_pair(7, curses.COLOR_BLACK, curses.COLOR_CYAN)
     cp, bold, dim = curses.color_pair, curses.A_BOLD, curses.A_DIM
     return {
         None: 0,
         "dim": dim,
         "name": bold,
         "selname": bold | curses.A_REVERSE,
-        "selrow": curses.A_REVERSE,
         "rail": dim,
         "border": dim,
         "here": cp(5),
-        "sel": bold,
+        "sel": cp(5) | bold,
         "sel_here": cp(5) | bold,
         "accent": cp(5),
+        "spark": cp(5),
+        "interact": cp(7) | bold,
         "needs": cp(2) | bold,
         "status:working": cp(1) | bold,
         "status:blocked": cp(2) | bold,
@@ -680,14 +781,14 @@ def make_styles():
     }
 
 
-def setup(screen, unit=None):
+def setup(screen_, unit=None, preview=True):
     curses.curs_set(0)
     curses.use_default_colors()
     curses.mousemask(curses.ALL_MOUSE_EVENTS)
     curses.mouseinterval(0)
-    screen.timeout(int(FRAME_SECONDS * 1000))
-    screen.keypad(True)
-    app = App(screen, unit=unit)
+    screen_.timeout(int(FRAME_SECONDS * 1000))
+    screen_.keypad(True)
+    app = App(screen_, unit=unit, preview=preview)
     app.styles = make_styles()
     app.run()
 
@@ -695,10 +796,10 @@ def setup(screen, unit=None):
 # ---- entry points ----------------------------------------------------------
 
 
-def dump(unit=None):
-    tree = model.build(herdr.snapshot(), load_state(), own_pane=os.environ.get("HERDR_PANE_ID", ""), unit=unit,
+def dump():
+    tree = model.build(herdr.snapshot(), load_state(), own_pane=os.environ.get("HERDR_PANE_ID", ""),
                        own_workspace=os.environ.get("HERDR_WORKSPACE_ID", ""))
-    print(model.to_text(tree.roots) or "(empty)")
+    print(model.to_text(tree))
     return 0
 
 
@@ -708,7 +809,7 @@ def _rects(pane_id):
 
 
 def split(unit=None):
-    """Open the map in a new pane right of the caller, ~SPLIT_WIDTH columns wide."""
+    """Open the map (preview off) in a new pane right of the caller, ~SPLIT_WIDTH columns wide."""
     caller = os.environ.get("HERDR_PANE_ID")
     if not caller:
         print("map: --split needs HERDR_PANE_ID (run inside Herdr)", file=sys.stderr)
@@ -722,7 +823,8 @@ def split(unit=None):
     if not new:
         print("map: pane split returned no pane id", file=sys.stderr)
         return 1
-    cmd = [sys.executable, os.path.dirname(os.path.abspath(__file__))] + (["--unit", unit] if unit else [])
+    cmd = [sys.executable, os.path.dirname(os.path.abspath(__file__)), "--no-preview"]
+    cmd += ["--unit", unit] if unit else []
     herdr.call("pane", "run", new, " ".join(shlex.quote(c) for c in cmd))
     for _ in range(3):  # nudge the divider until the map is `size` wide (Horchestra toggle.fit)
         boxes = _rects(new)
@@ -744,13 +846,14 @@ def split(unit=None):
 
 def main(argv=None):
     ap = argparse.ArgumentParser(prog="map", description="prometheus agent map")
-    ap.add_argument("--unit", help="scope to one unit workspace id")
-    ap.add_argument("--dump", action="store_true", help="print the tree as text, no curses")
-    ap.add_argument("--split", action="store_true", help="open the map in a new pane right of this one")
+    ap.add_argument("--unit", help="open at one unit workspace id's level")
+    ap.add_argument("--dump", action="store_true", help="print every level as text, no curses")
+    ap.add_argument("--split", action="store_true", help="open the map (no preview) in a new pane right of this one")
+    ap.add_argument("--no-preview", action="store_true", help="start with the preview off")
     a = ap.parse_args(argv)
     try:
         if a.dump:
-            return dump(a.unit)
+            return dump()
         if a.split:
             return split(a.unit)
     except herdr.HerdrError as exc:
@@ -765,7 +868,7 @@ def main(argv=None):
     own = os.environ.get("HERDR_PANE_ID", "")
     mark_view(own, True)
     try:
-        curses.wrapper(setup, a.unit)
+        curses.wrapper(setup, a.unit, not a.no_preview)
     except KeyboardInterrupt:
         pass
     finally:

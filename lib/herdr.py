@@ -70,6 +70,15 @@ def read(pane_id: str) -> str:
     return out.stdout if out.returncode == 0 else ""
 
 
+def read_ansi(pane_id: str) -> str:
+    """The pane's visible screen with SGR colors, for the map's preview."""
+    out = subprocess.run([bin_path(), "pane", "read", pane_id, "--source", "visible", "--ansi"],
+                         capture_output=True, text=True, timeout=5)
+    if out.returncode != 0:
+        raise HerdrError("herdr pane read %s: %s" % (pane_id, out.stderr.strip()[:80]))
+    return out.stdout
+
+
 def start_agent(name: str, pane_id: str, args: list[str], timeout_ms: int = 90000) -> dict:
     """Start Claude in a shell pane; returns once Herdr sees it ready for input."""
     return call("agent", "start", name, "--kind", "claude", "--pane", pane_id,
