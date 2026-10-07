@@ -1,6 +1,6 @@
 ---
 title: <Full Name> — interactions
-type: person
+type: person-part
 part: interactions
 person: "[[<slug>]]"
 refs: []

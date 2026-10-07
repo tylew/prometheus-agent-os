@@ -179,8 +179,8 @@ class HandleTest(Base):
         story = {"kind": "story", "story": "sc-7", "state": "Completed", "change": "In Development → Completed",
                  "line": "x"}
         with dispatch.locked_state() as st:
-            ev.handle(self.snap(), st, [story], settle_fn=lambda s: settled.append(s) or "ok")
-        self.assertEqual(settled, ["sc-7"])
+            ev.handle(self.snap(), st, [story], settle_fn=lambda s, state: settled.append((s, state)) or "ok")
+        self.assertEqual(settled, [("sc-7", "Completed")])
 
 
 class VerdictTest(Base):

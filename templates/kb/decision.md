@@ -6,7 +6,7 @@ status: active
 decided: <YYYY-MM-DD>
 refs: []
 edges:
-  grounded_by: []
+  evidence: []
   decided_by: []
   supersedes: []
 created: <YYYY-MM-DD>

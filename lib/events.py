@@ -386,7 +386,7 @@ def handle(snap: dict, st: dict, events: list[dict], triage_fn=triage, create_fn
             except (RuntimeError, ValueError, KeyError):
                 ev["stack"] = [ev["pr"]]
         if ev["kind"] == "story" and ev["state"] in DONE_STATES + DROP_STATES and settle_fn:
-            log.append(settle_fn(ev["story"]))
+            log.append(settle_fn(ev["story"], ev["state"]))
         subject = _subject(ev)
         if subject in st["ignored"]:
             continue
@@ -494,9 +494,9 @@ def proposal(cmd: str, pid: str) -> str:
 
 # ------------------------------------------------------------------- settle
 
-def settle(story: str) -> str:
+def settle(story: str, state: str) -> str:
     kb = os.path.join(LIB, "kb.py")
-    out = subprocess.run([sys.executable, kb, "inbox", "settle", "--story", story],
+    out = subprocess.run([sys.executable, kb, "inbox", "settle", "--story", story, "--state", state],
                          capture_output=True, text=True, timeout=60)
     msg = (out.stdout or out.stderr).strip()
     return "settle %s: %s" % (story, msg or "rc=%d" % out.returncode)

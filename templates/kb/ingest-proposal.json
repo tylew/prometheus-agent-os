@@ -1,13 +1,34 @@
 {
-  "$comment": "Template: one proposal per source. kb.py apply writes facts with a final basis; tentative facts and ambiguous mentions are held in the inbox. Every decision is held until its binds_to settles: released when every bound story is Completed (or the operator confirms an operator-bound one), dropped when any moves to Won't Fix.",
-  "source": { "kind": "meeting | pr | story | operator | doc", "ref": "<granola:id | owner/repo#n | sc-#####>", "date": "<YYYY-MM-DD>" },
-  "scope": ["general"],
+  "$comment": "Template: one proposal per source, applied by kb.py apply (idempotent per proposal). Final facts land; these are held in the inbox: tentative facts, `stated` facts without a quote, ambiguous mentions, a new person or org (until confirmed), a field whose existing value differs, and every decision (until binds_to settles: every bound story Completed → recorded, any Won't Fix → dropped; operator-bound → confirmed by the operator).",
+  "source": {
+    "kind": "meeting | pr | story | operator | doc",
+    "ref": "<granola:id | owner/repo#n | sc-#####>",
+    "date": "<YYYY-MM-DD>"
+  },
   "entities": [
     {
       "mention": "<name as it appeared>",
       "type": "person | org | concept | system | topic",
+      "scope": [
+        "<general | project-key>"
+      ],
       "facts": [
-        { "text": "<one fact>", "basis": "decided | merged | stated | confirmed | tentative" }
+        {
+          "text": "<one fact, one line>",
+          "basis": "decided | merged | stated | confirmed | tentative",
+          "quote": "<the source span — required for stated>"
+        },
+        {
+          "field": "<structured field, e.g. role · team · handles.slack>",
+          "value": "<value>",
+          "basis": "stated",
+          "quote": "<span>"
+        },
+        {
+          "interaction": "<what they decided / asked for / committed to>",
+          "basis": "decided",
+          "quote": "<span>"
+        }
       ]
     }
   ],
@@ -19,14 +40,28 @@
       "why": "<the durable, non-obvious reason>",
       "basis": "decided | confirmed",
       "signoff": "<ref: confirmed spec, meeting id, operator>",
-      "binds_to": ["<sc-##### | operator>"],
-      "scope": ["<project-key>"],
-      "grounded_by": ["<mention or slug>"],
-      "decided_by": ["<mention>"],
-      "supersedes": ["<decision slug>"]
+      "binds_to": [
+        "<sc-##### | operator>"
+      ],
+      "scope": [
+        "<project-key>"
+      ],
+      "evidence": [
+        "<mention or slug>"
+      ],
+      "decided_by": [
+        "<mention>"
+      ],
+      "supersedes": [
+        "<decision slug>"
+      ]
     }
   ],
   "edges": [
-    { "from": "<mention or slug>", "edge": "member_of | owns | works_with | defines | part_of | depends_on | grounded_by | decided_by | supersedes | relates_to", "to": "<mention or slug>" }
+    {
+      "from": "<mention or slug>",
+      "edge": "member_of | owns | works_with | part_of | depends_on | evidence | decided_by | supersedes | relates_to",
+      "to": "<mention or slug>"
+    }
   ]
 }
