@@ -290,7 +290,12 @@ def repo_projects() -> dict:
 
 
 def project_keys() -> list[str]:
-    keys = sorted(set(repo_projects().values()) | set(dispatch._csv(os.environ.get("PROMETHEUS_PROJECTS"))))
+    try:
+        import registry
+        editable = {k for k, e in (registry.projects() or {}).items() if e.get("access") == "editable"}
+    except (ImportError, RuntimeError, ValueError):
+        editable = set()
+    keys = sorted(editable | set(repo_projects().values()) | set(dispatch._csv(os.environ.get("PROMETHEUS_PROJECTS"))))
     return keys or ["unknown"]
 
 
