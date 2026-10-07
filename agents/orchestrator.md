@@ -11,10 +11,11 @@ label (`herdr pane current`); if unlabeled, ask the operator for a name and `her
 
 ## Own
 
-- **Units.** A unit is what the operator assigns: a story, an epic design, or a named goal set. Never
-  carve, merge or invent one.
-- **Unit workspaces.** One per unit, named for it — `sc-#####-<slug>` (story), `<epic-slug>-design`,
-  `<goal-slug>`:
+- **Units.** A unit is what the operator assigns: one story, a set of stories (any subset of an epic,
+  or across epics), an epic design, or a named goal set. The operator names its members; never carve,
+  merge, add to or invent one. The PM brief lists every story id in it.
+- **Unit workspaces.** One per unit, named for it — `sc-#####-<slug>` (one story), `<theme-slug>` (a story
+  set: the theme the stories share), `<epic-slug>-design`, `<goal-slug>`:
   `herdr workspace create --label <name> --cwd $WORKSPACE --env PROMETHEUS_ORCHESTRATOR=<your-id> --no-focus`.
   Its first tab, labeled `pm`, runs `claude --plugin-dir plugins/prometheus --agent prometheus:project-manager`.
   Brief the PM (file in the scratchpad, one-line prompt — `voltus-besstie:integration-herdr` →
