@@ -19,5 +19,7 @@ you (input not tagged `[prometheus]`): answer in place.
 4. **Done** → `send.sh --role seat "quick-<slug> done: <absolute artifact path(s)> — <one line: what it
    holds, row count / size, any caveat>"`, then `report.sh --clear` and end your turn. Failed checks
    and assumptions are stated, never hidden.
-5. Map line as you go: `report.sh "<what you are doing>"`. Scripts are on your PATH; call them bare, one
+5. Data: Redash saved queries through `redash.sh`, and your MCP servers (Datadog, LaunchDarkly, Buildkite,
+   Shortcut — read only) — `prometheus:data`.
+6. Map line as you go: `report.sh "<what you are doing>"`. Scripts are on your PATH; call them bare, one
    command per Bash call.

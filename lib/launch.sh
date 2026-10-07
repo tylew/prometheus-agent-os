@@ -48,6 +48,33 @@ merged.pop("$comment", None)
 state = os.environ.get("PROMETHEUS_STATE_DIR") or os.path.expanduser("~/.local/state/prometheus")
 perms = merged.get("permissions") or {}
 workspace = os.environ.get("WORKSPACE") or ""
+role_name = os.path.basename(out)[:-5]
+# per-role MCP: generated config (secrets stay out of the repo) + read/write tool rules
+mcp_map = json.load(open(os.path.join(os.path.dirname(base_path), "..", "mcp", "roles.json")))
+servers = {}
+for src in mcp_map["sources"]:
+    try:
+        servers.update({k: v for k, v in json.load(open(os.path.join(workspace, src)))["mcpServers"].items()
+                        if k not in servers})
+    except (OSError, ValueError, KeyError):
+        pass
+mine = [s for s in mcp_map["roles"].get(role_name, []) if s in servers]
+mcp_dir = os.path.join(state, "mcp")
+os.makedirs(mcp_dir, exist_ok=True)
+mcp_path = os.path.join(mcp_dir, role_name + ".json")
+fd = os.open(mcp_path + ".tmp", os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+with os.fdopen(fd, "w") as fh:
+    json.dump({"mcpServers": {s: servers[s] for s in mine}}, fh, indent=2)
+os.replace(mcp_path + ".tmp", mcp_path)
+mperms = merged.setdefault("permissions", {})
+mperms["allow"] = list(dict.fromkeys(mperms.get("allow", []) + ["mcp__%s" % s for s in mine]))
+deny = [("mcp__%s__%s" % (s, t)) for s in mine for t in mcp_map["write_tools"].get(s, [])
+        if role_name not in mcp_map["writers"].get(s, [])]
+mperms["deny"] = list(dict.fromkeys(mperms.get("deny", []) + deny))
+ask = [("mcp__%s__%s" % (s, t)) for s in mine if role_name in mcp_map.get("ask_writers", {}).get(s, [])
+       for t in mcp_map["write_tools"].get(s, [])]
+if ask:  # a writer that still asks the operator per call (ask beats allow)
+    mperms["ask"] = list(dict.fromkeys(mperms.get("ask", []) + ask))
 for key in ("allow", "deny", "additionalDirectories"):
     if key in perms:
         perms[key] = [r.replace("{state_dir}", state).replace("{workspace}", workspace) for r in perms[key]]
@@ -60,7 +87,8 @@ with open(out + ".tmp", "w") as fh:
 os.replace(out + ".tmp", out)
 PY
 
-cmd=(claude --plugin-dir "$plugin_root" --settings "$settings" --agent "prometheus:$agent")
+cmd=(claude --plugin-dir "$plugin_root" --settings "$settings" --agent "prometheus:$agent"
+     --mcp-config "$state_dir/mcp/$role.json" --strict-mcp-config)
 case $role in
   implementor|reviewer|librarian) cmd+=(--permission-mode dontAsk) ;;
 esac

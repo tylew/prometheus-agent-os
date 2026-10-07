@@ -1,0 +1,115 @@
+{
+  "$comment": "Which MCP servers each role gets — launch.sh builds <state>/mcp/<role>.json (mode 600, never committed) from the server definitions in `sources` (workspace-relative; they hold the secrets) and launches with --mcp-config <it> --strict-mcp-config, so a role sees the same servers in any folder. `write_tools` are denied to every role not in `writers`; read tools are allowed server-wide for dontAsk roles. `ask_writers` may write only through a per-call permission prompt (a flag change is the operator's yes in the PM's tab).",
+  "sources": [
+    ".mcp.json",
+    "repos/voltus/.mcp.json"
+  ],
+  "roles": {
+    "seat": [
+      "shortcut"
+    ],
+    "pm": [
+      "shortcut",
+      "buildkite",
+      "launchdarkly",
+      "datadog"
+    ],
+    "planner": [
+      "shortcut",
+      "launchdarkly"
+    ],
+    "implementor": [
+      "shortcut",
+      "buildkite",
+      "launchdarkly"
+    ],
+    "reviewer": [
+      "shortcut",
+      "buildkite",
+      "launchdarkly",
+      "datadog"
+    ],
+    "runner": [
+      "shortcut",
+      "buildkite",
+      "launchdarkly",
+      "datadog"
+    ],
+    "librarian": [
+      "shortcut"
+    ]
+  },
+  "writers": {
+    "shortcut": [
+      "pm",
+      "planner"
+    ],
+    "launchdarkly": [
+      "pm"
+    ],
+    "buildkite": [
+      "pm"
+    ]
+  },
+  "write_tools": {
+    "shortcut": [
+      "stories-create",
+      "stories-update",
+      "stories-create-comment",
+      "stories-add-task",
+      "stories-update-task",
+      "stories-add-subtask",
+      "stories-create-subtask",
+      "stories-remove-subtask",
+      "stories-add-relation",
+      "stories-add-external-link",
+      "stories-remove-external-link",
+      "stories-set-external-links",
+      "stories-assign-current-user",
+      "stories-unassign-current-user",
+      "stories-upload-file",
+      "epics-create",
+      "epics-update",
+      "epics-create-comment",
+      "documents-create",
+      "documents-update",
+      "labels-create"
+    ],
+    "launchdarkly": [
+      "create-feature-flag",
+      "update-feature-flag",
+      "delete-feature-flag",
+      "create-ai-config",
+      "create-ai-config-variation",
+      "update-ai-config",
+      "update-ai-config-targeting",
+      "update-ai-config-variation",
+      "delete-ai-config",
+      "delete-ai-config-variation"
+    ],
+    "buildkite": [
+      "cancel_build",
+      "create_build",
+      "rebuild_build",
+      "retry_job",
+      "unblock_job",
+      "create_annotation",
+      "create_pipeline",
+      "update_pipeline",
+      "create_pipeline_schedule",
+      "update_pipeline_schedule",
+      "create_cluster",
+      "update_cluster",
+      "create_cluster_queue",
+      "update_cluster_queue",
+      "create_cluster_secret",
+      "pause_cluster_queue_dispatch",
+      "resume_cluster_queue_dispatch"
+    ]
+  },
+  "ask_writers": {
+    "launchdarkly": [
+      "pm"
+    ]
+  }
+}

@@ -69,5 +69,24 @@ class LaunchTest(unittest.TestCase):
         self.assertEqual(run_launch("boss", state_dir=self.state.name).returncode, 2)
 
 
+
+class McpTest(unittest.TestCase):
+    def test_roles_get_their_servers_and_writes_are_gated(self):
+        import json, stat, tempfile
+        with tempfile.TemporaryDirectory() as st:
+            for role in ("reviewer", "pm", "seat"):
+                run_launch(role, state_dir=st)
+            m = {r: json.load(open(os.path.join(st, "mcp", r + ".json")))["mcpServers"] for r in ("reviewer", "pm", "seat")}
+            s = {r: json.load(open(os.path.join(st, "settings", r + ".json")))["permissions"] for r in ("reviewer", "pm", "seat")}
+            self.assertLessEqual(set(m["seat"]), {"shortcut"})
+            self.assertEqual(stat.S_IMODE(os.stat(os.path.join(st, "mcp", "pm.json")).st_mode), 0o600)
+            if "launchdarkly" in m["reviewer"]:
+                self.assertIn("mcp__launchdarkly__update-feature-flag", s["reviewer"]["deny"])
+                self.assertIn("mcp__launchdarkly__update-feature-flag", s["pm"]["ask"])
+                self.assertNotIn("mcp__launchdarkly__update-feature-flag", s["pm"].get("deny", []))
+            if "shortcut" in m["seat"]:
+                self.assertIn("mcp__shortcut__stories-update", s["seat"]["deny"])
+                self.assertNotIn("mcp__shortcut__stories-update", s["pm"].get("deny", []))
+
 if __name__ == "__main__":
     unittest.main()

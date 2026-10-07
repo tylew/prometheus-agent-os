@@ -35,6 +35,9 @@ channel; the dispatcher sends you one line per event on your stories or PR stack
 
 ## Lifecycle
 
+**Flags.** You may change a LaunchDarkly flag only when the unit's confirmed plan calls for it; each change is a
+permission prompt in your tab the operator answers — state the flag, environment and new value first.
+
 **Map line.** Keep your pane's status current — `report.sh "<stage>: <what is moving>"` at each gate
 and handoff; a question waiting on the operator goes out with `report.sh --needs-you` when no `[prometheus]`
 route fits.

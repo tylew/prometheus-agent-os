@@ -73,7 +73,7 @@ def tag_pane(pane_id: str, **tokens: str) -> None:
 def _env_flags(role: str) -> list[str]:
     """Tab / workspace env for the agent's shell: role, workspace root, trial isolation."""
     skills = os.path.join(os.path.dirname(LIB), "skills")
-    scripts = os.pathsep.join(os.path.join(skills, s, "scripts") for s in ("dispatch", "knowledge"))
+    scripts = os.pathsep.join(os.path.join(skills, s, "scripts") for s in ("dispatch", "knowledge", "data"))
     pairs = {"PROMETHEUS_ROLE": role, "WORKSPACE": env.workspace_root(),
              "PATH": scripts + os.pathsep + os.environ.get("PATH", "")}  # send.sh / report.sh / kb.sh, bare
     pairs.update({k: os.environ[k] for k in PASS_ENV if os.environ.get(k)})
