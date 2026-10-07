@@ -69,8 +69,9 @@ def tag_pane(pane_id: str, **tokens: str) -> None:
 def _launch_cmd(role: str, extra_allow: list[str] | None = None, claude_args: list[str] | None = None) -> str:
     plugin = os.path.dirname(LIB)
     parts = []
-    if os.environ.get("PROMETHEUS_STATE_DIR"):
-        parts.append("PROMETHEUS_STATE_DIR=%s" % shlex.quote(os.environ["PROMETHEUS_STATE_DIR"]))
+    for var in ("PROMETHEUS_STATE_DIR", "PROMETHEUS_FILTER"):
+        if os.environ.get(var):
+            parts.append("%s=%s" % (var, shlex.quote(os.environ[var])))
     if extra_allow:
         parts.append("PROMETHEUS_EXTRA_ALLOW=%s" % shlex.quote("\n".join(extra_allow)))
     parts.append(shlex.quote(os.path.join(plugin, "lib", "launch.sh")))

@@ -18,6 +18,7 @@ tab=$(herdr tab create --workspace "$HERDR_WORKSPACE_ID" --label dispatcher --cw
 pane=$(herdr pane list --workspace "$HERDR_WORKSPACE_ID" \
       | python3 -c 'import json,sys; t=sys.argv[1]; print(next(p["pane_id"] for p in json.load(sys.stdin)["result"]["panes"] if p["tab_id"]==t))' "$tab")
 state=${PROMETHEUS_STATE_DIR:+PROMETHEUS_STATE_DIR=${(q)PROMETHEUS_STATE_DIR} }
+state+=${PROMETHEUS_FILTER:+PROMETHEUS_FILTER=${(q)PROMETHEUS_FILTER} }
 herdr pane run "$pane" "${state}HERDR_WORKSPACE_ID=$HERDR_WORKSPACE_ID INTERVAL=${INTERVAL:-60} HEARTBEAT=${HEARTBEAT:-30} ${(q)here}/dispatcher.sh" >/dev/null
 for _ in {1..20}; do python3 "$lib/dispatch.py" status >/dev/null && break; sleep 0.5; done
 echo "begin: dispatcher $(python3 "$lib/dispatch.py" status) in tab $tab (pane $pane)"

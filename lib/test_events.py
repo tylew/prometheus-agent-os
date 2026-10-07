@@ -201,6 +201,20 @@ class VerdictTest(Base):
         self.assertEqual(verdict["proposal"]["project"], "besstie")
 
 
+class FilterTest(Base):
+    def test_filter_skips_non_matching_subjects(self):
+        os.environ["PROMETHEUS_FILTER"] = r"\[prometheus-test\]"
+        calls = []
+        evs = [{"kind": "story", "story": "sc-1", "state": "Backlog State", "change": "new", "title": "Real work", "line": "x"},
+               {"kind": "story", "story": "sc-2", "state": "Backlog State", "change": "new", "title": "[prometheus-test] t", "line": "y"}]
+        try:
+            with dispatch.locked_state() as st:
+                ev.handle(dispatch.snapshot(), st, evs, triage_fn=lambda e, s: calls.append(e["story"]) or {"decision": "ignore", "reason": "r"})
+        finally:
+            del os.environ["PROMETHEUS_FILTER"]
+        self.assertEqual(calls, ["sc-2"])
+
+
 class HealthTest(Base):
     def test_exited_lead_is_resumed_once(self):
         import units

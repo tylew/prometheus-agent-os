@@ -16,7 +16,8 @@ stop.sh                  stop it; unit workspaces untouched
 ../../../lib/dispatch.py status
 ```
 Env: `INTERVAL` (s, default 60), `HEARTBEAT` (min, 30), `SHORTCUT_INTERVAL` (s, 300),
-`PROMETHEUS_NEW_PER_TICK` (3), `PROMETHEUS_STATE_DIR` (default `~/.claude/prometheus`).
+`PROMETHEUS_NEW_PER_TICK` (3), `PROMETHEUS_STATE_DIR` (default `~/.claude/prometheus`),
+`PROMETHEUS_FILTER` (regex on PR / story titles — trial runs act only on matches).
 
 ## One tick
 

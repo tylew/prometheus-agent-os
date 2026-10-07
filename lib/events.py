@@ -376,7 +376,10 @@ def handle(snap: dict, st: dict, events: list[dict], triage_fn=triage, create_fn
     """Route matched events, triage the rest, act on the verdict. Returns log lines."""
     log, cache = [], {}
     lost = _guard_tokens_lost(snap)
+    only = os.environ.get("PROMETHEUS_FILTER")
     for ev in events:
+        if only and ev["kind"] in ("pr", "story") and not re.search(only, ev.get("title") or ev.get("line", "")):
+            continue  # trial runs act only on matching subjects; nothing is remembered for the rest
         if ev["kind"] == "error":
             log.append(ev["line"])
             continue
