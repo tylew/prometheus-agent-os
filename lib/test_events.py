@@ -153,6 +153,19 @@ class HandleTest(Base):
         self.assertEqual([c[0] for c in self.created], ["review-9-pr-9"])
         self.assertTrue(any("created review unit" in l for l in log))
 
+    def test_a_failed_unit_start_tells_the_seat_and_retries(self):
+        seat = self.seat()
+        self.gh.review = ["o/r#2"]
+        self.gh.prs = {"o/r#2": pr(2, "b", "main")}
+        def boom(*a):
+            raise RuntimeError("could not start pm")
+        with dispatch.locked_state() as st:
+            events = ev.poll_github(self.snap(), st)
+            log = ev.handle(self.snap(), st, events, create_fn=boom)
+            self.assertNotIn("pr:o/r#2", st["cursors"])
+            self.assertIn("could not open the review unit for o/r#2", st["outbox"][seat][-1]["line"])
+        self.assertIn("create failed o/r#2", log[0])
+
     def test_stacked_pr_joins_existing_unit_without_triage(self):
         import units
         units.create("sc-1-a", "story", "besstie", ["sc-1"], ["o/r#1"])

@@ -94,11 +94,19 @@ def launch_args(role: str, extra_allow: list[str] | None = None, claude_args: li
     return json.loads(out.stdout)
 
 
+def herdr_name(name: str, pane_id: str) -> str:
+    """Herdr agent names: a lowercase letter first, [a-z0-9_-], at most 32 chars. The pane id keeps it unique."""
+    suffix = re.sub(r"[^a-z0-9]+", "-", pane_id.lower()).strip("-")
+    prefix = re.sub(r"[^a-z0-9_-]+", "-", name.lower()).strip("-")[:31 - len(suffix)].rstrip("-_")
+    out = ("%s-%s" % (prefix, suffix)) if prefix else suffix
+    return out if out[0].isalpha() else "p" + out[:31]
+
+
 def start(pane_id: str, role: str, name: str, label: str, extra_allow: list[str] | None = None,
           claude_args: list[str] | None = None) -> None:
     """Start the role's Claude in a shell pane; returns when Herdr sees it ready for input."""
     args = launch_args(role, extra_allow, ["--name", label, *(claude_args or [])])
-    agent_name = re.sub(r"[^a-z0-9_-]+", "-", ("%s-%s" % (name, pane_id)).lower())  # Herdr: [a-z0-9_-] only
+    agent_name = herdr_name(name, pane_id)
     try:
         hz.start_agent(agent_name, pane_id, args)
     except hz.HerdrError as exc:
@@ -129,7 +137,11 @@ def create(name: str, kind: str, project: str, stories: list[str], prs: list[str
             tab_id = p.get("tab_id", tab_id)
     _h("tab", "rename", tab_id, lead)
     tag_pane(pane_id, role=lead)
-    start(pane_id, lead, name, lead, claude_args=claude_args)
+    try:
+        start(pane_id, lead, name, lead, claude_args=claude_args)
+    except RuntimeError:
+        _h("workspace", "close", ws_id)  # no half-made unit: the caller reports and the next tick retries
+        raise
     out = {"workspace": ws_id, "unit": name, "lead": lead, "pane": pane_id}
     if brief:
         out["brief"] = send_brief(pane_id, brief)

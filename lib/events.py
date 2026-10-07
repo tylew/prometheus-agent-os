@@ -575,12 +575,13 @@ def act(snap: dict, st: dict, ev: dict, verdict: dict, lost: list[str], create_f
     stories = prop.get("stories") or ev.get("stories") or ([ev["story"]] if ev.get("story") else [])
     auto = ev["kind"] == "pr" and ev.get("source") in REVIEW_SOURCES and prop.get("kind") == "review"
     if auto and not lost:
-        why = ("review requested from the operator" if ev.get("source") == "review-requested" else
-               "not requested: it touches the operator's owned paths — say so in each review body and post "
-               "COMMENT unless Critical/High stand")
-        ws = create_fn(st, prop["name"], "review", prop["project"], stories, prs,
-                       "Review the stack %s (%s)." % (", ".join(prs), why))
-        return "created review unit %s (%s) for %s" % (prop["name"], ws, ", ".join(prs))
+        try:
+            return _create_review(st, ev, prop, stories, prs, create_fn)
+        except (RuntimeError, ValueError) as exc:
+            st["cursors"].pop("pr:" + ev["pr"], None)  # seen again next tick
+            _to_seat(snap, st, "[prometheus] could not open the review unit for %s: %s — retrying next tick"
+                     % (ev["pr"], str(exc)[:200]))
+            return "create failed %s: %s" % (ev["pr"], exc)
     st["next_pid"] = st.get("next_pid", 0) + 1
     pid = "p%d" % st["next_pid"]
     st["proposals"].append({"id": subject, "pid": pid, "kind": prop.get("kind"), "name": prop.get("name"),
@@ -592,6 +593,15 @@ def act(snap: dict, st: dict, ev: dict, verdict: dict, lost: list[str], create_f
              % (pid, prop.get("kind"), prop.get("name"), ", ".join(prs + stories), verdict.get("reason", ""),
                 why, pid, pid))
     return "proposed %s %s" % (pid, prop.get("name"))
+
+
+def _create_review(st: dict, ev: dict, prop: dict, stories: list[str], prs: list[str], create_fn) -> str:
+    why = ("review requested from the operator" if ev.get("source") == "review-requested" else
+           "not requested: it touches the operator's owned paths — say so in each review body and post "
+           "COMMENT unless Critical/High stand")
+    ws = create_fn(st, prop["name"], "review", prop["project"], stories, prs,
+                   "Review the stack %s (%s)." % (", ".join(prs), why))
+    return "created review unit %s (%s) for %s" % (prop["name"], ws, ", ".join(prs))
 
 
 def proposal(cmd: str, pid: str) -> str:
