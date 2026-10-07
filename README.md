@@ -9,17 +9,18 @@ Role-based delivery hierarchy, successor to `voltus-besstie`. Design:
 claude --plugin-dir plugins/prometheus --agent prometheus:orchestrator
 ```
 
-## Roles
+## Topology (Herdr)
 
-| Agent | Runs as | Spawned by |
-|---|---|---|
-| `orchestrator` | the operator's window | operator |
-| `project-manager` | dedicated window per unit (story · epic design · goal set) | orchestrator |
-| `implementor` | dedicated window per work item | project-manager |
-| `reviewer` | dedicated window per PR | project-manager |
-| `librarian` | background subagent | project-manager |
+```
+control workspace (operator)        panes: orchestrator, orchestrator, …
+  └─ unit workspace "<unit-name>"   one per unit, owned by the orchestrator that created it
+       ├─ tab pm                    project-manager — the orchestrator's only contact
+       ├─ tab impl-<item>           implementor, fresh per work item
+       ├─ tab review-<pr>           reviewer, fresh per independent round
+       └─ librarian                 background subagent of the PM
+```
 
-Windows are Herdr panes (`voltus-besstie:integration-herdr`) launched with
-`claude --plugin-dir plugins/prometheus --agent prometheus:<role>` plus a role brief.
+Every tab starts at `$WORKSPACE` with `claude --plugin-dir plugins/prometheus --agent prometheus:<role>`.
+Local state: `~/.claude/prometheus/orchestrators/<id>.md`, `~/.claude/prometheus/units/<unit>.md`.
 
 `voltus-besstie` must stay enabled: the agents load its skills for procedure.
