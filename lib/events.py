@@ -73,14 +73,38 @@ def ci_state(rollup: list[dict]) -> str:
     return "pass"
 
 
-def fingerprint(pr: dict) -> dict:
-    reviews = pr.get("latestReviews") or []
+NOISE_LOGIN = re.compile(r"(\[bot\]$|-integration$|^github-actions$|^dependabot|^renovate|^codecov|^graphite-app)", re.I)
+NOISE_BODY = ("<!-- PESTO", "app.graphite.com/github/pr/", "This pull request has been linked to [Shortcut")
+
+
+def is_noise(author: str, body: str, ignore: list[str] | None = None) -> bool:
+    """Integration bots and tool-generated comments (Graphite stack list, CI artifacts, tracker link-back)
+    never change anyone's next move."""
+    if author in (ignore or []) or NOISE_LOGIN.search(author or ""):
+        return True
+    return any(m in (body or "")[:400] for m in NOISE_BODY)
+
+
+def _ignore_authors(repo: str) -> list[str]:
+    try:
+        import registry
+        key = registry.repo_projects().get(repo)
+        return registry.field("review.ignore_authors", key=key, default=[]) if key else []
+    except (ImportError, RuntimeError, ValueError):
+        return []
+
+
+def fingerprint(pr: dict, ignore: list[str] | None = None) -> dict:
+    reviews = [r for r in pr.get("latestReviews") or []
+               if not is_noise((r.get("author") or {}).get("login", ""), r.get("body", ""), ignore)]
+    comments = [c for c in pr.get("comments") or []
+                if not is_noise((c.get("author") or {}).get("login", ""), c.get("body", ""), ignore)]
     last = max(reviews, key=lambda r: r.get("submittedAt") or "", default={})
     state = "merged" if pr.get("mergedAt") else (pr.get("state") or "").lower()
     return {"state": state, "draft": bool(pr.get("isDraft")), "head": pr.get("headRefOid"),
             "ci": ci_state(pr.get("statusCheckRollup")), "decision": pr.get("reviewDecision") or "",
             "review": "%s:%s" % (last.get("author", {}).get("login", ""), last.get("state", "")) if last else "",
-            "review_at": last.get("submittedAt", ""), "comments": len(pr.get("comments") or [])}
+            "review_at": last.get("submittedAt", ""), "comments": len(comments)}
 
 
 def pr_changes(ref: str, old: dict | None, new: dict) -> list[str]:
@@ -148,7 +172,7 @@ def poll_github(snap: dict, st: dict) -> list[dict]:
         except (RuntimeError, ValueError) as exc:
             events.append({"kind": "error", "line": "gh %s: %s" % (ref, exc)})
             continue
-        new = fingerprint(pr)
+        new = fingerprint(pr, _ignore_authors(split_ref(ref)[0]))
         st["cursors"][key] = new
         for change in pr_changes(ref, old, new):
             if change == "new" and ref in held:

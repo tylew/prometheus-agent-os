@@ -81,6 +81,18 @@ class GitHubTest(Base):
         self.assertEqual(ev.pr_changes("o/r#1", a, dict(a, ci="pending")), [])
         self.assertEqual(ev.pr_changes("o/r#1", None, a), ["new"])
 
+    def test_bot_and_tool_comments_do_not_count(self):
+        def c(login, body="hi"):
+            return {"author": {"login": login}, "body": body}
+        p = pr(1, "h", "main", comments=[
+            c("shortcut-integration", "This pull request has been linked to [Shortcut Story #1"),
+            c("vault-github-backend-integration", "<!-- PESTO_ARTIFACTS"),
+            c("tylew", "* **#43658** <a href=\"https://app.graphite.com/github/pr/voltusdev/voltus/43658"),
+            c("github-actions"), c("someone-human", "please rename this"), c("ci-noise-acct")],
+            reviews=[{"author": {"login": "github-actions"}, "state": "COMMENTED", "submittedAt": "t1"}])
+        f = ev.fingerprint(p, ignore=["ci-noise-acct"])
+        self.assertEqual((f["comments"], f["review"]), (1, ""))
+
     def test_stack_walks_bases_and_children(self):
         self.gh.prs = {"o/r#1": pr(1, "a", "main"), "o/r#2": pr(2, "b", "a"), "o/r#3": pr(3, "c", "b"),
                        "o/r#9": pr(9, "z", "main")}
