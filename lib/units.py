@@ -171,14 +171,12 @@ def send_brief(pane_id: str, brief_path: str, ready_timeout: float = 90, landed_
     st = _wait_ready(pane_id, ready_timeout)
     if st not in READY_STATES:
         raise RuntimeError("agent in %s never reached its prompt (last: %s)" % (pane_id, st))
-    _h("agent", "prompt", pane_id, "Read your brief at %s and begin." % os.path.abspath(brief_path))
-    deadline = time.time() + landed_timeout
-    while time.time() < deadline:
-        st = _status(pane_id)
-        if st in BUSY_STATES:
-            return "landed (%s)" % st
-        time.sleep(1)
-    raise RuntimeError("brief prompt not observed landing in %s (state %s); not re-sending" % (pane_id, st))
+    result = dispatch.submit(pane_id, "Read your brief at %s and begin." % os.path.abspath(brief_path),
+                             wait=landed_timeout / 2)
+    st = _status(pane_id)
+    if st in BUSY_STATES:
+        return "landed (%s)" % st
+    raise RuntimeError("brief prompt not observed landing in %s (%s, state %s); not re-sending" % (pane_id, result, st))
 
 
 def _tab_by_label(workspace_id: str, label: str) -> str | None:

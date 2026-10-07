@@ -86,6 +86,21 @@ elif cmd == ["pane", "run"]:
 elif cmd == ["agent", "prompt"]:
     p = find("panes", "pane_id", a[2])
     p.setdefault("prompts", []).append(a[3])
-    p["agent_status"] = "working"
+    if os.environ.get("FAKE_HERDR_SWALLOW_ENTER") and not p.get("swallowed"):
+        p["swallowed"] = True
+        p["input"] = a[3]
+    else:
+        p["agent_status"] = "working"
+elif cmd == ["agent", "send-keys"]:
+    p = find("panes", "pane_id", a[2])
+    p.setdefault("keys", []).append(a[3:])
+    if "enter" in a[3:] and p.get("input"):
+        p["agent_status"] = "working"
+        p["input"] = ""
+elif cmd == ["pane", "read"]:
+    p = find("panes", "pane_id", a[2])
+    print("> " + (p.get("input") or ""))
+    json.dump(w, open(path, "w"))
+    sys.exit(0)
 json.dump(w, open(path, "w"))
 print(json.dumps({"result": res}))

@@ -68,6 +68,17 @@ class UnitsTest(unittest.TestCase):
         p = next(x for x in self.world()["panes"] if x["pane_id"] == pane)
         self.assertEqual(p["prompts"], ["Read your brief at %s and begin." % self.brief])
 
+    def test_send_brief_presses_enter_once_when_the_prompt_sits_unsubmitted(self):
+        os.environ["FAKE_HERDR_SWALLOW_ENTER"] = "1"
+        try:
+            ws = units.create("sc-1-a", "story", "besstie", ["sc-1"], [])["workspace"]
+            pane = units.open_tab(ws, "review-10", "reviewer", pr="o/r#10")
+            self.assertEqual(units.send_brief(pane, self.brief, landed_timeout=4), "landed (working)")
+        finally:
+            del os.environ["FAKE_HERDR_SWALLOW_ENTER"]
+        p = next(x for x in self.world()["panes"] if x["pane_id"] == pane)
+        self.assertEqual((len(p["prompts"]), p["keys"]), (1, [["enter"]]))
+
     def test_close_refuses_busy_and_untagged(self):
         ws = units.create("sc-1-a", "story", "besstie", ["sc-1"], [])["workspace"]
         units.open_tab(ws, "impl-a", "implementor")

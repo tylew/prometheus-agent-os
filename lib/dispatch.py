@@ -67,6 +67,38 @@ def herdr(*args: str) -> dict:
         return {}
 
 
+def _status_of(pane_id: str) -> str:
+    p = pane(snapshot(), pane_id)
+    return (p or {}).get("agent_status", "gone")
+
+
+def submit(pane_id: str, text: str, wait: float = 6.0) -> str:
+    """Type a prompt and make sure it was submitted. A prompt typed into an agent that is still starting
+    can sit unsubmitted in its input; then one Enter is sent — the text itself is never re-sent."""
+    before = _status_of(pane_id)
+    herdr("agent", "prompt", pane_id, text)
+    if before == "working":
+        return "queued"
+    for attempt in (0, 1):
+        deadline = time.time() + wait
+        while time.time() < deadline:
+            if _status_of(pane_id) in ("working", "blocked"):
+                return "submitted" if attempt == 0 else "submitted after enter"
+            time.sleep(0.5)
+        if attempt == 0:
+            if " ".join(text[:40].split()) in _read(pane_id):
+                herdr("agent", "send-keys", pane_id, "enter")
+            else:
+                return "not observed"
+    return "not observed"
+
+
+def _read(pane_id: str) -> str:
+    out = subprocess.run([os.environ.get("HERDR_BIN", "herdr"), "pane", "read", pane_id],
+                         capture_output=True, text=True, timeout=30)
+    return " ".join(out.stdout.split())
+
+
 def snapshot() -> dict:
     return herdr("api", "snapshot").get("snapshot", {})
 
@@ -191,7 +223,7 @@ def _compose(pane_id: str, items: list[dict]) -> str:
 
 def deliver(snap: dict, st: dict, prompt=None) -> dict:
     """Deliver each pane's outbox only in a safe state; coalesce to one prompt per pane."""
-    prompt = prompt or (lambda p, text: herdr("agent", "prompt", p, text))
+    prompt = prompt or submit
     report = {"delivered": [], "held": [], "dropped": []}
     for pane_id, items in list(st["outbox"].items()):
         if not items:
