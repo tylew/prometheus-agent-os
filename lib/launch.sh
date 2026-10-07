@@ -1,7 +1,7 @@
 #!/bin/zsh
 # ---
 # name: launch
-# description: The one launch line for every prometheus role. Resolves WORKSPACE, sets PROMETHEUS_ROLE, merges templates/settings/launch.json with the role's allow-list into one settings file, adds --permission-mode dontAsk for depth-3 roles, and execs claude with the role's agent. PROMETHEUS_DRY_RUN=1 prints the command instead.
+# description: The one launch line for every prometheus role. Resolves WORKSPACE, sets PROMETHEUS_ROLE, merges templates/settings/launch.json with the role's allow-list (plus PROMETHEUS_EXTRA_ALLOW, one rule per line) into one settings file, adds --permission-mode dontAsk for depth-3 roles, and execs claude with the role's agent. PROMETHEUS_DRY_RUN=1 prints the command instead.
 # usage: launch.sh <seat|planner|pm|implementor|reviewer> [extra claude args...]
 # ---
 set -euo pipefail
@@ -39,6 +39,10 @@ if os.path.exists(role_path):
         else:
             merged[key] = val
 merged.pop("$comment", None)
+extra = [r for r in os.environ.get("PROMETHEUS_EXTRA_ALLOW", "").splitlines() if r.strip()]
+if extra:
+    perms = merged.setdefault("permissions", {})
+    perms["allow"] = list(dict.fromkeys(perms.get("allow", []) + extra))
 with open(out + ".tmp", "w") as fh:
     json.dump(merged, fh, indent=2)
 os.replace(out + ".tmp", out)
