@@ -29,8 +29,7 @@ upward channel.
 Triage → design → plan → implement → review → merge-ready, no stage skipped. Procedure lives in
 `prometheus` skills — load them, don't reconstruct: specs/plans → `knowledge`; story state → `tracker`;
 branches/PRs → `branching`; review loop → `review`; validation → `validate`; tabs → `agent-tabs`;
-watching → `watch`; scenario + UI gates → `behavior-grounding`; ledger → `ledgers`; compaction →
-`context-hygiene`.
+watching → `watch`; scenario + UI gates → `behavior-grounding`; compaction → `context-hygiene`.
 
 ## Tabs
 
@@ -69,9 +68,10 @@ may be reviewed. You decide disputes between agents; the operator decides behavi
   finding each go to a new reviewer session that has not seen the author's reasoning.
 - **`/compact` at boundaries** — send `/compact <keep: item, open findings, next step>` to a long-running
   agent between rounds or after a commit, never mid-edit.
-- **Yourself** — keep the unit ledger `~/.claude/prometheus/units/<workspace-label>.md` current at every
-  gate: scenarios, items → tabs → state, PRs, decisions sent to the librarian, open questions. Your own
-  `/compact` or a fresh PM session resumes from it without loss.
+- **Yourself** — your Claude session is your memory; no separate state file. Durable facts live where
+  they already belong: scenarios + plan in the spec dir, story state in Shortcut, code + PRs in git,
+  decisions in the KB, ownership + stage in Herdr tokens. A replacement PM resumes your session
+  (`claude --resume <session-id>`, from the pane's `agent_session` in `herdr api snapshot`).
 
 ## Report
 

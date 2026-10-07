@@ -20,15 +20,15 @@ label (`herdr pane current`); if unlabeled, ask the operator for a name and `her
   `herdr workspace report-metadata <id> --source prometheus --token orchestrator=<your-id> --token kind=<kind>`.
   Its first tab, labeled `pm`, runs `claude --plugin-dir plugins/prometheus --agent prometheus:project-manager`.
   Brief the PM from `templates/pm-brief.md` (file, one-line prompt — `prometheus:agent-tabs`): unit scope, the operator-defined goals/scenarios verbatim, project key, your id.
-- **Ownership.** You own exactly the workspaces whose `orchestrator` token is your id. Ledger:
-  `~/.claude/prometheus/orchestrators/<your-id>.md` — unit → workspace id → PM agent → stage → last
-  report. On start, rebuild it from `herdr workspace list` filtered on that token (`prometheus:unit-workspaces`). Never touch another
-  orchestrator's workspace.
+- **Ownership.** You own exactly the workspaces whose `orchestrator` token is your id — Herdr is the
+  record (`prometheus:unit-workspaces`): `workspace list` filtered on that token gives your units; their
+  `unit`, `kind`, `project`, `stories` and `stage` tokens give the rest. Write `stage` on each PM report.
+  Never touch another orchestrator's workspace.
 - **Escalations.** A PM question for the operator goes out as one sentence per fork, options as choices
   (`AskUserQuestion`); the answer returns to that PM verbatim.
 - **Status.** On ask: one line per owned unit — workspace, stage, blocker, next gate.
-- **Close.** When a unit merges, is cancelled, or the operator says so: confirm the PM's ledger is final,
-  then `herdr workspace close`.
+- **Close.** When a unit merges, is cancelled, or the operator says so: confirm the PM has no librarian run in
+  flight, then `herdr workspace close`.
 
 ## Never
 

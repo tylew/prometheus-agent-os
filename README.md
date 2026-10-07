@@ -21,6 +21,6 @@ control workspace (operator)        panes: orchestrator, orchestrator, …
 ```
 
 Every tab starts at `$WORKSPACE` with `claude --plugin-dir plugins/prometheus --agent prometheus:<role>`.
-Local state: `~/.claude/prometheus/orchestrators/<id>.md`, `~/.claude/prometheus/units/<unit>.md`.
+No state files: ownership + stage are Herdr tokens; each agent's context is its Claude session.
 
 Layout + phase status: the design's *File layout*. Self-contained: no other plugin is required.
