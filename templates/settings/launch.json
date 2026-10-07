@@ -1,0 +1,6 @@
+{
+  "$comment": "Every prometheus launch passes this with --settings: voltus-besstie is disabled for the session so one plugin's hooks, skills and agents load. Removed at cutover.",
+  "enabledPlugins": {
+    "voltus-besstie@brightfield-besstie-local": false
+  }
+}
