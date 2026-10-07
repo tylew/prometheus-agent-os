@@ -43,7 +43,7 @@ class Base(unittest.TestCase):
         self.world_path = os.path.join(self.tmp.name, "world.json")
         os.environ.update(HERDR_BIN=os.path.join(LIB, "testing", "fake_herdr.py"),
                           FAKE_HERDR_WORLD=self.world_path, PROMETHEUS_STATE_DIR=self.tmp.name,
-                          PROMETHEUS_EXTERNAL="0", PROMETHEUS_REPOS="o/r",
+                          PROMETHEUS_EXTERNAL="0", PROMETHEUS_REPOS="o/r", WORKSPACE=self.tmp.name,
                           PROMETHEUS_REPO_PROJECTS="o/r=besstie", PROMETHEUS_PROJECTS="besstie")
         self.gh = FakeGitHub()
         self._gh, ev.gh_json = ev.gh_json, self.gh
@@ -51,6 +51,7 @@ class Base(unittest.TestCase):
 
     def tearDown(self):
         ev.gh_json = self._gh
+        os.environ.pop("WORKSPACE", None)
         self.tmp.cleanup()
 
     def world(self):
