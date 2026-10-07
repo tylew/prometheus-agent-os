@@ -1,0 +1,10 @@
+{
+  "name": "prometheus",
+  "displayName": "Prometheus",
+  "version": "0.1.0",
+  "description": "Role-based delivery hierarchy, successor to voltus-besstie. An orchestrator spins up one project manager per operator-defined unit of work; each PM leads the full vertical, spawning dedicated implementor and reviewer windows and running a background librarian that records finalized decisions in the knowledge base. Phase 1 agents carry role, boundaries and handoffs; procedure comes from voltus-besstie skills.",
+  "author": {
+    "name": "Tyler Lewis",
+    "email": "tlewis@voltus.co"
+  }
+}
