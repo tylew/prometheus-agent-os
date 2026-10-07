@@ -10,7 +10,12 @@
       "{state_dir}"
     ],
     "allow": [
-      "Bash(*/.claude/prometheus/projects/*/*.sh *)"
+      "Bash(*/.claude/prometheus/projects/*/*.sh *)",
+      "Bash(send.sh *)",
+      "Bash(report.sh *)",
+      "Bash(kb.sh *)",
+      "Bash(python3 \"*/lib/registry.py\" *)",
+      "Bash(python3 */lib/registry.py *)"
     ]
   }
 }

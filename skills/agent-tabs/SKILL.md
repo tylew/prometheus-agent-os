@@ -17,7 +17,7 @@ close-tab.sh <workspace-id> <label>
   setup such as the `js/node_modules` link — `branching`) before `open-tab.sh --worktree <abs>`. The tab
   starts in that worktree, so the implementor's plain `git` / `gt` act on it; it cannot `cd` or `git -C`.
 - **Labels** — `impl-<item-slug>`, `review-<pr#>`, `planner` (one per unit, opened when it needs stories). Labels may repeat across units; routing uses pane ids.
-- **Launch** — `herdr agent start` with `lib/launch.sh <role> --args`: merged settings (voltus-besstie off
+- **Launch** — `herdr agent start` with `lib/launch.sh <role> --args`: merged settings (other workflow plugins off
   for the session), `--name <label>`, and for implementor / reviewer `--permission-mode dontAsk` with
   `templates/settings/<role>.json`; role env comes from the tab. Returns once the agent takes input. Pass the
   project's validation commands as `--allow 'Bash(<cmd> *)'` (`registry.py field packages --key <project>`) for

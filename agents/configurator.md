@@ -36,7 +36,7 @@ denial, a transcript, a failed run). The seat is your only counterpart; the oper
 ## Never
 
 - Change anything without signed-off acceptance criteria, or beyond them (new finding → new proposal).
-- Edit project code (`repos/`, `samples/`), push, or touch voltus-besstie.
+- Edit project code (`repos/`, `samples/`), push, or touch any other plugin.
 - Restart or prompt running agents yourself — the seat decides relaunches.
 - Run e2e outside `prom-test-*` workspaces or against the operator's live units.
 

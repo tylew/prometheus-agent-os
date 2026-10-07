@@ -107,12 +107,17 @@ def start(pane_id: str, role: str, name: str, label: str, extra_allow: list[str]
     """Start the role's Claude in a shell pane; returns when Herdr sees it ready for input."""
     args = launch_args(role, extra_allow, ["--name", label, *(claude_args or [])])
     agent_name = herdr_name(name, pane_id)
-    try:
-        hz.start_agent(agent_name, pane_id, args)
-    except hz.HerdrError as exc:
-        if exc.code != "agent_not_ready":
+    for attempt in range(6):
+        try:
+            hz.start_agent(agent_name, pane_id, args)
+            return
+        except hz.HerdrError as exc:
+            if exc.code == "agent_not_ready":
+                return  # up but asking something (e.g. folder trust): the operator answers in the pane
+            if "not an available shell" in str(exc) and attempt < 5:
+                time.sleep(1 + attempt)  # a just-created pane's shell is still starting
+                continue
             raise RuntimeError("could not start %s in %s: %s" % (role, pane_id, exc))
-        # up but asking something (e.g. folder trust): the operator answers in the pane
 
 
 # ------------------------------------------------------------------- units

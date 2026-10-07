@@ -73,8 +73,7 @@ holds; it starts the role's agent (settings, `--name <label>`, `dontAsk` for imp
 | `review-<pr#>` | reviewer | PR number, round, stack position, the unit's scenarios — `templates/reviewer-brief.md` |
 | `planner` | planner | the goals or gap to turn into stories, the project, the epic, the operator's stated behavior verbatim |
 
-Briefs go in a file; prompt one line pointing at it; confirm it landed by agent state
-(`agent-tabs`). Every later message to an agent — fixes, next round, answers — goes through `send.sh`. Close a tab when its item merges or its session is retired.
+Briefs, later messages and closing tabs: `agent-tabs`.
 
 ## Wake → deliberate → hand off
 

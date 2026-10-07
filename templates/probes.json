@@ -1,0 +1,269 @@
+{
+  "$comment": "Tier-2 allow-list probes, run by lib/probes.py against each role's merged settings (lib/launch.sh). Per role: `allow` must be permitted, `deny` must be refused, `ask` must prompt per call. A string is a Bash command, unless it names a tool: `mcp__<server>__<tool>`, or `Read|Write|Edit|Glob|Grep|Agent|Skill|Workflow|AskUserQuestion[(<path or arg>)]`. An object {cmd, live, why} carries the form --live executes instead (live: false = static only; a Bash allow probe without `live` runs verbatim, so it must be safe to execute). A Bash deny probe runs live only when it carries `live`. Placeholders: {workspace}, {state_dir}, {plugin_root}, {wt} (a worktree path that does not exist, so live forms fail harmlessly).",
+  "roles": {
+    "seat": {
+      "allow": [
+        "{workspace}/.claude/prometheus/projects/besstie/scratch-test.sh {wt}",
+        {
+          "cmd": "send.sh --role pm \"status?\"",
+          "live": "send.sh --help"
+        },
+        {
+          "cmd": "report.sh waiting on operator",
+          "live": "report.sh --help"
+        },
+        "mcp__shortcut__stories-get-by-id"
+      ],
+      "deny": [
+        "mcp__shortcut__stories-update",
+        "mcp__shortcut__stories-create",
+        "mcp__shortcut__stories-create-comment",
+        "mcp__launchdarkly__update-feature-flag"
+      ]
+    },
+    "pm": {
+      "allow": [
+        "{workspace}/.claude/prometheus/projects/besstie/scratch-test.sh {wt}",
+        {
+          "cmd": "send.sh --role implementor \"go\"",
+          "live": "send.sh --help"
+        },
+        {
+          "cmd": "report.sh unit on track",
+          "live": "report.sh --help"
+        },
+        "python3 \"{plugin_root}/lib/registry.py\" field repo.slug --key besstie",
+        "mcp__shortcut__stories-update",
+        "mcp__launchdarkly__get-feature-flag"
+      ],
+      "ask": [
+        "mcp__launchdarkly__update-feature-flag"
+      ]
+    },
+    "planner": {
+      "allow": [
+        "{workspace}/.claude/prometheus/projects/besstie/scratch-test.sh {wt}",
+        {
+          "cmd": "send.sh --role pm \"stories ready\"",
+          "live": "send.sh --help"
+        },
+        "mcp__shortcut__stories-create"
+      ],
+      "deny": [
+        "mcp__launchdarkly__update-feature-flag"
+      ]
+    },
+    "implementor": {
+      "allow": [
+        "{workspace}/.claude/prometheus/projects/besstie/scratch-test.sh {wt}",
+        {
+          "cmd": "send.sh --role pm \"pushed\"",
+          "live": "send.sh --help"
+        },
+        {
+          "cmd": "report.sh implementing item 1",
+          "live": "report.sh --help"
+        },
+        {
+          "cmd": "{plugin_root}/skills/dispatch/scripts/send.sh --role pm \"pushed\"",
+          "live": "{plugin_root}/skills/dispatch/scripts/send.sh --help"
+        },
+        "python3 \"{plugin_root}/lib/registry.py\" field repo.slug --key besstie",
+        "python3 {plugin_root}/lib/registry.py field repo.slug --key besstie",
+        "make -C {wt}/voltuspy/brightfield-besstie lint VOLTUS={wt}",
+        "make -C {wt}/voltuspy/brightfield-besstie run_test VOLTUS={wt}",
+        "git -C {wt} status --short",
+        "git status",
+        {
+          "cmd": "gt create -m \"Add thing\"",
+          "live": false
+        },
+        {
+          "cmd": "gt submit --draft --no-interactive",
+          "live": false
+        },
+        "Write({wt}/voltuspy/brightfield-besstie/x.py)",
+        "Edit({wt}/voltuspy/brightfield-besstie/x.py)",
+        "Read({workspace}/CLAUDE.md)",
+        "mcp__shortcut__stories-get-by-id"
+      ],
+      "deny": [
+        {
+          "cmd": "cd {wt} && git status",
+          "live": "cd {wt} && git status"
+        },
+        {
+          "cmd": "cd {wt}/voltuspy/brightfield-besstie && make lint",
+          "live": "cd {wt}/voltuspy/brightfield-besstie && make lint"
+        },
+        "gt merge",
+        "gt submit --publish",
+        "gh pr merge 1",
+        "gh pr ready 1",
+        "git push --force origin HEAD",
+        "git stash",
+        "git add -A",
+        "AskUserQuestion",
+        "mcp__shortcut__stories-update",
+        "mcp__shortcut__stories-create",
+        "mcp__shortcut__stories-create-comment",
+        "mcp__launchdarkly__update-feature-flag"
+      ]
+    },
+    "reviewer": {
+      "allow": [
+        "{workspace}/.claude/prometheus/projects/besstie/scratch-test.sh {wt}",
+        {
+          "cmd": "send.sh --role pm \"round 1 posted\"",
+          "live": "send.sh --help"
+        },
+        {
+          "cmd": "report.sh reviewing",
+          "live": "report.sh --help"
+        },
+        "python3 \"{plugin_root}/lib/registry.py\" field repo.slug --key besstie",
+        "make -C {wt}/voltuspy/brightfield-besstie lint VOLTUS={wt}",
+        "gh api repos/o/r/commits/abc",
+        "gh api repos/o/r/compare/a...b",
+        {
+          "cmd": "semgrep --config auto {wt}/x.py",
+          "live": "semgrep --config auto --version"
+        },
+        "gh api repos/o/r/pulls/1/comments --paginate",
+        "git -C {wt} log -1",
+        "Write({state_dir}/reviews/x.md)",
+        "Read({workspace}/CLAUDE.md)",
+        "Agent",
+        "Skill",
+        "mcp__shortcut__stories-get-by-id",
+        "mcp__launchdarkly__get-feature-flag"
+      ],
+      "deny": [
+        {
+          "cmd": "cd {wt} && git status",
+          "live": "cd {wt} && git status"
+        },
+        {
+          "cmd": "cd {wt}/voltuspy/brightfield-besstie && make lint",
+          "live": "cd {wt}/voltuspy/brightfield-besstie && make lint"
+        },
+        "git commit -m x",
+        "git push origin HEAD",
+        "gt submit",
+        "gh pr merge 1",
+        "AskUserQuestion",
+        "Write({wt}/voltuspy/brightfield-besstie/x.py)",
+        "Edit({workspace}/docs/x.md)",
+        "mcp__shortcut__stories-update",
+        "mcp__shortcut__stories-create",
+        "mcp__shortcut__stories-create-comment",
+        "mcp__launchdarkly__update-feature-flag"
+      ]
+    },
+    "librarian": {
+      "allow": [
+        "{workspace}/.claude/prometheus/projects/besstie/scratch-test.sh {wt}",
+        {
+          "cmd": "kb.sh search transmission",
+          "live": "kb.sh --help"
+        },
+        {
+          "cmd": "send.sh --role pm \"folded\"",
+          "live": "send.sh --help"
+        },
+        {
+          "cmd": "report.sh batch folded",
+          "live": "report.sh --help"
+        },
+        "python3 \"{plugin_root}/lib/registry.py\" field repo.slug --key besstie",
+        "git status",
+        "git log -1",
+        "mcp__shortcut__stories-get-by-id"
+      ],
+      "deny": [
+        {
+          "cmd": "cd {workspace} && git status",
+          "live": "cd {wt} && git status"
+        },
+        "Edit({workspace}/docs/x.md)",
+        "git add docs",
+        "git push",
+        "gt sync",
+        "AskUserQuestion",
+        "mcp__shortcut__stories-update",
+        "mcp__shortcut__stories-create",
+        "mcp__shortcut__stories-create-comment",
+        "mcp__launchdarkly__update-feature-flag"
+      ]
+    },
+    "runner": {
+      "allow": [
+        "{workspace}/.claude/prometheus/projects/besstie/scratch-test.sh {wt}",
+        {
+          "cmd": "send.sh --role seat \"export ready\"",
+          "live": "send.sh --help"
+        },
+        {
+          "cmd": "report.sh exporting",
+          "live": "report.sh --help"
+        },
+        {
+          "cmd": "redash.sh queries --search besstie",
+          "live": "redash.sh --help"
+        },
+        "python3 \"{plugin_root}/lib/registry.py\" field repo.slug --key besstie",
+        "Write({state_dir}/exports/x.csv)"
+      ],
+      "deny": [
+        "Write({workspace}/docs/x.md)",
+        "git commit -m x",
+        "git push origin HEAD",
+        "gt submit",
+        "gh pr create --draft",
+        "gh pr merge 1",
+        "mcp__shortcut__stories-update",
+        "mcp__shortcut__stories-create",
+        "mcp__shortcut__stories-create-comment",
+        "mcp__launchdarkly__update-feature-flag"
+      ]
+    },
+    "configurator": {
+      "allow": [
+        "{workspace}/.claude/prometheus/projects/besstie/scratch-test.sh {wt}",
+        {
+          "cmd": "python3 lib/lint.py",
+          "live": "python3 lib/lint.py --help"
+        },
+        {
+          "cmd": "python3 lib/probes.py",
+          "live": "python3 lib/probes.py --help"
+        },
+        {
+          "cmd": "python3 -m unittest discover -s lib -p 'test_*.py'",
+          "live": false
+        },
+        {
+          "cmd": "git -C {plugin_root} commit -m x -- agents/configurator.md",
+          "live": false
+        },
+        {
+          "cmd": "send.sh --role seat \"config-x proposal: /tmp/p.md\"",
+          "live": "send.sh --help"
+        },
+        "Edit({plugin_root}/agents/configurator.md)",
+        "Write({workspace}/.claude/prometheus/projects/prometheus.json)"
+      ],
+      "deny": [
+        {
+          "cmd": "git push origin main",
+          "live": false
+        },
+        {
+          "cmd": "git -C {plugin_root} push",
+          "live": false
+        },
+        "Edit({workspace}/repos/voltus/x.py)"
+      ]
+    }
+  }
+}

@@ -26,12 +26,8 @@ nothing: collapsed is still permanent, still content.
 
 Rebuild the full body from the live copy (pre-write guard, SKILL.md); change only these two:
 
-- **What's decided** — `- **the claim** (Name, YYYY-MM-DD).` A reason clause only when the claim reads as
-  arbitrary without it. "Nothing yet." when empty. A changed ruling says what it replaces; delete the old
-  bullet.
-- **Still open** — `- **Name:** the ask. Blocks this story.` or `… Not blocking: we build <default>; a
-  different answer changes <what>.` One owner per item; "Nothing." when empty. Answered → fold into What's
-  decided, delete the item, re-check the `question` label.
+- **What's decided** and **Still open** — formats in `stories` → *Story text* (their one home); here, also
+  re-check the `question` label when an open item is answered.
 
 A gap in Scenarios or AC → message the planner; never patch them.
 
