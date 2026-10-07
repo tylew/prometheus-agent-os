@@ -1,5 +1,5 @@
 {
-  "$comment": "Template: one proposal per source. kb.py apply writes facts with a final basis; tentative facts, ambiguous mentions and decisions are held in the inbox.",
+  "$comment": "Template: one proposal per source. kb.py apply writes facts with a final basis; tentative facts and ambiguous mentions are held in the inbox. Every decision is held until its binds_to settles: released when all bound PRs merge / stories complete (or the operator confirms an operator-bound one), dropped when any is abandoned.",
   "source": { "kind": "meeting | pr | story | operator | doc", "ref": "<granola:id | owner/repo#n | sc-#####>", "date": "<YYYY-MM-DD>" },
   "scope": ["general"],
   "entities": [
@@ -12,7 +12,19 @@
     }
   ],
   "decisions": [
-    { "title": "<decision as a statement>", "context": "", "why": "", "grounded_by": ["<mention or slug>"], "decided_by": ["<mention>"] }
+    {
+      "title": "<decision as a statement>",
+      "decision": "<what was chosen>",
+      "context": "<the fork and its alternatives>",
+      "why": "<the durable, non-obvious reason>",
+      "basis": "decided | confirmed",
+      "signoff": "<ref: confirmed spec, meeting id, operator>",
+      "binds_to": ["<owner/repo#n | sc-##### | operator>"],
+      "scope": ["<project-key>"],
+      "grounded_by": ["<mention or slug>"],
+      "decided_by": ["<mention>"],
+      "supersedes": ["<decision slug>"]
+    }
   ],
   "edges": [
     { "from": "<mention or slug>", "edge": "member_of | owns | works_with | defines | part_of | depends_on | grounded_by | decided_by | supersedes | relates_to", "to": "<mention or slug>" }

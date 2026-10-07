@@ -1,9 +1,10 @@
 ---
-description: Project manager → librarian. One finalized decision or design consideration, handed off when final.
+description: Project manager → librarian. One decision, handed off when made; it waits in the KB inbox until binds_to settles (all merged / Completed → recorded; any abandoned → dropped).
 unit: <workspace-label>
 project: <registry key>
 spec_dir: <docs/specs/<project>/<slug>/>
-kind: decision | design-consideration
+binds_to: [<owner/repo#n | sc-##### | operator>]
+signoff: <confirmed spec path | meeting id | operator>
 date: <YYYY-MM-DD>
 ---
 
