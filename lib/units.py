@@ -395,9 +395,13 @@ def respawn(pane_id: str, force: bool = False, timeout: float = 30) -> str:
     tabs = {t["tab_id"]: t.get("label") for t in snap.get("tabs", [])}
     label = tabs.get(p.get("tab_id")) or role
     unit = dispatch.unit_of_pane(snap, pane_id)
-    hz.call("agent", "send-keys", pane_id, "ctrl+c", "ctrl+c")
-    deadline = time.time() + timeout
-    while time.time() < deadline and (dispatch.pane(_snap(), pane_id) or {}).get("agent"):
+    deadline, keys_at = time.time() + timeout, 0.0
+    while (live := dispatch.pane(_snap(), pane_id) or {}).get("agent"):
+        if time.time() >= deadline:
+            raise ValueError("%s did not exit (%s); left running" % (pane_id, live.get("agent_status")))
+        if time.time() >= keys_at:  # esc leaves a sub-view (agents list, dialog) where ctrl+c does not quit
+            hz.call("agent", "send-keys", pane_id, "esc", "ctrl+c", "ctrl+c")
+            keys_at = time.time() + 5
         time.sleep(1)
     start(pane_id, role, unit_name(unit) if unit else "prometheus", label,
           claude_args=["--resume", session, "--system-prompt-snapshot", "off"])

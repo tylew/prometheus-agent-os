@@ -175,6 +175,38 @@ class UnitsTest(unittest.TestCase):
         p = next(x for x in self.world()["panes"] if x["pane_id"] == pane)
         self.assertEqual(p["prompts"], ["/compact keep item a"])
 
+    def _respawn(self, live_polls):
+        def snap(agent):
+            pane = {"pane_id": "w1F:p1", "workspace_id": "w1F", "tab_id": "w1F:t1", "tokens": {"role": "pm"},
+                    "agent_session": {"value": "s-1"}, "agent_status": "done", "agent": agent}
+            return {"panes": [pane], "tabs": [{"tab_id": "w1F:t1", "label": "pm"}], "workspaces": []}
+        snaps = iter([snap("claude")] * (1 + live_polls) + [snap(None)] * 10)
+        clock = iter(range(0, 1000))
+        with unittest.mock.patch.object(units, "_snap", side_effect=lambda: next(snaps)), \
+                unittest.mock.patch.object(units.hz, "call") as call, \
+                unittest.mock.patch.object(units, "start") as start, \
+                unittest.mock.patch.object(units.time, "sleep"), \
+                unittest.mock.patch.object(units.time, "time", side_effect=lambda: next(clock)):
+            try:
+                return units.respawn("w1F:p1", timeout=30), call, start
+            except ValueError as exc:
+                return exc, call, start
+
+    def test_respawn_sends_esc_first_and_resumes_once_the_agent_exits(self):
+        out, call, start = self._respawn(live_polls=2)
+        self.assertIn("respawned pm", out)
+        self.assertEqual(call.call_args_list[0].args, ("agent", "send-keys", "w1F:p1", "esc", "ctrl+c", "ctrl+c"))
+        start.assert_called_once()
+        self.assertEqual(start.call_args.kwargs["claude_args"],
+                         ["--resume", "s-1", "--system-prompt-snapshot", "off"])
+
+    def test_respawn_refuses_to_start_over_an_agent_that_did_not_exit(self):
+        out, call, start = self._respawn(live_polls=999)
+        self.assertIsInstance(out, ValueError)
+        self.assertIn("did not exit", str(out))
+        start.assert_not_called()
+        self.assertGreater(call.call_count, 1)
+
 
 if __name__ == "__main__":
     unittest.main()
