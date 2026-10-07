@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # ---
 # name: units
-# description: Unit workspaces and agent tabs over Herdr — create a unit (workspace, tokens, lead tab), list and close units, open / brief / close agent tabs (role tokens, launch.sh, allow-list extras), and context hygiene (compact an idle agent, refresh a session in a new tab). The unit-workspaces, agent-tabs and context-hygiene scripts are thin wrappers over its subcommands.
-# usage: units.py {create|list|close|open-tab|send-brief|close-tab|compact|refresh} [args]
+# description: Unit workspaces and agent tabs over Herdr — create a unit (workspace, tokens, lead tab), list and close units, open / brief / close agent tabs (role tokens, `herdr agent start` with launch.sh's args, allow-list extras), the control tabs beside the seat (librarian, map), restoring units from the dispatcher's image after a Herdr restart, and context hygiene (compact an idle agent, refresh a session in a new tab). The unit-workspaces, agent-tabs and context-hygiene scripts are thin wrappers over its subcommands.
+# usage: units.py {create|list|close|open-tab|send-brief|close-tab|compact|refresh|control-tabs|restore} [args]
 # ---
 from __future__ import annotations
 
@@ -10,6 +10,7 @@ import argparse
 import json
 import os
 import shlex
+import subprocess
 import sys
 import time
 
@@ -17,11 +18,13 @@ LIB = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, LIB)
 import dispatch  # noqa: E402
 import env  # noqa: E402
+import herdr as hz  # noqa: E402
 
 KINDS = ("story", "story-set", "goal-set", "review")
-ROLES = ("pm", "planner", "implementor", "reviewer")
+ROLES = ("pm", "planner", "implementor", "reviewer", "librarian")
 READY_STATES = ("idle", "done")
 BUSY_STATES = ("working", "blocked")
+PASS_ENV = ("PROMETHEUS_STATE_DIR", "PROMETHEUS_FILTER", "PROMETHEUS_EXTERNAL")
 
 
 def _h(*args: str) -> dict:
@@ -66,30 +69,40 @@ def tag_pane(pane_id: str, **tokens: str) -> None:
     _h(*args)
 
 
-def _launch_cmd(role: str, extra_allow: list[str] | None = None, claude_args: list[str] | None = None) -> str:
-    plugin = os.path.dirname(LIB)
-    parts = []
-    for var in ("PROMETHEUS_STATE_DIR", "PROMETHEUS_FILTER"):
-        if os.environ.get(var):
-            parts.append("%s=%s" % (var, shlex.quote(os.environ[var])))
+def _env_flags(role: str) -> list[str]:
+    """Tab / workspace env for the agent's shell: role, workspace root, trial isolation."""
+    scripts = os.path.join(os.path.dirname(LIB), "skills", "dispatch", "scripts")
+    pairs = {"PROMETHEUS_ROLE": role, "WORKSPACE": env.workspace_root(),
+             "PATH": scripts + os.pathsep + os.environ.get("PATH", "")}  # send.sh / report.sh, bare
+    pairs.update({k: os.environ[k] for k in PASS_ENV if os.environ.get(k)})
+    out = []
+    for k, v in pairs.items():
+        out += ["--env", "%s=%s" % (k, v)]
+    return out
+
+
+def launch_args(role: str, extra_allow: list[str] | None = None, claude_args: list[str] | None = None) -> list[str]:
+    run_env = dict(os.environ)
     if extra_allow:
-        parts.append("PROMETHEUS_EXTRA_ALLOW=%s" % shlex.quote("\n".join(extra_allow)))
-    parts.append(shlex.quote(os.path.join(plugin, "lib", "launch.sh")))
-    parts.append(role)
-    parts += [shlex.quote(a) for a in (claude_args or [])]
-    return " ".join(parts)
+        run_env["PROMETHEUS_EXTRA_ALLOW"] = "\n".join(extra_allow)
+    out = subprocess.run([os.path.join(LIB, "launch.sh"), role, "--args", *(claude_args or [])],
+                         capture_output=True, text=True, env=run_env, timeout=30)
+    if out.returncode != 0:
+        raise RuntimeError("launch.sh %s: %s" % (role, out.stderr.strip()))
+    return json.loads(out.stdout)
 
 
-def _wait_ready(pane_id: str, timeout: float = 90) -> str:
-    """Wait until a freshly launched agent sits at its prompt (idle / done)."""
-    deadline = time.time() + timeout
-    st = "unknown"
-    while time.time() < deadline:
-        st = _status(pane_id)
-        if st in READY_STATES:
-            return st
-        time.sleep(1)
-    return st
+def start(pane_id: str, role: str, name: str, label: str, extra_allow: list[str] | None = None,
+          claude_args: list[str] | None = None) -> None:
+    """Start the role's Claude in a shell pane; returns when Herdr sees it ready for input."""
+    args = launch_args(role, extra_allow, ["--name", label, *(claude_args or [])])
+    agent_name = "%s-%s" % (name, pane_id.replace(":", "-"))
+    try:
+        hz.start_agent(agent_name, pane_id, args)
+    except hz.HerdrError as exc:
+        if exc.code != "agent_not_ready":
+            raise RuntimeError("could not start %s in %s: %s" % (role, pane_id, exc))
+        # up but asking something (e.g. folder trust): the operator answers in the pane
 
 
 # ------------------------------------------------------------------- units
@@ -101,7 +114,7 @@ def create(name: str, kind: str, project: str, stories: list[str], prs: list[str
     if any(dispatch._tokens(u).get("unit") == name for u in dispatch.units(_snap())):
         raise ValueError("unit %s already exists" % name)
     root = env.workspace_root()
-    ws = _h("workspace", "create", "--label", name, "--cwd", root, "--no-focus")
+    ws = _h("workspace", "create", "--label", name, "--cwd", root, "--no-focus", *_env_flags("pm"))
     ws_id = (ws.get("workspace") or ws)["workspace_id"]
     lead = "pm"
     tag_workspace(ws_id, unit=name, kind=kind, project=project,
@@ -114,7 +127,7 @@ def create(name: str, kind: str, project: str, stories: list[str], prs: list[str
             tab_id = p.get("tab_id", tab_id)
     _h("tab", "rename", tab_id, lead)
     tag_pane(pane_id, role=lead)
-    _h("pane", "run", pane_id, _launch_cmd(lead, claude_args=claude_args))
+    start(pane_id, lead, name, lead, claude_args=claude_args)
     out = {"workspace": ws_id, "unit": name, "lead": lead, "pane": pane_id}
     if brief:
         out["brief"] = send_brief(pane_id, brief)
@@ -146,6 +159,12 @@ def close(workspace_id: str, force: bool = False) -> None:
     if busy and not force:
         raise ValueError("agents still working or blocked: %s" % ", ".join(busy))
     _h("workspace", "close", workspace_id)
+    with dispatch.locked_state() as st:
+        st.get("image", {}).pop(unit_name(unit), None)
+
+
+def unit_name(unit: dict) -> str:
+    return dispatch._tokens(unit).get("unit", "")
 
 
 # -------------------------------------------------------------------- tabs
@@ -156,26 +175,23 @@ def open_tab(workspace_id: str, label: str, role: str, item: str | None = None,
     if role not in ROLES:
         raise ValueError("role must be one of %s" % ", ".join(ROLES))
     tab = _h("tab", "create", "--workspace", workspace_id, "--label", label,
-             "--cwd", env.workspace_root(), "--no-focus")
+             "--cwd", env.workspace_root(), "--no-focus", *_env_flags(role))
     tab_id = (tab.get("tab") or tab)["tab_id"]
     pane_id = _first_pane(workspace_id, tab_id)
     tag_pane(pane_id, role=role, item=item, pr=pr, worktree=worktree)
-    _h("pane", "run", pane_id, _launch_cmd(role, extra_allow, claude_args))
+    unit = dispatch.unit_of_workspace(_snap(), workspace_id)
+    start(pane_id, role, unit_name(unit) if unit else "prometheus", label, extra_allow, claude_args)
     return pane_id
 
 
-def send_brief(pane_id: str, brief_path: str, ready_timeout: float = 90, landed_timeout: float = 20) -> str:
-    """Prompt one line pointing at the brief; confirm it landed by state. Never re-sends."""
+def send_brief(pane_id: str, brief_path: str) -> str:
+    """Prompt one line pointing at the brief; Herdr confirms a turn started (resent only on a stall)."""
     if not os.path.isfile(brief_path):
         raise ValueError("brief not found: %s" % brief_path)
-    if not dispatch.wait_input_ready(pane_id, ready_timeout):
-        raise RuntimeError("agent in %s never reached a ready prompt (state %s)" % (pane_id, _status(pane_id)))
-    result = dispatch.submit(pane_id, "Read your brief at %s and begin." % os.path.abspath(brief_path),
-                             wait=landed_timeout / 2)
-    st = _status(pane_id)
-    if st in BUSY_STATES:
-        return "landed (%s)" % st
-    raise RuntimeError("brief prompt not observed landing in %s (%s, state %s); not re-sending" % (pane_id, result, st))
+    result = dispatch.submit(pane_id, "Read your brief at %s and begin." % os.path.abspath(brief_path))
+    if result == "stalled":
+        raise RuntimeError("brief never started a turn in %s (state %s)" % (pane_id, _status(pane_id)))
+    return "landed (%s)" % result
 
 
 def _tab_by_label(workspace_id: str, label: str) -> str | None:
@@ -188,6 +204,95 @@ def close_tab(workspace_id: str, label: str) -> None:
     if not tab_id:
         raise ValueError("no tab %s in %s" % (label, workspace_id))
     _h("tab", "close", tab_id)
+
+
+# ------------------------------------------------------------ control tabs
+
+def control_tabs(workspace_id: str) -> list[str]:
+    """Beside the seat: a `librarian` agent tab and a `map` tab, each opened only if missing."""
+    snap = _snap()
+    done = []
+    if not dispatch.panes_with_role(snap, "librarian"):
+        open_tab(workspace_id, "librarian", "librarian")
+        done.append("librarian")
+    if not any(_tokens(p).get("view") == "map" for p in snap.get("panes", [])):
+        tab = _h("tab", "create", "--workspace", workspace_id, "--label", "map",
+                 "--cwd", env.workspace_root(), "--no-focus", *_env_flags("map"))
+        pane_id = _first_pane(workspace_id, (tab.get("tab") or tab)["tab_id"])
+        _h("pane", "run", pane_id, shlex.quote(os.path.join(os.path.dirname(LIB), "skills", "dispatch",
+                                                            "scripts", "map.sh")))
+        done.append("map")
+    return done
+
+
+# ----------------------------------------------------------------- restore
+
+def session_on_disk(session: str | None) -> bool:
+    if not session:
+        return False
+    root = os.path.join(os.environ.get("CLAUDE_CONFIG_DIR") or os.path.expanduser("~/.claude"), "projects")
+    return any(os.path.exists(os.path.join(root, d, session + ".jsonl"))
+               for d in (os.listdir(root) if os.path.isdir(root) else []))
+
+
+def restore_unit(name: str, record: dict) -> dict:
+    """Recreate a unit lost to a Herdr restart: workspace, tokens, one tab per imaged agent resumed from
+    its session. An agent whose session is gone is not started fresh; it is reported."""
+    toks = record["tokens"]
+    root = env.workspace_root()
+    ws = _h("workspace", "create", "--label", name, "--cwd", root, "--no-focus", *_env_flags("pm"))
+    ws_id = (ws.get("workspace") or ws)["workspace_id"]
+    tag_workspace(ws_id, **toks)
+    back, missing = [], []
+    first = True
+    for agent in record.get("agents", []):
+        role, label, session = agent["tokens"].get("role"), agent["label"], agent.get("session")
+        if not session_on_disk(session):
+            missing.append(label)
+            continue
+        extra = {k: v for k, v in agent["tokens"].items() if k != "role"}
+        if first:
+            pane_id = _first_pane(ws_id)
+            tab_id = next(p["tab_id"] for p in _h("pane", "list", "--workspace", ws_id).get("panes", [])
+                          if p["pane_id"] == pane_id)
+            _h("tab", "rename", tab_id, label)
+            tag_pane(pane_id, role=role, **extra)
+            start(pane_id, role, name, label, claude_args=["--resume", session])
+            first = False
+        else:
+            open_tab(ws_id, label, role, claude_args=["--resume", session], **extra)
+        back.append(label)
+    return {"unit": name, "workspace": ws_id, "back": back, "missing": missing}
+
+
+def restore_all(only: list[str] | None = None, forget: list[str] | None = None) -> list[dict]:
+    snap = _snap()
+    with dispatch.locked_state() as st:
+        for name in forget or []:
+            st.get("image", {}).pop(name, None)
+        pending = dispatch.pending_restore(snap, st)
+    out = []
+    for name, record in sorted(pending.items()):
+        if only and name not in only:
+            continue
+        out.append(restore_unit(name, record))
+    if out:
+        with dispatch.locked_state() as st:
+            seat = dispatch.panes_with_role(_snap(), "seat")
+            line = "[prometheus] restored after a Herdr restart: " + "; ".join(
+                "%s (back: %s%s)" % (r["unit"], ", ".join(r["back"]) or "none",
+                                     "; no session: " + ", ".join(r["missing"]) if r["missing"] else "")
+                for r in out)
+            if seat:
+                dispatch.enqueue(st, seat[0]["pane_id"], line)
+            else:
+                st.setdefault("seat_backlog", []).append(line)
+            for r in out:
+                for line in st.get("restore_backlog", {}).pop(r["unit"], []):
+                    lead = dispatch.panes_with_role(_snap(), "pm", r["workspace"])
+                    if lead:
+                        dispatch.enqueue(st, lead[0]["pane_id"], line, unit=r["unit"])
+    return out
 
 
 # --------------------------------------------------------- context hygiene
@@ -245,6 +350,11 @@ def main(argv: list[str]) -> int:
     r.add_argument("label")
     r.add_argument("role", choices=ROLES)
     r.add_argument("brief")
+    sub.add_parser("control-tabs").add_argument("workspace")
+    rs = sub.add_parser("restore")
+    rs.add_argument("--unit", action="append", default=[])
+    rs.add_argument("--forget", action="append", default=[], help="drop a unit's image instead; repeatable")
+    rs.add_argument("--list", action="store_true")
     a = ap.parse_args(argv)
 
     try:
@@ -273,6 +383,17 @@ def main(argv: list[str]) -> int:
             print("compact sent to %s" % a.pane)
         elif a.cmd == "refresh":
             print(refresh(a.workspace, a.label, a.role, a.brief))
+        elif a.cmd == "control-tabs":
+            print("opened: %s" % (", ".join(control_tabs(a.workspace)) or "nothing (both present)"))
+        elif a.cmd == "restore":
+            if a.list:
+                with dispatch.locked_state() as st:
+                    pending = dispatch.pending_restore(_snap(), st)
+                for name, rec in sorted(pending.items()):
+                    print("%s\t%s" % (name, ", ".join(x["label"] for x in rec.get("agents", []))))
+                return 0
+            for r in restore_all(a.unit or None, a.forget):
+                print(json.dumps(r))
     except (ValueError, RuntimeError) as exc:
         print("units: %s" % exc, file=sys.stderr)
         return 1

@@ -402,7 +402,8 @@ def handle(snap: dict, st: dict, events: list[dict], triage_fn=triage, create_fn
            settle_fn=None, stack_fn=pr_stack) -> list[str]:
     """Route matched events, triage the rest, act on the verdict. Returns log lines."""
     log, cache = [], {}
-    lost = _guard_tokens_lost(snap)
+    pending = dispatch.pending_restore(snap, st)
+    lost = _guard_tokens_lost(snap) + sorted(pending)
     only = os.environ.get("PROMETHEUS_FILTER")
     for ev in events:
         if only and ev["kind"] in ("pr", "story") and not re.search(only, ev.get("title") or ev.get("line", "")):
@@ -419,6 +420,12 @@ def handle(snap: dict, st: dict, events: list[dict], triage_fn=triage, create_fn
             log.append(settle_fn(ev["story"], ev["state"]))
         subject = _subject(ev)
         if subject in st["ignored"]:
+            continue
+        owner = _imaged_owner(pending, ev)
+        if owner:
+            # its unit awaits restore: keep the line for that unit's PM instead of re-triaging it
+            st.setdefault("restore_backlog", {}).setdefault(owner, []).append(ev["line"])
+            log.append("held for restore of %s: %s" % (owner, subject))
             continue
         hits = dispatch.match_units(snap, ev)
         if len(hits) > 1:
@@ -452,6 +459,16 @@ def handle(snap: dict, st: dict, events: list[dict], triage_fn=triage, create_fn
             continue
         log.append(act(snap, st, ev, verdict, lost, create_fn))
     return log
+
+
+def _imaged_owner(pending: dict, ev: dict) -> str | None:
+    stories = set(filter(None, [ev.get("story"), *ev.get("stories", [])]))
+    prs = set(filter(None, [ev.get("pr"), *ev.get("stack", [])]))
+    for name, rec in pending.items():
+        t = rec.get("tokens", {})
+        if stories & set(dispatch._csv(t.get("stories"))) or prs & set(dispatch._csv(t.get("prs"))):
+            return name
+    return None
 
 
 def _append_token(unit: dict, key: str, value: str) -> None:
@@ -499,7 +516,7 @@ def act(snap: dict, st: dict, ev: dict, verdict: dict, lost: list[str], create_f
     st["proposals"].append({"id": subject, "pid": pid, "kind": prop.get("kind"), "name": prop.get("name"),
                             "project": prop.get("project"), "stories": stories, "prs": prs,
                             "reason": verdict.get("reason", ""), "event": ev.get("line")})
-    why = " (auto-create held: workspaces %s look like units but carry no tokens)" % ",".join(lost) if auto else ""
+    why = " (auto-create held: %s awaiting restore or carrying no tokens)" % ",".join(lost) if auto else ""
     _to_seat(snap, st, "[prometheus] proposal %s: new %s unit %s for %s — %s%s. Answer with "
              "proposal.sh approve %s | decline %s"
              % (pid, prop.get("kind"), prop.get("name"), ", ".join(prs + stories), verdict.get("reason", ""),
@@ -556,12 +573,19 @@ def health(snap: dict, st: dict, now: float | None = None) -> list[str]:
             continue
         st["restarts"][label] = int(now)
         if panes:
-            units._h("pane", "run", panes[0]["pane_id"], units._launch_cmd(lead, claude_args=["--resume", sid]))
+            units.start(panes[0]["pane_id"], lead, label, lead, claude_args=["--resume", sid])
             log.append("resumed %s in %s (session %s)" % (lead, panes[0]["pane_id"], sid))
         else:
             pane = units.open_tab(u["workspace_id"], lead, lead, claude_args=["--resume", sid])
             log.append("reopened %s for %s in %s (session %s)" % (lead, label, pane, sid))
         _to_seat(snap, st, "[prometheus] %s of %s had exited; resumed session %s" % (lead, label, sid))
+    for p in dispatch.panes_with_role(snap, "librarian"):
+        last = st.setdefault("restarts", {}).get("librarian", 0)
+        if p.get("agent") or now - last < HEALTH_COOLDOWN:
+            continue
+        st["restarts"]["librarian"] = int(now)
+        units.start(p["pane_id"], "librarian", "prometheus", "librarian")  # stateless: always fresh
+        log.append("restarted librarian in %s" % p["pane_id"])
     return log
 
 
@@ -604,6 +628,7 @@ def main(argv: list[str]) -> int:
             return 0
         if a.cmd == "proposal":
             print(proposal(a.action, a.pid))
+            dispatch.poke()
             return 0
         snap = dispatch.snapshot()
         if a.cmd == "match":

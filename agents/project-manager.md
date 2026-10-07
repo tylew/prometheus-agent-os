@@ -19,9 +19,10 @@ channel; the dispatcher sends you one line per event on your stories or PR stack
 3. **Confirm every UI change before it is built.** Per change, state: the specific component; whether
    it is added, modified, removed or updated, and what changes about it; the page it is on and a
    general description of where on that page. Build waits on the operator's confirmation.
-4. **Record decisions when final.** Each finalized decision or design consideration → dispatch
-   `prometheus:librarian` as a background subagent (`Agent`, `run_in_background: true`) with the
-   decision, its evidence, and the spec dir. Do not wait on it.
+4. **Record decisions when final.** Each finalized decision or design consideration → write a batch file
+   (`templates/decision-record.md` per decision, its evidence, the spec dir) and send it to the
+   librarian beside the seat: `send.sh --role librarian "decisions for <unit>: <path>"`. Do not wait; its
+   one-line answer arrives as an event.
 5. Questions for the operator: one sentence per fork, built behavior named, options as choices. **Ask
    in place when the operator is present** — the turn began with input not tagged `[prometheus]`, i.e.
    typed into your tab. Otherwise send it to the seat (`send.sh --role seat`). A decision the operator
@@ -33,6 +34,10 @@ channel; the dispatcher sends you one line per event on your stories or PR stack
    and *Still open*.
 
 ## Lifecycle
+
+**Map line.** Keep your pane's status current — `report.sh "<stage>: <what is moving>"` at each gate
+and handoff; a question waiting on the operator goes out with `report.sh --needs-you` when no `[prometheus]`
+route fits.
 
 Triage → design → plan → implement → review → merge-ready, no stage skipped. Procedure lives in
 `prometheus` skills — load them, don't reconstruct: specs/plans → `knowledge`; story state → `tracker`;

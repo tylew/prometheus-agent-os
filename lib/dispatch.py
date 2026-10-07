@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # ---
 # name: dispatch
-# description: The dispatcher's engine — the only watcher. Shared state under a file lock, Herdr access, routing by workspace/pane tokens, agent-to-agent messages (send), safe-state coalesced delivery, agent-state polling, heartbeats, and the singleton loop. Shell scripts in skills/dispatch/scripts are thin wrappers over its subcommands.
-# usage: dispatch.py {run|tick|stop|status|send|poll-agents|route|deliver|heartbeat} [args]
+# description: The dispatcher's engine — the only watcher. Shared state under a file lock, routing by workspace/pane tokens, agent-to-agent messages (send), agents' self-reports (status / needs-you tokens), safe-state coalesced delivery, agent-state polling, heartbeats, the restore image, and the singleton loop woken by Herdr events. Shell scripts in skills/dispatch/scripts are thin wrappers over its subcommands.
+# usage: dispatch.py {run|tick|stop|status|send|report|poll-agents|route|deliver|heartbeat} [args]
 # ---
 from __future__ import annotations
 
@@ -12,14 +12,18 @@ import fcntl
 import json
 import os
 import signal
-import subprocess
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import herdr as hz  # noqa: E402
 
 SAFE_STATES = ("idle", "done", "working")
 LEADS = ("pm",)
 DEPTH3 = ("implementor", "reviewer")
 CHILDREN = DEPTH3 + ("planner",)
+CONTROL = ("seat", "librarian")
+ROLES = ("seat", "librarian", "pm", "planner", "implementor", "reviewer")
 INLINE_LIMIT = 400
 
 
@@ -33,7 +37,7 @@ def state_dir() -> str:
 
 def _empty() -> dict:
     return {"cursors": {}, "agents": {}, "ignored": [], "proposals": [], "outbox": {},
-            "last_change": {}, "beats": {}}
+            "last_change": {}, "beats": {}, "image": {}}
 
 
 @contextlib.contextmanager
@@ -58,57 +62,12 @@ def locked_state():
 # ------------------------------------------------------------------------ herdr
 
 def herdr(*args: str) -> dict:
-    out = subprocess.run([os.environ.get("HERDR_BIN", "herdr"), *args],
-                         capture_output=True, text=True, timeout=30)
-    if out.returncode != 0:
-        raise RuntimeError("herdr %s: %s" % (" ".join(args[:3]), out.stderr.strip()))
-    try:
-        return json.loads(out.stdout).get("result", {})
-    except ValueError:
-        return {}
+    return hz.call(*args)
 
 
-def _status_of(pane_id: str) -> str:
-    p = pane(snapshot(), pane_id)
-    return (p or {}).get("agent_status", "gone")
-
-
-def submit(pane_id: str, text: str, wait: float = 6.0) -> str:
-    """Type a prompt and make sure it was submitted. A prompt typed into an agent that is still starting
-    can sit unsubmitted in its input; then one Enter is sent — the text itself is never re-sent."""
-    before = _status_of(pane_id)
-    herdr("agent", "prompt", pane_id, text)
-    if before == "working":
-        return "queued"
-    for attempt in (0, 1):
-        deadline = time.time() + wait
-        while time.time() < deadline:
-            if _status_of(pane_id) in ("working", "blocked"):
-                return "submitted" if attempt == 0 else "submitted after enter"
-            time.sleep(0.5)
-        if attempt == 0:
-            if " ".join(text[:40].split()) in _read(pane_id):
-                herdr("agent", "send-keys", pane_id, "enter")
-            else:
-                # neither running nor on the input line: the keystrokes were lost, so typing once more
-                # cannot duplicate anything
-                herdr("agent", "prompt", pane_id, text)
-    return "not observed"
-
-
-def wait_input_ready(pane_id: str, timeout: float = 90, settle: float = 2.0) -> bool:
-    """Herdr reports a fresh agent idle before its input box accepts keystrokes. Ready = idle/done, the
-    Claude banner and an empty prompt line on screen, unchanged across a short settle."""
-    deadline = time.time() + timeout
-    while time.time() < deadline:
-        if _status_of(pane_id) in ("idle", "done"):
-            screen = _read(pane_id)
-            if "Claude Code" in screen and "❯" in screen and not input_busy(pane_id):
-                time.sleep(settle)
-                if _status_of(pane_id) in ("idle", "done") and not input_busy(pane_id):
-                    return True
-        time.sleep(1)
-    return False
+def submit(pane_id: str, text: str) -> str:
+    """Submit a prompt and confirm a turn started (Herdr's prompt --wait; resent only on a stall)."""
+    return hz.prompt_wait(pane_id, text)
 
 
 DIALOG_MARKERS = ("Enter to select", "Esc to cancel", "to navigate", "Do you want to proceed", "Type something")
@@ -117,9 +76,7 @@ DIALOG_MARKERS = ("Enter to select", "Esc to cancel", "to navigate", "Do you wan
 def input_busy(pane_id: str) -> str | None:
     """Why typing into this pane now would collide, or None. Herdr reports an open choice dialog as
     done/idle, and text already on the prompt line (the operator typing) would be glued to ours."""
-    out = subprocess.run([os.environ.get("HERDR_BIN", "herdr"), "pane", "read", pane_id],
-                         capture_output=True, text=True, timeout=30)
-    lines = [l.rstrip() for l in out.stdout.splitlines() if l.strip()][-12:]
+    lines = [l.rstrip() for l in hz.read(pane_id).splitlines() if l.strip()][-12:]
     if any(m in l for l in lines for m in DIALOG_MARKERS):
         return "dialog open"
     prompts = [l for l in lines if l.lstrip().startswith("❯")]
@@ -128,14 +85,8 @@ def input_busy(pane_id: str) -> str | None:
     return None
 
 
-def _read(pane_id: str) -> str:
-    out = subprocess.run([os.environ.get("HERDR_BIN", "herdr"), "pane", "read", pane_id],
-                         capture_output=True, text=True, timeout=30)
-    return " ".join(out.stdout.split())
-
-
 def snapshot() -> dict:
-    return herdr("api", "snapshot").get("snapshot", {})
+    return hz.snapshot()
 
 
 def _tokens(item: dict) -> dict:
@@ -199,11 +150,11 @@ def route(snap: dict, event: dict) -> str:
     if event.get("to_pane"):
         return event["to_pane"]
     role = event.get("role", "pm")
-    if role == "seat":
-        seats = panes_with_role(snap, "seat")
-        if not seats:
-            raise RouteError("no seat pane")
-        return seats[0]["pane_id"]
+    if role in CONTROL:
+        found = panes_with_role(snap, role)
+        if not found:
+            raise RouteError("no %s pane" % role)
+        return found[0]["pane_id"]
     hits = match_units(snap, event)
     if len(hits) > 1:
         raise RouteError("CONFLICT: " + ",".join(_tokens(u)["unit"] for u in hits))
@@ -238,10 +189,39 @@ def send(snap: dict, st: dict, message: str, *, pane_id: str | None = None,
         unit_of_workspace(snap, os.environ.get("HERDR_WORKSPACE_ID", ""))
     my_label = _tokens(my_unit).get("unit") if my_unit else "control"
     event = {"to_pane": pane_id, "role": role or "pm", "unit": unit or (my_label if my_unit else None)}
+    if event["role"] in CONTROL:
+        event["unit"] = None
     target = route(snap, event)
     enqueue(st, target, "[prometheus] from %s@%s: %s" % (me_role, my_label, message),
             unit=event.get("unit"))
     return target
+
+
+def report(snap: dict, st: dict, text: str, needs: bool = False, clear: bool = False) -> str:
+    """An agent's own map line (`status` token); --needs-you also flags it and asks the seat."""
+    me = os.environ.get("HERDR_PANE_ID")
+    if not me:
+        raise RouteError("report needs HERDR_PANE_ID (run inside an agent pane)")
+    if clear:
+        herdr("pane", "report-metadata", me, "--source", "prometheus", "--clear-token", "status",
+              "--clear-token", "needs")
+        return "cleared"
+    args = ["pane", "report-metadata", me, "--source", "prometheus", "--token", "status=%s" % text[:120]]
+    if needs:
+        args += ["--token", "needs=1"]
+    herdr(*args)
+    if not needs:
+        return "status set"
+    p = pane(snap, me) or {}
+    role = _tokens(p).get("role") or os.environ.get("PROMETHEUS_ROLE", "agent")
+    unit = unit_of_pane(snap, me)
+    where = "%s@%s" % (role, _tokens(unit).get("unit") if unit else "control")
+    line = "[prometheus] needs you — %s (%s): %s — answer with send.sh --pane %s" % (where, me, text, me)
+    try:
+        enqueue(st, route(snap, {"role": "seat"}), line)
+    except RouteError:
+        st.setdefault("seat_backlog", []).append(line)
+    return "needs-you sent to the seat"
 
 
 # --------------------------------------------------------------------- delivery
@@ -277,10 +257,20 @@ def deliver(snap: dict, st: dict, prompt=None) -> dict:
         if p.get("agent_status") not in SAFE_STATES or (prompt is submit and input_busy(pane_id)):
             report["held"].append(pane_id)
             continue
+        if _tokens(p).get("role") == "librarian":
+            if p.get("agent_status") == "working":
+                report["held"].append(pane_id)  # one batch per turn: never queue behind a running batch
+                continue
+            clear(pane_id) if prompt is submit else prompt(pane_id, "/clear")
         prompt(pane_id, _compose(pane_id, items))
         st["outbox"].pop(pane_id)
         report["delivered"].append(pane_id)
     return report
+
+
+def clear(pane_id: str) -> None:
+    herdr("agent", "prompt", pane_id, "/clear")
+    time.sleep(1.5)
 
 
 # ------------------------------------------------------------------ agent state
@@ -295,7 +285,15 @@ def poll_agents(snap: dict, st: dict) -> list[dict]:
         pid, new = p["pane_id"], p.get("agent_status", "unknown")
         seen[pid] = new
         old = st["agents"].get(pid)
+        if new == "working" and _tokens(p).get("needs"):
+            with contextlib.suppress(Exception):
+                herdr("pane", "report-metadata", pid, "--source", "prometheus", "--clear-token", "needs")
         if old is None or old == new:
+            continue
+        if role == "librarian":
+            if new == "blocked":
+                events.append({"kind": "agent", "pane": pid, "role": role, "unit": None, "route_role": "seat",
+                               "line": "[prometheus] the librarian is blocked"})
             continue
         unit = unit_of_pane(snap, pid)
         label = _tokens(unit).get("unit") if unit else None
@@ -330,9 +328,43 @@ def heartbeat(snap: dict, st: dict, minutes: int, now: float | None = None) -> l
     return events
 
 
+# ---------------------------------------------------------------- restore image
+
+def session_of(p: dict) -> str | None:
+    sess = p.get("agent_session")
+    return (sess.get("value") if isinstance(sess, dict) else sess) or None
+
+
+def update_image(snap: dict, st: dict) -> None:
+    """Record every live unit: its tokens and, per agent tab, label + pane tokens + Claude session.
+    Units not live keep their last image — that is what a Herdr restart leaves to restore."""
+    tabs = {t["tab_id"]: t.get("label") for t in snap.get("tabs", [])}
+    image = st.setdefault("image", {})
+    for u in units(snap):
+        label = _tokens(u)["unit"]
+        agents = []
+        for p in snap.get("panes", []):
+            if p.get("workspace_id") != u["workspace_id"] or not _tokens(p).get("role"):
+                continue
+            prev = next((a for a in image.get(label, {}).get("agents", [])
+                         if a["label"] == tabs.get(p.get("tab_id"))), {})
+            agents.append({"label": tabs.get(p.get("tab_id")) or _tokens(p)["role"],
+                           "tokens": {k: v for k, v in _tokens(p).items() if k not in ("status", "needs")},
+                           "session": session_of(p) or prev.get("session")})
+        agents.sort(key=lambda a: a["tokens"].get("role") != lead_role(u))
+        image[label] = {"tokens": dict(_tokens(u)), "agents": agents, "ts": int(time.time())}
+
+
+def pending_restore(snap: dict, st: dict) -> dict:
+    live = {_tokens(u)["unit"] for u in units(snap)}
+    return {k: v for k, v in st.get("image", {}).items() if k not in live}
+
+
 # ------------------------------------------------------------------------- tick
 
 def tick(heartbeat_min: int = 30, prompt=None, external: bool | None = None) -> dict:
+    """external=True runs the GitHub / Shortcut sources and unit health too; an event-woken tick only
+    polls agents and delivers."""
     snap = snapshot()
     if external is None:
         external = os.environ.get("PROMETHEUS_EXTERNAL", "1") == "1"
@@ -341,6 +373,7 @@ def tick(heartbeat_min: int = 30, prompt=None, external: bool | None = None) -> 
         if external:
             import events as ext
             log = ext.tick(snap, st)
+        update_image(snap, st)
         seats = panes_with_role(snap, "seat")
         if seats and st.get("seat_backlog"):
             for line in st.pop("seat_backlog"):
@@ -388,19 +421,31 @@ def run(interval: int, heartbeat_min: int) -> int:
     signal.signal(signal.SIGTERM, lambda *_: stopping.update(now=True))
     signal.signal(signal.SIGINT, lambda *_: stopping.update(now=True))
     _set_token("running")
+    watcher = hz.Watcher()
+    watcher.start()
+    signal.signal(signal.SIGUSR1, lambda *_: watcher.changed.set())  # poke(): a message was queued
     print("dispatcher: running, interval %ss, heartbeat %s min" % (interval, heartbeat_min), flush=True)
+    external_env = os.environ.get("PROMETHEUS_EXTERNAL", "1") == "1"
+    next_full = 0.0
     try:
         while not stopping["now"]:
+            full = time.time() >= next_full
             try:
-                r = tick(heartbeat_min)
+                r = tick(heartbeat_min, external=external_env and full)
                 if r["events"] or r["delivered"] or r["unrouted"] or r["log"]:
                     print(time.strftime("%H:%M:%S"), json.dumps(r), flush=True)
+                with contextlib.suppress(Exception):
+                    watcher.watch(p["pane_id"] for p in snapshot().get("panes", []) if _tokens(p).get("role"))
             except Exception as exc:  # one bad tick must not end the loop
                 print(time.strftime("%H:%M:%S"), "tick failed:", exc, flush=True)
-            for _ in range(interval):
-                if stopping["now"]:
+            if full:
+                next_full = time.time() + interval
+            # sleep until a Herdr event or the next full tick; 1s steps keep SIGTERM responsive
+            while not stopping["now"] and time.time() < next_full:
+                if watcher.wait(min(1.0, max(0.0, next_full - time.time()))):
+                    time.sleep(0.5)  # let a burst of events settle into one tick
+                    watcher.changed.clear()
                     break
-                time.sleep(1)
     finally:
         _set_token(None)
         with contextlib.suppress(OSError):
@@ -417,6 +462,14 @@ def running_pid() -> int | None:
         return pid
     except (OSError, ValueError):
         return None
+
+
+def poke() -> None:
+    """Wake the loop now so a queued message is delivered without waiting for the next tick."""
+    pid = running_pid()
+    if pid:
+        with contextlib.suppress(OSError):
+            os.kill(pid, signal.SIGUSR1)
 
 
 def stop() -> int:
@@ -444,9 +497,13 @@ def main(argv: list[str]) -> int:
     s = sub.add_parser("send")
     g = s.add_mutually_exclusive_group(required=True)
     g.add_argument("--pane")
-    g.add_argument("--role", choices=["pm", "planner", "implementor", "reviewer", "seat"])
+    g.add_argument("--role", choices=list(ROLES))
     s.add_argument("--unit")
     s.add_argument("message", nargs="+")
+    rp = sub.add_parser("report")
+    rp.add_argument("--needs-you", action="store_true")
+    rp.add_argument("--clear", action="store_true")
+    rp.add_argument("text", nargs="*")
     sub.add_parser("poll-agents")
     rt = sub.add_parser("route")
     rt.add_argument("event")
@@ -482,6 +539,17 @@ def main(argv: list[str]) -> int:
                 print("send: %s" % exc, file=sys.stderr)
                 return 1
             print("queued for %s" % target)
+            poke()
+        elif a.cmd == "report":
+            if not a.clear and not a.text:
+                print("report: give a line, or --clear", file=sys.stderr)
+                return 2
+            try:
+                print(report(snap, st, " ".join(a.text), needs=a.needs_you, clear=a.clear))
+                poke()
+            except RouteError as exc:
+                print("report: %s" % exc, file=sys.stderr)
+                return 1
         elif a.cmd == "poll-agents":
             for ev in poll_agents(snap, st):
                 print(json.dumps(ev))

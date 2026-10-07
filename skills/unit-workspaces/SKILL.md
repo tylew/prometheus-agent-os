@@ -22,5 +22,5 @@ close-unit.sh <workspace-id> [--force]
 - **Lead** — a delivery workspace's first tab, renamed `pm`, runs `lib/launch.sh pm`.
   `--brief` delivers the brief once the agent reaches its prompt.
 - **Close** — refused while a role pane is `working` or `blocked`, or for a workspace without unit tokens.
-  Before closing, the lead has removed its worktrees and has no librarian run in flight.
+  Before closing, the lead has removed its worktrees and sent its last decision batch to the librarian.
 - The operator defines units: never carve, merge or add to one without them.

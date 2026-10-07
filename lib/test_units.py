@@ -3,6 +3,7 @@ import os
 import sys
 import tempfile
 import unittest
+import unittest.mock
 
 LIB = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, LIB)
@@ -34,7 +35,8 @@ class UnitsTest(unittest.TestCase):
                                         "stories": "sc-1", "prs": "o/r#10", "stage": "triage"})
         pane = w["panes"][0]
         self.assertEqual(pane["tokens"], {"role": "pm"})
-        self.assertIn("launch.sh pm", pane["ran"])
+        self.assertIn("--agent prometheus:project-manager --name pm", pane["ran"])
+        self.assertEqual(pane["agent_name"], "sc-1-a-%s" % pane["pane_id"].replace(":", "-"))
         self.assertEqual(w["tabs"][0]["label"], "pm")
         self.assertEqual(out["lead"], "pm")
 
@@ -53,26 +55,65 @@ class UnitsTest(unittest.TestCase):
                               extra_allow=["Bash(make lint *)"])
         p = next(x for x in self.world()["panes"] if x["pane_id"] == pane)
         self.assertEqual(p["tokens"], {"role": "implementor", "item": "derate", "worktree": "/w/derate"})
-        self.assertIn("PROMETHEUS_EXTRA_ALLOW=", p["ran"])
-        self.assertIn("launch.sh implementor", p["ran"])
+        self.assertIn("--agent prometheus:implementor --permission-mode dontAsk --name impl-derate", p["ran"])
+        settings = json.load(open(os.path.join(self.tmp.name, "settings", "implementor.json")))
+        self.assertIn("Bash(make lint *)", settings["permissions"]["allow"])
 
-    def test_send_brief_waits_for_prompt_then_confirms_landing(self):
+    def test_send_brief_lands_with_prompt_wait(self):
         ws = units.create("sc-1-a", "story", "besstie", ["sc-1"], [])["workspace"]
         pane = units.open_tab(ws, "review-10", "reviewer", pr="o/r#10")
-        self.assertEqual(units.send_brief(pane, self.brief), "landed (working)")
+        self.assertEqual(units.send_brief(pane, self.brief), "landed (started)")
         p = next(x for x in self.world()["panes"] if x["pane_id"] == pane)
         self.assertEqual(p["prompts"], ["Read your brief at %s and begin." % self.brief])
 
-    def test_send_brief_presses_enter_once_when_the_prompt_sits_unsubmitted(self):
-        os.environ["FAKE_HERDR_SWALLOW_ENTER"] = "1"
+    def test_send_brief_resends_once_after_a_stall(self):
+        os.environ["FAKE_HERDR_STALL"] = "1"
         try:
             ws = units.create("sc-1-a", "story", "besstie", ["sc-1"], [])["workspace"]
             pane = units.open_tab(ws, "review-10", "reviewer", pr="o/r#10")
-            self.assertEqual(units.send_brief(pane, self.brief, landed_timeout=4), "landed (working)")
+            with unittest.mock.patch("time.sleep"):
+                self.assertEqual(units.send_brief(pane, self.brief), "landed (started)")
         finally:
-            del os.environ["FAKE_HERDR_SWALLOW_ENTER"]
+            del os.environ["FAKE_HERDR_STALL"]
         p = next(x for x in self.world()["panes"] if x["pane_id"] == pane)
-        self.assertEqual((len(p["prompts"]), p["keys"]), (1, [["enter"]]))
+        self.assertEqual(len(p["prompts"]), 2)
+
+    def test_close_drops_the_restore_image(self):
+        import dispatch
+        ws = units.create("sc-1-a", "story", "besstie", ["sc-1"], [])["workspace"]
+        with dispatch.locked_state() as st:
+            dispatch.update_image(dispatch.snapshot(), st)
+            self.assertIn("sc-1-a", st["image"])
+        units.close(ws, force=True)
+        with dispatch.locked_state() as st:
+            self.assertNotIn("sc-1-a", st["image"])
+
+    def test_restore_recreates_unit_and_resumes_sessions(self):
+        import dispatch
+        projects = os.path.join(self.tmp.name, "claude", "projects", "-ws")
+        os.makedirs(projects)
+        open(os.path.join(projects, "s-pm.jsonl"), "w").close()
+        os.environ["CLAUDE_CONFIG_DIR"] = os.path.join(self.tmp.name, "claude")
+        try:
+            with dispatch.locked_state() as st:
+                st["image"] = {"sc-1-a": {"tokens": {"unit": "sc-1-a", "kind": "story", "project": "besstie",
+                                                     "stories": "sc-1", "stage": "implement"},
+                                          "agents": [{"label": "pm", "tokens": {"role": "pm"}, "session": "s-pm"},
+                                                     {"label": "impl-a", "tokens": {"role": "implementor", "item": "a"},
+                                                      "session": "s-gone"}]}}
+                st["restore_backlog"] = {"sc-1-a": ["[prometheus] ci pass o/r#10"]}
+            out = units.restore_all()
+        finally:
+            del os.environ["CLAUDE_CONFIG_DIR"]
+        self.assertEqual((out[0]["back"], out[0]["missing"]), (["pm"], ["impl-a"]))
+        w = self.world()
+        self.assertEqual(w["workspaces"][0]["tokens"]["stage"], "implement")
+        pm = w["panes"][0]
+        self.assertEqual(pm["tokens"], {"role": "pm"})
+        self.assertIn("--resume s-pm", pm["ran"])
+        with dispatch.locked_state() as st:
+            self.assertEqual(st["outbox"][pm["pane_id"]][0]["line"], "[prometheus] ci pass o/r#10")
+            self.assertEqual(dispatch.pending_restore(dispatch.snapshot(), st), {})
 
     def test_close_refuses_busy_and_untagged(self):
         ws = units.create("sc-1-a", "story", "besstie", ["sc-1"], [])["workspace"]

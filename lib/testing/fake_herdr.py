@@ -85,6 +85,20 @@ elif cmd == ["pane", "run"]:
     p = find("panes", "pane_id", a[2])
     p["agent_status"] = os.environ.get("FAKE_HERDR_LAUNCH_STATE", "idle")
     p["ran"] = a[3]
+elif cmd == ["agent", "start"]:
+    p = find("panes", "pane_id", opt("--pane"))
+    p.update(agent="claude", agent_name=a[2], agent_status=os.environ.get("FAKE_HERDR_LAUNCH_STATE", "idle"),
+             ran=" ".join(a[a.index("--") + 1:]) if "--" in a else "")
+    res = {"agent": {"name": a[2]}}
+elif cmd == ["agent", "prompt"] and "--wait" in a:
+    p = find("panes", "pane_id", a[2])
+    p.setdefault("prompts", []).append(a[3])
+    if os.environ.get("FAKE_HERDR_STALL") and not p.get("stalled"):
+        p["stalled"] = True
+        json.dump(w, open(path, "w"))
+        print(json.dumps({"error": {"code": "agent_prompt_stalled", "message": "no state change"}}))
+        sys.exit(1)
+    p["agent_status"] = "working"
 elif cmd == ["agent", "prompt"]:
     p = find("panes", "pane_id", a[2])
     p.setdefault("prompts", []).append(a[3])

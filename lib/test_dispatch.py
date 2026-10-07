@@ -130,6 +130,64 @@ class SendDeliverTest(Base):
         self.assertEqual(r["dropped"], ["wZ:p9"])
 
 
+class LibrarianReportTest(Base):
+    def lib_snap(self):
+        s = snap()
+        s["panes"].append({"pane_id": "wC:p2", "workspace_id": "wC", "agent_status": "idle",
+                           "tokens": {"role": "librarian"}})
+        return s
+
+    def test_librarian_is_reached_from_any_unit_and_cleared_before_each_batch(self):
+        os.environ.update(PROMETHEUS_ROLE="pm", HERDR_WORKSPACE_ID="wA")
+        sent = []
+        with d.locked_state() as st:
+            self.assertEqual(d.send(self.lib_snap(), st, "decisions for sc-1-a: /b.md", role="librarian"), "wC:p2")
+            d.deliver(self.lib_snap(), st, prompt=lambda p, t: sent.append(t))
+        self.assertEqual(sent, ["/clear", "[prometheus] from pm@sc-1-a: decisions for sc-1-a: /b.md"])
+
+    def test_a_working_librarian_is_never_queued_behind(self):
+        s = self.lib_snap()
+        s["panes"][-1]["agent_status"] = "working"
+        with d.locked_state() as st:
+            d.enqueue(st, "wC:p2", "[prometheus] batch 2")
+            r = d.deliver(s, st, prompt=lambda p, t: self.fail("delivered"))
+        self.assertEqual(r["held"], ["wC:p2"])
+
+    def test_needs_you_flags_the_pane_and_asks_the_seat(self):
+        world = os.path.join(self.tmp.name, "world.json")
+        json.dump(snap(), open(world, "w"))
+        os.environ.update(HERDR_BIN=os.path.join(LIB, "testing", "fake_herdr.py"), FAKE_HERDR_WORLD=world,
+                          HERDR_PANE_ID="wA:p1")
+        try:
+            with d.locked_state() as st:
+                d.report(d.snapshot(), st, "v1 or v2 API?", needs=True)
+                line = st["outbox"]["wC:p1"][0]["line"]
+            toks = json.load(open(world))["panes"][1]["tokens"]
+            self.assertEqual((toks["status"], toks["needs"]), ("v1 or v2 API?", "1"))
+            self.assertIn("needs you — pm@sc-1-a (wA:p1): v1 or v2 API?", line)
+            w = json.load(open(world))
+            w["panes"][1]["agent_status"] = "working"
+            json.dump(w, open(world, "w"))
+            with d.locked_state() as st:
+                d.poll_agents(d.snapshot(), st)
+            self.assertNotIn("needs", json.load(open(world))["panes"][1]["tokens"])
+        finally:
+            for k in ("HERDR_BIN", "FAKE_HERDR_WORLD", "HERDR_PANE_ID"):
+                os.environ.pop(k)
+
+    def test_image_keeps_units_that_vanish(self):
+        s = snap()
+        s["tabs"] = [{"tab_id": "wA:t1", "label": "pm"}]
+        s["panes"][1].update(tab_id="wA:t1", agent_session={"value": "s1"})
+        with d.locked_state() as st:
+            d.update_image(s, st)
+            gone = snap(workspaces=[w for w in snap()["workspaces"] if w["workspace_id"] != "wA"])
+            d.update_image(gone, st)
+            pending = d.pending_restore(gone, st)
+        self.assertEqual(list(pending), ["sc-1-a"])
+        self.assertEqual(pending["sc-1-a"]["agents"][0], {"label": "pm", "tokens": {"role": "pm"}, "session": "s1"})
+
+
 class AgentsHeartbeatTest(Base):
     def test_depth3_finish_goes_to_pm_lead_block_goes_to_seat(self):
         with d.locked_state() as st:

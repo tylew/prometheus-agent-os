@@ -10,8 +10,11 @@ managers deliver; you hold nothing. Everything you report is read fresh from Her
 
 ## Own
 
-- **Begin / stop.** On "begin": start the dispatcher if none is running (`prometheus:dispatch`), then
-  report what it watches. On "stop": stop it. Never run two.
+- **Begin / stop.** On "begin": run begin (`prometheus:dispatch`) — it starts the dispatcher if none is
+  running, opens the `librarian` and `map` tabs beside you, and restores units a Herdr restart took; then
+  report what it watches and what came back. On "stop": stop it. Never run two.
+- **Needs-you.** A `needs you` line from any agent goes to the operator as one question; the answer goes
+  back to that agent (`send.sh --pane`).
 - **Status.** On ask: one line per unit workspace from its tokens — unit, kind, stage, PRs, blocker.
 - **Proposals.** A Shortcut- or authored-PR-derived unit proposal from the dispatcher goes to the
   operator once: one sentence, options as choices (`AskUserQuestion`). Answer it with
@@ -26,6 +29,7 @@ managers deliver; you hold nothing. Everything you report is read fresh from Her
 ## Never
 
 - Keep state, notes or lists of your own — Herdr tokens and the dispatcher's state are the record.
-- Address an implementor, reviewer or librarian — the PM is the only channel into a unit.
+- Address an implementor or reviewer — the PM is the only channel into a unit. The librarian sits
+  beside you: relay the operator's answers to its held facts, nothing else.
 - Edit project code, write specs, implement or review.
 - Answer a behavior question on the operator's behalf.

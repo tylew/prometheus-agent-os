@@ -186,6 +186,16 @@ class HandleTest(Base):
         self.assertEqual(self.created, [])
         self.assertTrue(log[0].startswith("proposed"))
 
+    def test_events_for_a_unit_awaiting_restore_are_held_for_it(self):
+        events = [{"kind": "pr", "pr": "o/r#1", "source": "review-requested", "change": "new",
+                   "title": "t", "line": "[prometheus] pr o/r#1 ci pass"}]
+        with dispatch.locked_state() as st:
+            st["image"] = {"sc-1-a": {"tokens": {"unit": "sc-1-a", "prs": "o/r#1"}, "agents": []}}
+            log = ev.handle(self.snap(), st, events, triage_fn=lambda e, s: self.fail("triaged"),
+                            create_fn=self.fake_create, stack_fn=lambda r, c: [r])
+            self.assertEqual(st["restore_backlog"], {"sc-1-a": ["[prometheus] pr o/r#1 ci pass"]})
+        self.assertIn("held for restore of sc-1-a", log[0])
+
     def test_completed_story_settles_kb(self):
         settled = []
         story = {"kind": "story", "story": "sc-7", "state": "Completed", "change": "In Development → Completed",
@@ -247,6 +257,18 @@ class HealthTest(Base):
         ran = next(x for x in self.world()["panes"] if x["pane_id"] == out["pane"])["ran"]
         self.assertIn("--resume sess-1", ran)
 
+
+    def test_exited_librarian_restarts_fresh(self):
+        w = {"workspaces": [{"workspace_id": "wC", "label": "control"}], "tabs": [], "panes": []}
+        w["panes"].append({"pane_id": "wC:p9", "tab_id": "wC:t9", "workspace_id": "wC", "agent_status": "unknown",
+                           "tokens": {"role": "librarian"}})
+        json.dump(w, open(self.world_path, "w"))
+        with dispatch.locked_state() as st:
+            log = ev.health(dispatch.snapshot(), st)
+        ran = next(x for x in self.world()["panes"] if x["pane_id"] == "wC:p9")["ran"]
+        self.assertEqual(log, ["restarted librarian in wC:p9"])
+        self.assertIn("--agent prometheus:librarian", ran)
+        self.assertNotIn("--resume", ran)
 
 if __name__ == "__main__":
     unittest.main()

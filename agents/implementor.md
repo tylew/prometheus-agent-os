@@ -30,3 +30,5 @@ workspace), then end your turn — the PM's answer arrives the same way.
   and its result, PR link, open questions; failed or skipped checks stated as such — and send one line
   pointing at it.
 - **Blocked or a question:** one line naming it. Never wait in a dialog for the PM.
+
+Map line: `report.sh "<what you are doing>"` at each step (`prometheus:dispatch`); `report.sh --clear` when done.

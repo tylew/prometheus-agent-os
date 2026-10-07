@@ -40,3 +40,5 @@ nothing about *how* work is built; you make *what* changes exact, with the opera
 Send to any agent with `prometheus:dispatch` → `send.sh` (queued, delivered in a safe state):
 `--role pm --unit <label>` to answer a PM's scope request. Report to
 the seat when a batch is created: story links, proposed units, open questions.
+
+Map line: `report.sh "<what you are doing>"` at each step (`prometheus:dispatch`); `report.sh --clear` when done.

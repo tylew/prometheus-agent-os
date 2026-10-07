@@ -22,8 +22,9 @@
       "Bash(wc *)",
       "Bash(find *)",
       "Bash(*/skills/dispatch/scripts/send.sh *)",
+      "Bash(*/skills/dispatch/scripts/report.sh *)",
       "Bash(python3 */lib/registry.py *)",
-      "Write({state_dir}/reviews/**)",
+      "Write(/{state_dir}/reviews/**)",
       "Bash(git -C * show *)",
       "Bash(git -C * diff *)",
       "Bash(git -C * log *)",
@@ -36,7 +37,9 @@
       "Bash(git cat-file *)",
       "Bash(git rev-parse *)",
       "Bash(git grep *)",
-      "Bash(git -C * grep *)"
+      "Bash(git -C * grep *)",
+      "Bash(send.sh *)",
+      "Bash(report.sh *)"
     ],
     "deny": [
       "AskUserQuestion",
