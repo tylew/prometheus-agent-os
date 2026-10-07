@@ -17,7 +17,8 @@
       "Bash(python3 */lib/registry.py *)",
       "Bash(ls *)",
       "Bash(wc *)",
-      "Bash(head *)"
+      "Bash(head *)",
+      "Bash(python3 \"*/lib/registry.py\" *)"
     ],
     "deny": [
       "Edit(/{workspace}/**)",

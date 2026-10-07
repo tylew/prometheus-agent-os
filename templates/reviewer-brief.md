@@ -1,10 +1,15 @@
 ---
-description: Project manager → reviewer. One PR, one round, judged fresh against the unit's operator-defined scenarios.
+description: Project manager → reviewer. One PR, one round, a fresh session, judged against the unit's operator-defined scenarios.
 unit: <workspace-label>
-pr: <number>
+project: <registry key>
+pr: <owner/repo#number>
 round: <n>
+requested: <yes | no — no = a teammate's PR touching owned paths; COMMENT unless Critical/High, never approve>
+deep: <false | true — true only when the operator opted in for this PR>
+stack: [<#bottom>, …, <#top> | standalone]
 stack_position: <n of m | standalone>
-worktree: <absolute path, read-only>
+below: <#n approved | none>
+worktree: <absolute path, read-only, detached at the head>
 artifact: ~/.local/state/prometheus/reviews/<owner>-<repo>-<pr>-r<round>.md
 ---
 
@@ -13,9 +18,18 @@ artifact: ~/.local/state/prometheus/reviews/<owner>-<repo>-<pr>-r<round>.md
 ## Scenarios the PR must satisfy
 <Operator scenarios for the items in this PR, verbatim.>
 
+## Story scope
+<The delivered story's scope as the board states it, quoted. Empty for a teammate's PR without one.>
+
+## Open threads
+<Unresolved review threads at brief time: comment id, path:line, author — from the PM's reviewThreads read.
+Any comment newer than this brief is also open.>
+
 ## Prior rounds
-<Standing findings to re-check, or "first round".>
+<Findings files of earlier rounds (paths), the head each reviewed, or "first round".>
 
 ## Deliver
-Findings posted per `review`; report to the PM: counts by severity, review link, and anything
-that needs a PM or operator call (behavior beyond the scenarios, scenarios not met).
+One round per `prometheus:review`: post it, write the findings file at `artifact`, then one
+`send.sh --role pm` line — counts, held-back counts, event, review link, file path — and end the turn.
+Anything needing a PM or operator call (behavior beyond the scenarios, scenarios not met, disputes,
+non-convergence, a hold cause, denied actions) goes under *Needs a call* in the file.

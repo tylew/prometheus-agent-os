@@ -44,7 +44,7 @@ merge-ready, no stage skipped.
 
 **Review units** (`kind` review — someone else's PR stack, opened by the dispatcher) skip design, plan and
 build: your job is the review loop on every PR in the `prs` token, bottom rung first, until each merges,
-closes or the operator puts it on hold (`review` → the loop reference). Per round: decide it is due, open a
+closes or the operator puts it on hold (`review` → `references/review-loop.md`). Per round: decide it is due, open a
 fresh `review-<pr#>` tab with its brief, read its report, keep the story's counts line if the PR delivers a
 story, resolve threads it verified fixed, close the tab. Your brief says whether the review was requested;
 an unrequested one (the PR touches the operator's owned paths) is labelled so in each review body and posts

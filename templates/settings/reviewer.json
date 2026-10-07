@@ -1,5 +1,5 @@
 {
-  "$comment": "Depth-3 reviewer: never prompts a human, never edits code. Launched with --permission-mode dontAsk; anything not allowed is denied and reported to the PM. Writes only its findings file under {state_dir}/reviews/ (launch.sh fills in the real state dir). open-tab.sh appends the project's validation commands. Path rules for writes are Edit(...) (they cover Write); a bare Edit deny would block the findings file too — dontAsk already denies every edit not allowed.",
+  "$comment": "Depth-3 reviewer: never prompts a human, never edits code; posts its own round via gh api (reviews, comments). Agent = the pr-review-toolkit fan-out; Workflow = deep mode on the operator's opt-in only. Launched with --permission-mode dontAsk; anything not allowed is denied and reported to the PM. Writes only its findings file under {state_dir}/reviews/ (launch.sh fills in the real state dir). open-tab.sh appends the project's validation commands. Path rules for writes are Edit(...) (they cover Write); a bare Edit deny would block the findings file too — dontAsk already denies every edit not allowed.",
   "permissions": {
     "defaultMode": "dontAsk",
     "allow": [
@@ -39,7 +39,16 @@
       "Bash(git grep *)",
       "Bash(git -C * grep *)",
       "Bash(send.sh *)",
-      "Bash(report.sh *)"
+      "Bash(report.sh *)",
+      "Agent",
+      "Workflow",
+      "Skill",
+      "Bash(gh pr list *)",
+      "Bash(gh api repos/*/pulls/*/reviews/*)",
+      "Bash(git merge-base *)",
+      "Bash(git -C * merge-base *)",
+      "Bash(head *)",
+      "Bash(python3 \"*/lib/registry.py\" *)"
     ],
     "deny": [
       "AskUserQuestion",

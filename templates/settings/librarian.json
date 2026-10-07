@@ -20,7 +20,8 @@
       "Bash(ls *)",
       "mcp__shortcut__stories-get-by-id",
       "Bash(send.sh *)",
-      "Bash(report.sh *)"
+      "Bash(report.sh *)",
+      "Bash(python3 \"*/lib/registry.py\" *)"
     ],
     "deny": [
       "AskUserQuestion",
