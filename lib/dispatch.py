@@ -93,6 +93,23 @@ def submit(pane_id: str, text: str, wait: float = 6.0) -> str:
     return "not observed"
 
 
+DIALOG_MARKERS = ("Enter to select", "Esc to cancel", "to navigate", "Do you want to proceed", "Type something")
+
+
+def input_busy(pane_id: str) -> str | None:
+    """Why typing into this pane now would collide, or None. Herdr reports an open choice dialog as
+    done/idle, and text already on the prompt line (the operator typing) would be glued to ours."""
+    out = subprocess.run([os.environ.get("HERDR_BIN", "herdr"), "pane", "read", pane_id],
+                         capture_output=True, text=True, timeout=30)
+    lines = [l.rstrip() for l in out.stdout.splitlines() if l.strip()][-12:]
+    if any(m in l for l in lines for m in DIALOG_MARKERS):
+        return "dialog open"
+    prompts = [l for l in lines if l.lstrip().startswith("❯")]
+    if prompts and prompts[-1].lstrip()[1:].strip():
+        return "input line not empty"
+    return None
+
+
 def _read(pane_id: str) -> str:
     out = subprocess.run([os.environ.get("HERDR_BIN", "herdr"), "pane", "read", pane_id],
                          capture_output=True, text=True, timeout=30)
@@ -234,7 +251,7 @@ def deliver(snap: dict, st: dict, prompt=None) -> dict:
             report["dropped"].append(pane_id)
             st["outbox"].pop(pane_id)
             continue
-        if p.get("agent_status") not in SAFE_STATES:
+        if p.get("agent_status") not in SAFE_STATES or (prompt is submit and input_busy(pane_id)):
             report["held"].append(pane_id)
             continue
         prompt(pane_id, _compose(pane_id, items))

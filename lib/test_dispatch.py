@@ -100,6 +100,25 @@ class SendDeliverTest(Base):
         path = sent[0].rsplit("details: ", 1)[1]
         self.assertEqual(len(json.load(open(path))), 3)
 
+    def test_open_dialog_or_typed_input_holds_delivery(self):
+        world = os.path.join(self.tmp.name, "world.json")
+        s = snap()
+        s["panes"][1]["screen"] = "Enter to select · ↑/↓ to navigate · Esc to cancel"
+        s["panes"][0]["input"] = "half-typed by the operator"
+        json.dump(s, open(world, "w"))
+        os.environ.update(HERDR_BIN=os.path.join(LIB, "testing", "fake_herdr.py"), FAKE_HERDR_WORLD=world)
+        try:
+            self.assertEqual(d.input_busy("wA:p1"), "dialog open")
+            self.assertEqual(d.input_busy("wC:p1"), "input line not empty")
+            self.assertIsNone(d.input_busy("wA:p2"))
+            with d.locked_state() as st:
+                d.enqueue(st, "wA:p1", "x")
+                r = d.deliver(s, st)
+            self.assertEqual(r["held"], ["wA:p1"])
+        finally:
+            for k in ("HERDR_BIN", "FAKE_HERDR_WORLD"):
+                os.environ.pop(k)
+
     def test_vanished_pane_is_dropped(self):
         with d.locked_state() as st:
             d.enqueue(st, "wZ:p9", "x")
