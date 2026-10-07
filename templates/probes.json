@@ -38,10 +38,24 @@
         },
         "python3 \"{plugin_root}/lib/registry.py\" field repo.slug --key besstie",
         "mcp__shortcut__stories-update",
-        "mcp__launchdarkly__get-feature-flag"
+        "mcp__launchdarkly__get-feature-flag",
+        {
+          "cmd": "composio search sheets",
+          "live": false
+        }
       ],
       "ask": [
-        "mcp__launchdarkly__update-feature-flag"
+        "mcp__launchdarkly__update-feature-flag",
+        {
+          "cmd": "composio execute GOOGLESHEETS_GET x",
+          "live": false
+        }
+      ],
+      "deny": [
+        {
+          "cmd": "composio link googlesheets",
+          "live": false
+        }
       ]
     },
     "planner": {
@@ -115,7 +129,11 @@
         "mcp__shortcut__stories-update",
         "mcp__shortcut__stories-create",
         "mcp__shortcut__stories-create-comment",
-        "mcp__launchdarkly__update-feature-flag"
+        "mcp__launchdarkly__update-feature-flag",
+        {
+          "cmd": "composio search sheets",
+          "live": false
+        }
       ]
     },
     "reviewer": {
@@ -179,7 +197,11 @@
         "mcp__shortcut__stories-update",
         "mcp__shortcut__stories-create",
         "mcp__shortcut__stories-create-comment",
-        "mcp__launchdarkly__update-feature-flag"
+        "mcp__launchdarkly__update-feature-flag",
+        {
+          "cmd": "composio search sheets",
+          "live": false
+        }
       ]
     },
     "librarian": {
@@ -215,7 +237,11 @@
         "mcp__shortcut__stories-update",
         "mcp__shortcut__stories-create",
         "mcp__shortcut__stories-create-comment",
-        "mcp__launchdarkly__update-feature-flag"
+        "mcp__launchdarkly__update-feature-flag",
+        {
+          "cmd": "composio search sheets",
+          "live": false
+        }
       ]
     },
     "runner": {
@@ -234,7 +260,11 @@
           "live": "redash.sh --help"
         },
         "python3 \"{plugin_root}/lib/registry.py\" field repo.slug --key besstie",
-        "Write({state_dir}/exports/x.csv)"
+        "Write({state_dir}/exports/x.csv)",
+        {
+          "cmd": "composio search sheets",
+          "live": false
+        }
       ],
       "deny": [
         "Write({workspace}/docs/x.md)",
@@ -246,7 +276,17 @@
         "mcp__shortcut__stories-update",
         "mcp__shortcut__stories-create",
         "mcp__shortcut__stories-create-comment",
-        "mcp__launchdarkly__update-feature-flag"
+        "mcp__launchdarkly__update-feature-flag",
+        {
+          "cmd": "composio link googlesheets",
+          "live": false
+        }
+      ],
+      "ask": [
+        {
+          "cmd": "composio execute GOOGLESHEETS_GET x",
+          "live": false
+        }
       ]
     },
     "configurator": {

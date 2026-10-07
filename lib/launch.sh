@@ -54,10 +54,17 @@ mcp_map = json.load(open(os.path.join(os.path.dirname(base_path), "..", "mcp", "
 servers = {}
 for src in mcp_map["sources"]:
     try:
-        servers.update({k: v for k, v in json.load(open(os.path.join(workspace, src)))["mcpServers"].items()
-                        if k not in servers})
+        defs = json.load(open(os.path.join(workspace, src)))["mcpServers"]
     except (OSError, ValueError, KeyError):
-        pass
+        continue
+    base = os.path.dirname(os.path.join(workspace, src))
+    for k, v in defs.items():
+        if k in servers:
+            continue
+        if v.get("args"):  # sub-repo stdio servers name paths relative to their repo: make them absolute
+            v = dict(v, args=[os.path.join(base, x) if not x.startswith(("-", "/", ":")) and
+                              os.path.exists(os.path.join(base, x)) and base != workspace else x for x in v["args"]])
+        servers[k] = v
 mine = [s for s in mcp_map["roles"].get(role_name, []) if s in servers]
 mcp_dir = os.path.join(state, "mcp")
 os.makedirs(mcp_dir, exist_ok=True)
@@ -71,6 +78,12 @@ mperms["allow"] = list(dict.fromkeys(mperms.get("allow", []) + ["mcp__%s" % s fo
 deny = [("mcp__%s__%s" % (s, t)) for s in mine for t in mcp_map["write_tools"].get(s, [])
         if role_name not in mcp_map["writers"].get(s, [])]
 mperms["deny"] = list(dict.fromkeys(mperms.get("deny", []) + deny))
+for tool, spec in mcp_map.get("cli", {}).items():
+    if role_name in spec.get("roles", []):
+        for kind in ("allow", "ask", "deny"):
+            mperms[kind] = list(dict.fromkeys(mperms.get(kind, []) + ["Bash(%s)" % c for c in spec.get(kind, [])]))
+    else:
+        mperms["deny"] = list(dict.fromkeys(mperms.get("deny", []) + ["Bash(%s *)" % tool]))
 ask = [("mcp__%s__%s" % (s, t)) for s in mine if role_name in mcp_map.get("ask_writers", {}).get(s, [])
        for t in mcp_map["write_tools"].get(s, [])]
 if ask:  # a writer that still asks the operator per call (ask beats allow)

@@ -107,7 +107,9 @@ class McpTest(unittest.TestCase):
                 run_launch(role, state_dir=st)
             m = {r: json.load(open(os.path.join(st, "mcp", r + ".json")))["mcpServers"] for r in ("reviewer", "pm", "seat")}
             s = {r: json.load(open(os.path.join(st, "settings", r + ".json")))["permissions"] for r in ("reviewer", "pm", "seat")}
-            self.assertLessEqual(set(m["seat"]), {"shortcut"})
+            roles = json.load(open(os.path.join(os.path.dirname(LIB), "templates", "mcp", "roles.json")))["roles"]
+            for r in ("reviewer", "pm", "seat"):
+                self.assertLessEqual(set(m[r]), set(roles[r]))  # never a server the map does not grant
             self.assertEqual(stat.S_IMODE(os.stat(os.path.join(st, "mcp", "pm.json")).st_mode), 0o600)
             if "launchdarkly" in m["reviewer"]:
                 self.assertIn("mcp__launchdarkly__update-feature-flag", s["reviewer"]["deny"])

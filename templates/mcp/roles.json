@@ -1,27 +1,37 @@
 {
-  "$comment": "Which MCP servers each role gets — launch.sh builds <state>/mcp/<role>.json (mode 600, never committed) from the server definitions in `sources` (workspace-relative; they hold the secrets) and launches with --mcp-config <it> --strict-mcp-config, so a role sees the same servers in any folder. `write_tools` are denied to every role not in `writers`; read tools are allowed server-wide for dontAsk roles. `ask_writers` may write only through a per-call permission prompt (a flag change is the operator's yes in the PM's tab).",
+  "$comment": "Which MCP servers each role gets — launch.sh builds <state>/mcp/<role>.json (mode 600, never committed) from the server definitions in `sources` (workspace-relative; they hold the secrets) and launches with --mcp-config <it> --strict-mcp-config, so a role sees the same servers in any folder. `write_tools` are denied to every role not in `writers`; read tools are allowed server-wide for dontAsk roles. `ask_writers` may write only through a per-call permission prompt (a flag change is the operator's yes in the PM's tab). `cli` grants command-line tools the same way (Bash rules per role; `ask` prompts each call). A stdio server from a sub-repo source has its relative path arguments made absolute so it runs from any folder.",
   "sources": [
     ".mcp.json",
     "repos/voltus/.mcp.json"
   ],
   "roles": {
     "seat": [
-      "shortcut"
+      "shortcut",
+      "buildkite",
+      "granola",
+      "slack-readonly"
     ],
     "pm": [
       "shortcut",
       "buildkite",
       "launchdarkly",
-      "datadog"
+      "datadog",
+      "granola",
+      "slack-readonly",
+      "voltus",
+      "duckdb"
     ],
     "planner": [
       "shortcut",
-      "launchdarkly"
+      "launchdarkly",
+      "granola",
+      "slack-readonly"
     ],
     "implementor": [
       "shortcut",
       "buildkite",
-      "launchdarkly"
+      "launchdarkly",
+      "duckdb"
     ],
     "reviewer": [
       "shortcut",
@@ -33,10 +43,16 @@
       "shortcut",
       "buildkite",
       "launchdarkly",
-      "datadog"
+      "datadog",
+      "granola",
+      "slack-readonly",
+      "voltus",
+      "duckdb"
     ],
     "librarian": [
-      "shortcut"
+      "shortcut",
+      "granola",
+      "slack-readonly"
     ],
     "configurator": [
       "shortcut"
@@ -114,5 +130,27 @@
     "launchdarkly": [
       "pm"
     ]
+  },
+  "cli": {
+    "composio": {
+      "roles": [
+        "pm",
+        "runner"
+      ],
+      "allow": [
+        "composio search *",
+        "composio tools *",
+        "composio --help",
+        "composio * --help"
+      ],
+      "ask": [
+        "composio execute *",
+        "composio run *",
+        "composio proxy *"
+      ],
+      "deny": [
+        "composio link *"
+      ]
+    }
   }
 }
