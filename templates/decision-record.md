@@ -1,9 +1,9 @@
 ---
-description: Project manager → librarian. One decision, handed off when made; it waits in the KB inbox until binds_to settles (all merged / Completed → recorded; any abandoned → dropped).
+description: Project manager → librarian. One decision, handed off when made; it waits in the KB inbox until binds_to settles (every bound story Completed → recorded; any Won't Fix → dropped).
 unit: <workspace-label>
 project: <registry key>
 spec_dir: <docs/specs/<project>/<slug>/>
-binds_to: [<owner/repo#n | sc-##### | operator>]
+binds_to: [<sc-##### | operator>]
 signoff: <confirmed spec path | meeting id | operator>
 date: <YYYY-MM-DD>
 ---
