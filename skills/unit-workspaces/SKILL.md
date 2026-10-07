@@ -18,7 +18,7 @@ close-unit.sh <workspace-id> [--force]
   "plan X" becomes) · `review-<root-pr>-<slug>` (a stack under review).
 - **Tokens** (source `prometheus`) — workspace: `unit`, `kind`, `project` (a registry key), `stories`,
   `prs`, `stage`; panes: `role`, `item`, `pr`, `worktree`. One writer each: `create-unit.sh` sets the
-  workspace tokens; the lead keeps `stage`, `stories`, `prs` current; the session-role hook sets `role`.
+  workspace tokens; the lead keeps `stage`, `stories`, `prs` current with `dispatch/scripts/unit-tokens.sh`; the session-role hook sets `role`.
 - **Lead** — a delivery workspace's first tab, renamed `pm`, runs `lib/launch.sh pm`.
   `--brief` delivers the brief once the agent reaches its prompt.
 - **Close** — refused while a role pane is `working` or `blocked`, or for a workspace without unit tokens.

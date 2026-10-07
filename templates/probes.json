@@ -32,6 +32,10 @@
           "cmd": "report.sh unit on track",
           "live": "report.sh --help"
         },
+        {
+          "cmd": "unit-tokens.sh --stage review --add-pr o/r#1",
+          "live": "unit-tokens.sh --help"
+        },
         "python3 \"{plugin_root}/lib/registry.py\" field repo.slug --key besstie",
         "mcp__shortcut__stories-update",
         "mcp__launchdarkly__get-feature-flag"
@@ -89,6 +93,10 @@
       ],
       "deny": [
         {
+          "cmd": "unit-tokens.sh --stage review --add-pr o/r#1",
+          "live": false
+        },
+        {
           "cmd": "cd {wt} && git status",
           "live": "cd {wt} && git status"
         },
@@ -136,9 +144,23 @@
         "Agent",
         "Skill",
         "mcp__shortcut__stories-get-by-id",
-        "mcp__launchdarkly__get-feature-flag"
+        "mcp__launchdarkly__get-feature-flag",
+        "mcp__claude-in-chrome__navigate",
+        "mcp__claude-in-chrome__computer",
+        "mcp__claude-in-chrome__read_page",
+        "mcp__claude-in-chrome__find",
+        "mcp__claude-in-chrome__get_page_text",
+        "mcp__claude-in-chrome__tabs_context_mcp",
+        "mcp__claude-in-chrome__tabs_create_mcp",
+        "mcp__claude-in-chrome__tabs_close_mcp",
+        "mcp__claude-in-chrome__read_console_messages",
+        "mcp__claude-in-chrome__read_network_requests",
+        "mcp__claude-in-chrome__javascript_tool",
+        "mcp__claude-in-chrome__file_upload",
+        "mcp__claude-in-chrome__upload_image"
       ],
       "deny": [
+        "mcp__claude-in-chrome__gif_creator",
         {
           "cmd": "cd {wt} && git status",
           "live": "cd {wt} && git status"

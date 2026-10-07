@@ -2,7 +2,7 @@
 # ---
 # name: units
 # description: Unit workspaces and agent tabs over Herdr — create a unit (workspace, tokens, lead tab), list and close units, open / brief / close agent tabs (role tokens, `herdr agent start` with launch.sh's args, allow-list extras), the control tabs beside the seat (librarian, map), restoring units from the dispatcher's image after a Herdr restart, and context hygiene (compact an idle agent, refresh a session in a new tab). The unit-workspaces, agent-tabs and context-hygiene scripts are thin wrappers over its subcommands.
-# usage: units.py {create|list|close|open-tab|send-brief|close-tab|compact|refresh|control-tabs|restore} [args]
+# usage: units.py {create|list|tokens|close|open-tab|send-brief|close-tab|compact|refresh|control-tabs|restore} [args]
 # ---
 from __future__ import annotations
 
@@ -165,6 +165,28 @@ def list_units() -> list[dict]:
                      "stories": t.get("stories"), "prs": t.get("prs"),
                      "lead": lead, "lead_status": leads[0].get("agent_status") if leads else "missing"})
     return rows
+
+
+def set_tokens(workspace_id: str, stage: str | None = None, stories: str | None = None,
+               prs: str | None = None, add_stories: list[str] | None = None,
+               add_prs: list[str] | None = None) -> dict:
+    """The lead's writer for its unit's stage / stories / prs; never unit, kind or project."""
+    unit = dispatch.unit_of_workspace(_snap(), workspace_id)
+    if not unit:
+        raise ValueError("%s is not a unit workspace" % workspace_id)
+    cur = dispatch._tokens(unit)
+    out = {}
+    for key, whole, extra in (("stories", stories, add_stories), ("prs", prs, add_prs)):
+        if whole is None and not extra:
+            continue
+        base = dispatch._csv(whole) if whole is not None else dispatch._csv(cur.get(key))
+        out[key] = ",".join(dict.fromkeys(base + (extra or [])))
+    if stage:
+        out["stage"] = stage
+    if not out:
+        raise ValueError("nothing to set: give --stage, --stories, --prs, --add-story or --add-pr")
+    tag_workspace(workspace_id, **out)
+    return {**{k: cur.get(k) for k in ("unit", "stage", "stories", "prs")}, **out}
 
 
 def close(workspace_id: str, force: bool = False) -> None:
@@ -449,6 +471,12 @@ def main(argv: list[str]) -> int:
     q.add_argument("workspace")
     q.add_argument("slug")
     q.add_argument("ask", nargs="+")
+    tk = sub.add_parser("tokens", help="set the caller's own unit tokens (HERDR_PANE_ID)")
+    tk.add_argument("--stage")
+    tk.add_argument("--stories", help="replace: csv")
+    tk.add_argument("--prs", help="replace: csv")
+    tk.add_argument("--add-story", action="append", default=[])
+    tk.add_argument("--add-pr", action="append", default=[])
     rs = sub.add_parser("restore")
     rs.add_argument("--unit", action="append", default=[])
     rs.add_argument("--forget", action="append", default=[], help="drop a unit's image instead; repeatable")
@@ -487,6 +515,12 @@ def main(argv: list[str]) -> int:
             print(json.dumps(quick(a.workspace, a.slug, " ".join(a.ask))))
         elif a.cmd == "respawn":
             print(respawn(a.pane, a.force))
+        elif a.cmd == "tokens":
+            unit = dispatch.unit_of_pane(_snap(), os.environ.get("HERDR_PANE_ID", ""))
+            if not unit:
+                raise ValueError("tokens: run from a pane inside a unit workspace (HERDR_PANE_ID)")
+            print(json.dumps(set_tokens(unit["workspace_id"], a.stage, a.stories, a.prs,
+                                        a.add_story, a.add_pr)))
         elif a.cmd == "control-tabs":
             print("opened: %s" % (", ".join(control_tabs(a.workspace)) or "nothing (both present)"))
         elif a.cmd == "restore":

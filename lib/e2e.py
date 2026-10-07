@@ -42,6 +42,9 @@ def main(argv: list[str]) -> int:
         opened.append(out["workspace"])
         pm = out["pane"]
         step("unit created and PM started", dispatch.pane(dispatch.snapshot(), pm) is not None, pm)
+        units.set_tokens(out["workspace"], stage="design", add_prs=["o/r#1"])
+        row = next((r for r in units.list_units() if r["unit"] == name), {})
+        step("unit tokens set (stage, prs)", (row.get("stage"), row.get("prs")) == ("design", "o/r#1"), str(row))
         brief = os.path.join(state, "brief.md")
         with open(brief, "w") as fh:
             fh.write("Plumbing e2e. Reply with the single word OK and do nothing else.\n")

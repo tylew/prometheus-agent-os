@@ -53,6 +53,24 @@ class UnitsTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             units.create("plan-x", "planning", "besstie", [], [])
 
+    def test_tokens_sets_stage_stories_prs_on_the_callers_unit_only(self):
+        out = units.create("sc-1-a", "story", "besstie", ["sc-1"], ["o/r#10"])
+        got = units.set_tokens(out["workspace"], stage="review", add_prs=["o/r#11", "o/r#10"])
+        self.assertEqual((got["stage"], got["prs"]), ("review", "o/r#10,o/r#11"))
+        units.set_tokens(out["workspace"], stories="sc-1,sc-2")
+        self.assertEqual(self.world()["workspaces"][0]["tokens"],
+                         {"unit": "sc-1-a", "kind": "story", "project": "besstie",
+                          "stories": "sc-1,sc-2", "prs": "o/r#10,o/r#11", "stage": "review"})
+        with self.assertRaises(TypeError):
+            units.set_tokens(out["workspace"], unit="x")
+        with self.assertRaises(ValueError):
+            units.set_tokens(out["workspace"])
+        with unittest.mock.patch.dict(os.environ, {"HERDR_PANE_ID": out["pane"]}):
+            self.assertEqual(units.main(["tokens", "--stage", "design"]), 0)
+        self.assertEqual(self.world()["workspaces"][0]["tokens"]["stage"], "design")
+        with unittest.mock.patch.dict(os.environ, {"HERDR_PANE_ID": "w9:p9"}):
+            self.assertEqual(units.main(["tokens", "--stage", "design"]), 1)
+
     def test_open_tab_tags_role_and_passes_allow_extras(self):
         ws = units.create("sc-1-a", "story", "besstie", ["sc-1"], [])["workspace"]
         pane = units.open_tab(ws, "impl-derate", "implementor", item="derate", worktree="/w/derate",

@@ -122,8 +122,8 @@ restack a branch another agent is editing.
   finding each go to a new reviewer session that has not seen the author's reasoning.
 - **`/compact` at boundaries** — send `/compact <keep: item, open findings, next step>` to a long-running
   agent between rounds or after a commit, never mid-edit.
-- **Tokens** — keep your workspace's `stage`, `stories` and `prs` current; a PR you open joins `prs`
-  before anything else, so the dispatcher routes its events to you.
+- **Tokens** — keep your workspace's `stage`, `stories` and `prs` current (`unit-tokens.sh`); a PR you
+  open joins `prs` (`--add-pr`) before anything else, so the dispatcher routes its events to you.
 - **Yourself** — your Claude session is your memory; no separate state file. Durable facts live where
   they already belong: scenarios + plan in the spec dir, story state in Shortcut, code + PRs in git,
   decisions in the KB, ownership + stage in Herdr tokens. A replacement PM resumes your session
