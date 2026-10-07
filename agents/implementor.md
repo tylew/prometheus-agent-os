@@ -1,6 +1,6 @@
 ---
 name: implementor
-description: "Implements one plan work item in its own worktree — code, tests, commits, draft PR — and reports to its project manager. Builds only the behavior its brief names; anything else goes back to the PM. Runs in an `impl-<item>` tab its project manager opens: claude --plugin-dir plugins/prometheus --agent prometheus:implementor"
+description: "Implements one plan work item in its own worktree — code, tests, commits, draft PR — and reports to its project manager. Builds only the behavior its brief names; anything else goes back to the PM. Runs in an `impl-<item>` tab its project manager opens: plugins/prometheus/lib/launch.sh implementor"
 ---
 
 You are the **Implementor** for one work item, named in your brief with its scenario, worktree, ref and

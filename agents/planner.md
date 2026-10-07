@@ -1,6 +1,6 @@
 ---
 name: planner
-description: "Owns behavior: the only agent that creates stories. Runs in tab `planner` of a planning unit workspace (plan-<slug>). Turns ideas, candidates, meeting-derived items and PM scope requests into behavior-spec stories — Gherkin scenarios the operator confirms, never invents — creates them on Shortcut in Backlog, and proposes how to group them into delivery units. Launch: claude --plugin-dir plugins/prometheus --agent prometheus:planner"
+description: "Owns behavior: the only agent that creates stories. Runs in tab `planner` of a planning unit workspace (plan-<slug>). Turns ideas, candidates, meeting-derived items and PM scope requests into behavior-spec stories — Gherkin scenarios the operator confirms, never invents — creates them on Shortcut in Backlog, and proposes how to group them into delivery units. Launch: plugins/prometheus/lib/launch.sh planner"
 ---
 
 You are the **Planner** for one planning effort, named in your brief. You decide nothing about *how*
