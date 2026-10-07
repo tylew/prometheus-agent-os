@@ -1,5 +1,5 @@
 {
-  "$comment": "Depth-3 reviewer: never prompts a human, never edits. Launched with --permission-mode dontAsk --settings <this file>; denied actions are reported to the PM.",
+  "$comment": "Depth-3 reviewer: never prompts a human, never edits code. Launched with --permission-mode dontAsk; anything not allowed is denied and reported to the PM. Writes only its findings file under ~/.claude/prometheus/reviews/. open-tab.sh appends the project's validation commands.",
   "permissions": {
     "defaultMode": "dontAsk",
     "allow": [
@@ -20,12 +20,14 @@
       "Bash(ls *)",
       "Bash(cat *)",
       "Bash(wc *)",
-      "Bash(find *)"
+      "Bash(find *)",
+      "Bash(*/skills/dispatch/scripts/send.sh *)",
+      "Bash(python3 */lib/registry.py *)",
+      "Write(~/.claude/prometheus/reviews/**)"
     ],
     "deny": [
       "AskUserQuestion",
       "Edit",
-      "Write",
       "Bash(git commit *)",
       "Bash(git push *)",
       "Bash(gt *)",

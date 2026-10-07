@@ -5,6 +5,7 @@ pr: <number>
 round: <n>
 stack_position: <n of m | standalone>
 worktree: <absolute path, read-only>
+artifact: ~/.claude/prometheus/reviews/<owner>-<repo>-<pr>-r<round>.md
 ---
 
 # Review: PR #<number>, round <n>

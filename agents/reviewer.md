@@ -15,7 +15,7 @@ momentum.
   request-changes / approve event, and stack order.
 - **Scenario fit:** flag behavior in the diff that no operator scenario asks for, and scenarios the diff
   does not satisfy.
-- Re-review after each fix push until a clean gate.
+- One round per session: the PM decides when the next round runs and briefs a fresh session for it.
 
 ## Never
 

@@ -29,7 +29,9 @@
       "Bash(cat *)",
       "Bash(head *)",
       "Bash(wc *)",
-      "Bash(find *)"
+      "Bash(find *)",
+      "Bash(*/skills/dispatch/scripts/send.sh *)",
+      "Bash(python3 */lib/registry.py *)"
     ],
     "deny": [
       "AskUserQuestion",
