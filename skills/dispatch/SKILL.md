@@ -78,7 +78,21 @@ quick.sh <slug> "<the ask>"     a quick-<slug> runner tab beside the seat; expor
 Artifacts only: the runner never edits a project, commits or writes the tracker; code changes come back as
 a proposed unit. Its permission prompts reach the seat as needs-you; its result is a `done` line to the seat.
 
-## Self-report — `report.sh` (every agent)
+## Instruction gaps — up, never fixed in place
+
+Only a configurator changes prometheus (the edit guard enforces it), and only the seat opens one. Any agent
+that hits a wrong or missing instruction, a denial its work needed, or a gap worth codifying reports it with
+the evidence and carries on with what it can:
+
+```
+worker (implementor · reviewer · planner) → its PM        send.sh --role pm   "gap: <what> — evidence: <denial / path>"
+PM · runner · librarian                    → the seat      send.sh --role seat "gap: <what> — evidence: …"
+seat: triage — gimme (mechanical: allow-list, path, script bug, lint) → configure.sh <slug> "<issue + evidence>"
+               changes what an agent decides or does → one question to the operator first
+```
+The configurator proposes acceptance criteria; the seat signs off or raises concerns (for the operator).
+
+## Quick work — `quick.sh` (the seat)
 
 ```
 report.sh "<one line>"              your line on the map (status token)

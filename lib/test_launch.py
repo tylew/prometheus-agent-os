@@ -70,6 +70,17 @@ class LaunchTest(unittest.TestCase):
 
 
 
+class PluginRepoTest(unittest.TestCase):
+    def test_workspace_is_never_the_plugin_repo(self):
+        import subprocess
+        plugin = os.path.dirname(LIB)
+        e = {k: v for k, v in os.environ.items() if k != "WORKSPACE"}
+        out = subprocess.run([sys.executable, os.path.join(LIB, "env.py")], cwd=plugin, env=e,
+                             capture_output=True, text=True).stdout.strip()
+        self.assertNotEqual(os.path.realpath(out), os.path.realpath(plugin))
+        self.assertTrue(os.path.isdir(os.path.join(out, "plugins", "prometheus")))
+
+
 class McpTest(unittest.TestCase):
     def test_roles_get_their_servers_and_writes_are_gated(self):
         import json, stat, tempfile

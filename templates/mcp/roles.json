@@ -37,6 +37,9 @@
     ],
     "librarian": [
       "shortcut"
+    ],
+    "configurator": [
+      "shortcut"
     ]
   },
   "writers": {

@@ -42,3 +42,5 @@ Send to any agent with `prometheus:dispatch` → `send.sh` (queued, delivered in
 the seat when a batch is created: story links, proposed units, open questions.
 
 Map line: `report.sh "<what you are doing>"` at each step (`prometheus:dispatch`); `report.sh --clear` when done.
+
+Instruction gap or a denial your work needed → your PM (`send.sh --role pm "gap: …"`) with the evidence; never edit prometheus yourself (`prometheus:dispatch` → *Instruction gaps*).

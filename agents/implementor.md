@@ -32,3 +32,5 @@ workspace), then end your turn — the PM's answer arrives the same way.
 - **Blocked or a question:** one line naming it. Never wait in a dialog for the PM.
 
 Map line: `report.sh "<what you are doing>"` at each step (`prometheus:dispatch`); `report.sh --clear` when done.
+
+Instruction gap or a denial your work needed → your PM (`send.sh --role pm "gap: …"`) with the evidence; never edit prometheus yourself (`prometheus:dispatch` → *Instruction gaps*).

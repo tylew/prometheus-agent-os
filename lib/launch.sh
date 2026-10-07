@@ -2,7 +2,7 @@
 # ---
 # name: launch
 # description: The one launch recipe for every prometheus role. Merges templates/settings/launch.json with the role's allow-list (plus PROMETHEUS_EXTRA_ALLOW, one rule per line) into one settings file, adds --permission-mode dontAsk for depth-3 roles and the librarian, and execs claude with the role's agent (WORKSPACE, PROMETHEUS_ROLE set). --args prints the claude arguments as a JSON array instead, for `herdr agent start`; PROMETHEUS_DRY_RUN=1 prints the command.
-# usage: launch.sh <seat|librarian|runner|planner|pm|implementor|reviewer> [--args] [extra claude args...]
+# usage: launch.sh <seat|librarian|runner|configurator|planner|pm|implementor|reviewer> [--args] [extra claude args...]
 # ---
 set -euo pipefail
 
@@ -15,7 +15,7 @@ if [[ ${1:-} == --args ]]; then args_only=1; shift; fi
 case $role in
   seat)        agent=orchestrator ;;
   pm)          agent=project-manager ;;
-  librarian|runner|planner|implementor|reviewer) agent=$role ;;
+  librarian|runner|configurator|planner|implementor|reviewer) agent=$role ;;
   *) echo "launch: unknown role '$role'" >&2; exit 2 ;;
 esac
 

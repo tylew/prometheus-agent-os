@@ -35,6 +35,9 @@ channel; the dispatcher sends you one line per event on your stories or PR stack
 
 ## Lifecycle
 
+**Instruction gaps.** A gap your agents or you hit goes to the seat with the evidence (`prometheus:dispatch`
+→ *Instruction gaps*); you never edit prometheus. Work around it for now only within your allow-list.
+
 **Flags.** You may change a LaunchDarkly flag only when the unit's confirmed plan calls for it; each change is a
 permission prompt in your tab the operator answers — state the flag, environment and new value first.
 

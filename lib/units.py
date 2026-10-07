@@ -22,7 +22,7 @@ import env  # noqa: E402
 import herdr as hz  # noqa: E402
 
 KINDS = ("story", "story-set", "goal-set", "review")
-ROLES = ("pm", "planner", "implementor", "reviewer", "librarian", "runner")
+ROLES = ("pm", "planner", "implementor", "reviewer", "librarian", "runner", "configurator")
 READY_STATES = ("idle", "done")
 BUSY_STATES = ("working", "blocked")
 PASS_ENV = ("PROMETHEUS_STATE_DIR", "PROMETHEUS_FILTER", "PROMETHEUS_EXTERNAL", "PROMETHEUS_KB_ROOT")
@@ -244,6 +244,24 @@ def control_tabs(workspace_id: str) -> list[str]:
 
 # -------------------------------------------------------------- quick work
 
+def configure(workspace_id: str, slug: str, issue: str) -> dict:
+    """One plugin change: a `config-<slug>` configurator tab beside the seat with the issue as its brief."""
+    slug = re.sub(r"[^a-z0-9-]+", "-", slug.lower()).strip("-")
+    label = "config-%s" % slug
+    if _tab_by_label(workspace_id, label):
+        raise ValueError("%s is already open" % label)
+    brief = os.path.join(dispatch.state_dir(), "briefs", "%s.md" % label)
+    os.makedirs(os.path.dirname(brief), exist_ok=True)
+    proposal = os.path.join(dispatch.state_dir(), "config", "%s.md" % slug)
+    with open(brief, "w") as fh:
+        fh.write("# %s\n\n## Issue and evidence (from the seat)\n%s\n\n## Proposal file\n%s — fill it from "
+                 "templates/config-change.md and send it to the seat before editing anything.\n"
+                 % (label, issue, proposal))
+    os.makedirs(os.path.dirname(proposal), exist_ok=True)
+    pane_id = open_tab(workspace_id, label, "configurator", item=slug)
+    return {"pane": pane_id, "label": label, "proposal": proposal, "brief": send_brief(pane_id, brief)}
+
+
 def quick(workspace_id: str, slug: str, ask: str) -> dict:
     """One quick work item: a `quick-<slug>` runner tab beside the seat, its exports folder, its brief."""
     slug = re.sub(r"[^a-z0-9-]+", "-", slug.lower()).strip("-")
@@ -388,6 +406,10 @@ def main(argv: list[str]) -> int:
     r.add_argument("role", choices=ROLES)
     r.add_argument("brief")
     sub.add_parser("control-tabs").add_argument("workspace")
+    cf = sub.add_parser("configure")
+    cf.add_argument("workspace")
+    cf.add_argument("slug")
+    cf.add_argument("issue", nargs="+")
     q = sub.add_parser("quick")
     q.add_argument("workspace")
     q.add_argument("slug")
@@ -424,6 +446,8 @@ def main(argv: list[str]) -> int:
             print("compact sent to %s" % a.pane)
         elif a.cmd == "refresh":
             print(refresh(a.workspace, a.label, a.role, a.brief))
+        elif a.cmd == "configure":
+            print(json.dumps(configure(a.workspace, a.slug, " ".join(a.issue))))
         elif a.cmd == "quick":
             print(json.dumps(quick(a.workspace, a.slug, " ".join(a.ask))))
         elif a.cmd == "control-tabs":

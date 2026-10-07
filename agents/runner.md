@@ -23,3 +23,5 @@ you (input not tagged `[prometheus]`): answer in place.
    Shortcut — read only) — `prometheus:data`.
 6. Map line as you go: `report.sh "<what you are doing>"`. Scripts are on your PATH; call them bare, one
    command per Bash call.
+
+Instruction gap or a denial your work needed → the seat (`send.sh --role seat "gap: …"`) with the evidence; never edit prometheus yourself (`prometheus:dispatch` → *Instruction gaps*).

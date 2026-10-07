@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # ---
 # name: env
-# description: Resolve the workspace root once for every prometheus script — $WORKSPACE if set, else the git toplevel holding this plugin (when the plugin lives in a workspace checkout), else the git toplevel of the cwd. Exit 1 with empty stdout when unresolvable.
+# description: Resolve the workspace root once for every prometheus script — $WORKSPACE if set, else the git toplevel holding this plugin's directory (the plugin is its own repository inside the workspace checkout), else the git toplevel of the cwd — never the plugin repo itself. Exit 1 with empty stdout when unresolvable.
 # usage: env.py [workspace]
 # ---
 from __future__ import annotations
@@ -28,10 +28,15 @@ def workspace_root(cwd: str | None = None) -> str | None:
     env = os.environ.get("WORKSPACE")
     if env and os.path.isdir(env):
         return os.path.abspath(env)
-    top = _toplevel(PLUGIN_ROOT)
-    if top and os.path.isdir(os.path.join(top, "plugins", "prometheus")):
-        return top
-    return _toplevel(cwd or os.getcwd())
+    # the plugin is its own repository inside the workspace: look from its parent, not from itself
+    for start in (os.path.dirname(PLUGIN_ROOT), PLUGIN_ROOT):
+        top = _toplevel(start)
+        if top and os.path.isdir(os.path.join(top, "plugins", "prometheus")):
+            return top
+    top = _toplevel(cwd or os.getcwd())
+    if top and os.path.realpath(top) == os.path.realpath(PLUGIN_ROOT):
+        return None  # never mistake the plugin repo for the workspace
+    return top
 
 
 def main(argv: list[str]) -> int:

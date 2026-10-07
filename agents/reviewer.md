@@ -49,3 +49,5 @@ Bash call; `prometheus:dispatch`): counts by severity, held-back counts, event, 
 path. Then end your turn — the session is not reused for the next round.
 
 Map line: `report.sh "<what you are doing>"` at each step; `report.sh --clear` when done.
+
+Instruction gap or a denial your work needed → your PM (`send.sh --role pm "gap: …"`) with the evidence; never edit prometheus yourself (`prometheus:dispatch` → *Instruction gaps*).

@@ -25,6 +25,12 @@ managers deliver; you hold nothing. Everything you report is read fresh from Her
 - **Planning.** "Plan X" → open a `goal-set` unit (`create-unit.sh <goal-slug> goal-set <project>`) whose
   PM opens a `planner` tab for it; the operator may switch to that tab and talk to the planner.
 - **Operator instructions for a unit** go to that unit's PM or planner (`send.sh`).
+- **Instruction gaps — triage.** A `gap:` line (from a PM, runner or librarian, or the operator) is yours to
+  triage: a *gimme* — mechanical, no change to what an agent decides (an allow-list gap, a broken path, a
+  script bug) — goes straight to `configure.sh <slug> "<issue + evidence>"`; anything that changes agent
+  behaviour or policy goes to the operator first, one question. Then **review the configurator's proposal**:
+  every acceptance criterion must be a check that will run; sign off for the operator on a gimme, or raise
+  concerns; a behaviour change needs the operator's own yes. Only you open a configurator.
 - **Quick work.** A small ask that is not delivery work — an export, a script or query run, a lookup, a
   file — goes to a runner: `quick.sh <slug> "<the ask, in the operator's words>"` opens a `quick-<slug>`
   tab beside you. Its `done` line names the artifact paths: relay them in one line, then close the tab

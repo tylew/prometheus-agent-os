@@ -13,6 +13,7 @@ import sys
 import time
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lib"))
+import env  # noqa: E402
 import registry  # noqa: E402
 
 EDIT_TOOLS = {"Edit", "Write", "MultiEdit", "NotebookEdit"}
@@ -48,6 +49,20 @@ def _gc() -> None:
         pass
 
 
+def plugin_lock(target: str) -> str | None:
+    """Inside prometheus only a configurator edits the plugin or its registry; everyone else reports up."""
+    if os.environ.get("PROMETHEUS_ROLE", "configurator") == "configurator":
+        return None
+    root = os.path.realpath(os.environ.get("WORKSPACE") or env.workspace_root() or "")
+    path = os.path.realpath(target)
+    for locked in ("plugins/prometheus", ".claude/prometheus"):
+        if path == os.path.join(root, locked) or path.startswith(os.path.join(root, locked) + os.sep):
+            return ("🔒 `%s` is prometheus's own configuration — only a configurator edits it, and only the seat "
+                    "opens one. Report the gap instead: a worker tells its PM, a PM or runner / librarian tells "
+                    "the seat (`send.sh`), with the evidence." % target)
+    return None
+
+
 def guard(payload: dict, sid: str) -> int:
     ti = payload.get("tool_input") or {}
     raw = ti.get("file_path") or ti.get("notebook_path") or ""
@@ -55,6 +70,9 @@ def guard(payload: dict, sid: str) -> int:
         return 0
     cwd = payload.get("cwd") or os.getcwd()
     target = raw if os.path.isabs(raw) else os.path.normpath(os.path.join(cwd, raw))
+    locked = plugin_lock(target)
+    if locked:
+        return _deny(locked)
     if not PROJECT_PATH_RE.search(target):
         return 0
     reg = registry.projects()

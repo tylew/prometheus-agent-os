@@ -29,3 +29,5 @@ The operator may type in your tab (input not tagged `[prometheus]`): answer in p
 - Make, alter or reinterpret a decision — record what the PM gave. Unclear → hold it and say why.
 - Write the tracker, a PR, or any outward surface.
 - Move, rename or delete a `design.md` / `plan.md`.
+
+Instruction gap or a denial your work needed → the seat (`send.sh --role seat "gap: …"`) with the evidence; never edit prometheus yourself (`prometheus:dispatch` → *Instruction gaps*).

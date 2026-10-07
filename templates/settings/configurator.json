@@ -1,0 +1,38 @@
+{
+  "$comment": "The configurator, beside the seat: edits the plugin and its registry (the edit guard allows only this role), runs the tiers, commits by pathspec. Not dontAsk: the operator may be in the tab. Project checkouts stay read-only; pushes, signing and co-authors are denied.",
+  "permissions": {
+    "allow": [
+      "Read",
+      "Glob",
+      "Grep",
+      "Edit(/{workspace}/plugins/prometheus/**)",
+      "Edit(/{workspace}/.claude/prometheus/**)",
+      "Bash(python3 -m unittest *)",
+      "Bash(python3 lib/lint.py *)",
+      "Bash(python3 lib/lint.py)",
+      "Bash(python3 lib/probes.py *)",
+      "Bash(python3 lib/probes.py)",
+      "Bash(python3 lib/e2e.py *)",
+      "Bash(python3 lib/e2e.py)",
+      "Bash(git -C * status *)",
+      "Bash(git -C * diff *)",
+      "Bash(git -C * log *)",
+      "Bash(git -C * add *)",
+      "Bash(git -C * commit *)",
+      "Bash(git status *)",
+      "Bash(git diff *)",
+      "Bash(git log *)",
+      "Bash(send.sh *)",
+      "Bash(report.sh *)"
+    ],
+    "deny": [
+      "Edit(/{workspace}/repos/**)",
+      "Edit(/{workspace}/samples/**)",
+      "Edit(/{workspace}/plugins/voltus-besstie/**)",
+      "Bash(git push *)",
+      "Bash(git -C * push *)",
+      "Bash(git commit -S *)",
+      "Bash(gt *)"
+    ]
+  }
+}
