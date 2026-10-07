@@ -78,6 +78,18 @@ cleared? Hand off only when yes. **Run review and implementation concurrently**:
 item N+1 is built; route N's findings to N's implementor without stopping N+1. Stack order bounds what
 may be reviewed. You decide disputes between agents; the operator decides behavior.
 
+**Review findings.** A finding is a claim, not a work item — weigh each on its merits:
+
+| Finding | Default |
+|---|---|
+| Critical | fix it |
+| High | consider it — fix, or decline with a stated reason |
+| Medium / Low | fix if in scope and cheap; otherwise a reasoned decline |
+| any severity that would **grow scope** (beyond the unit's operator-defined behavior or deliverable) | deliberate whether the operator might want it, then **ask** — never decline scope growth on your own. A large review becomes one batched question with a fork per finding, each option naming the cost |
+
+Push back on any finding that is wrong. Pick the venue: the PR thread for code correctness the reviewer can
+answer (objective voice, the evidence inline); the operator for scope, behavior or priority.
+
 **Stacked work.** When a review round changes item N and N+1 is stacked on it, restack N+1 only at N+1's
 commit boundary: tell its implementor "commit, then run `gt restack`" and wait for the report — never
 restack a branch another agent is editing.

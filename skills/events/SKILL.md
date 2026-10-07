@@ -17,7 +17,7 @@ typing in your tab — answer in place.
 | Kind | Example | React |
 |---|---|---|
 | `pr … ci pass / fail` | `pr o/r#12 ci fail` | fail → read the checks, brief the item's implementor; pass → is the round due? |
-| `pr … review <who>:<state>` · `… new comment(s)` | | route findings to the item's implementor; dispute → decide, behavior → operator |
+| `pr … review <who>:<state>` · `… new comment(s)` | | triage per the PM's *Review findings* table — critical fixed, high weighed, scope growth asked of the operator (batched), wrong findings pushed back on the thread or to the operator; fixes go to the item's implementor |
 | `pr … merged / closed` | | close the item's tab and worktree; merged → advance the story (`tracker`) |
 | `pr … new commits` · `ready for review` | | a review round may be due (`review`) |
 | `story sc-… <old> → <new>` | | reconcile your plan with the board |
