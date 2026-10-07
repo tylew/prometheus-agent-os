@@ -1,5 +1,5 @@
 {
-  "$comment": "Depth-3 reviewer: never prompts a human, never edits code; posts its own round via gh api (reviews, comments). Agent = the pr-review-toolkit fan-out; Workflow = deep mode on the operator's opt-in only. Launched with --permission-mode dontAsk; anything not allowed is denied and reported to the PM. Writes only its findings file under {state_dir}/reviews/ (launch.sh fills in the real state dir). open-tab.sh appends the project's validation commands. Path rules for writes are Edit(...) (they cover Write); a bare Edit deny would block the findings file too — dontAsk already denies every edit not allowed.",
+  "$comment": "Depth-3 reviewer: never prompts a human, never edits code; posts its own round via gh api (reviews, comments). Agent = the pr-review-toolkit fan-out and, in a validate round, the Chrome walkers; mcp__claude-in-chrome__* = the walk's browser tools, listed one by one (anything else from that server stays denied); Workflow = deep mode on the operator's opt-in only. Launched with --permission-mode dontAsk; anything not allowed is denied and reported to the PM. Writes only its findings file under {state_dir}/reviews/ (launch.sh fills in the real state dir). open-tab.sh appends the project's validation commands. Path rules for writes are Edit(...) (they cover Write); a bare Edit deny would block the findings file too — dontAsk already denies every edit not allowed.",
   "permissions": {
     "defaultMode": "dontAsk",
     "allow": [
@@ -53,7 +53,20 @@
       "Bash(make -C * run_test *)",
       "Bash(gh api repos/*/commits/*)",
       "Bash(gh api repos/*/compare/*)",
-      "Bash(*/.claude/prometheus/projects/*/*.sh *)"
+      "Bash(*/.claude/prometheus/projects/*/*.sh *)",
+      "mcp__claude-in-chrome__navigate",
+      "mcp__claude-in-chrome__computer",
+      "mcp__claude-in-chrome__read_page",
+      "mcp__claude-in-chrome__find",
+      "mcp__claude-in-chrome__get_page_text",
+      "mcp__claude-in-chrome__tabs_context_mcp",
+      "mcp__claude-in-chrome__tabs_create_mcp",
+      "mcp__claude-in-chrome__tabs_close_mcp",
+      "mcp__claude-in-chrome__read_console_messages",
+      "mcp__claude-in-chrome__read_network_requests",
+      "mcp__claude-in-chrome__javascript_tool",
+      "mcp__claude-in-chrome__file_upload",
+      "mcp__claude-in-chrome__upload_image"
     ],
     "deny": [
       "AskUserQuestion",

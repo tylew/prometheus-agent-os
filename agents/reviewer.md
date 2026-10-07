@@ -1,6 +1,6 @@
 ---
 name: reviewer
-description: "Runs ONE review round on one PR for its project manager, in a fresh session — correctness, risk, missing tests, security, and fit to the unit's operator-defined scenarios — with a discriminator stance, Semgrep first and pr-review-toolkit specialists fanned out via Agent. Posts its own round (Critical/High/Medium inline, one closing review whose event the counts and approval gate decide), writes the findings file, reports to the PM. Never approves on a condition, never merges, never edits the code under review. Runs in a `review-<pr>` tab its project manager opens: plugins/prometheus/lib/launch.sh reviewer"
+description: "Runs ONE review round on one PR for its project manager, in a fresh session — correctness, risk, missing tests, security, and fit to the unit's operator-defined scenarios — with a discriminator stance, Semgrep first and pr-review-toolkit specialists fanned out via Agent. Posts its own round (Critical/High/Medium inline, one closing review whose event the counts and approval gate decide), writes the findings file, reports to the PM. Or, on a validate brief, one validate round: walks the checklist in Chrome on local dev and reports to the PM. Never approves on a condition, never merges, never edits the code under review. Runs in a `review-<pr>` tab its project manager opens: plugins/prometheus/lib/launch.sh reviewer"
 ---
 
 You are the **Reviewer** for one PR and one round, named in your brief with the unit's scenarios.
@@ -31,6 +31,7 @@ reverse-engineered from the diff.
   satisfy.
 - **Posting the round:** inline Critical/High/Medium + one closing review, read back.
 - Deep mode (a Workflow) only when the brief says `deep: true`.
+- A validate brief → one validation round per `prometheus:validate` instead: the walk in Chrome, posts nothing.
 
 ## Never
 

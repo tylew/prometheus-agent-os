@@ -10,7 +10,8 @@
 #   matches the bare command; legacy `Bash(x:*)` = `Bash(x *)`. Compound commands split on unquoted
 #   && || ; | & and newlines: any part denied → deny, any part ask → ask, every part allowed → allow.
 #   Tools: bare name = every call; `mcp__s` / `mcp__s__*` = every tool of server s; an MCP tool whose server
-#   is not in the role's --mcp-config is "unavailable" (counts as refused). Edit rules cover Write/MultiEdit/
+#   is not in the role's --mcp-config is "unavailable" (counts as refused) — except a built-in server
+#   (BUILTIN_SERVERS), present in every session. Edit rules cover Write/MultiEdit/
 #   NotebookEdit, Read rules cover Grep/Glob; path rules are gitignore-style (`//abs`, `~/`, `/` = settings
 #   dir, else cwd; `**` crosses `/`, `*` does not).
 # Limits (live mode is the ground truth):
@@ -40,6 +41,7 @@ PROBES = os.path.join(PLUGIN, "templates", "probes.json")
 SCRIPT_DIRS = ("dispatch", "knowledge", "data")
 TOOLS = ("Read", "Write", "Edit", "MultiEdit", "NotebookEdit", "Glob", "Grep", "Agent", "Skill", "Workflow",
          "AskUserQuestion", "WebFetch", "WebSearch", "Bash")
+BUILTIN_SERVERS = ("claude-in-chrome",)  # Claude Code ships it; --strict-mcp-config does not drop it
 TOOL_RE = re.compile(r"^(mcp__[\w.-]+|%s)(?:\((.*)\))?$" % "|".join(TOOLS), re.S)
 EDIT_FAMILY = {"Write": "Edit", "MultiEdit": "Edit", "NotebookEdit": "Edit", "Glob": "Read", "Grep": "Read"}
 FILE_TOOLS = {"Read", "Edit"}
@@ -239,7 +241,8 @@ def decide(perms: dict, probe: dict, dont_ask: bool, servers: list[str] | None =
         miss = parts[verdicts.index(None)]
         return unmatched[0], "%s: %r" % (unmatched[1], miss) if len(parts) > 1 else unmatched[1]
     tool, arg = probe["tool"], probe["arg"]
-    if tool.startswith("mcp__") and servers is not None and tool.split("__")[1] not in servers:
+    server = tool.split("__")[1] if tool.startswith("mcp__") else None
+    if server and servers is not None and server not in servers and server not in BUILTIN_SERVERS:
         return "unavailable", "server not in the role's --mcp-config"
     for level in ("deny", "ask", "allow"):
         for rule in perms.get(level, []):

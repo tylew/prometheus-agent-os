@@ -71,6 +71,7 @@ holds; it starts the role's agent (settings, `--name <label>`, `dontAsk` for imp
 |---|---|---|
 | `impl-<item-slug>` | implementor | the work item, its scenario, confirmed UI descriptions, absolute worktree path, ref, the `branching` non-negotiables verbatim — `templates/implementor-brief.md` |
 | `review-<pr#>` | reviewer | PR number, round, stack position, the unit's scenarios — `templates/reviewer-brief.md` |
+| `validate-<pr#>` | reviewer | a validate round on local dev: branch + sha, served-tree proof, base URL, fixtures, the unit's scenarios — `templates/validate-brief.md` (`validate`) |
 | `planner` | planner | the goals or gap to turn into stories, the project, the epic, the operator's stated behavior verbatim |
 
 Briefs, later messages and closing tabs: `agent-tabs`.

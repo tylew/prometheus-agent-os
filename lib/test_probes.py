@@ -91,6 +91,7 @@ class DecideTest(unittest.TestCase):
         self.assertEqual(self.d(tool("mcp__other__x")), "deny")
         self.assertEqual(self.d(tool("mcp__other__x"), dont_ask=False), "prompt")
         self.assertEqual(self.d(tool("mcp__other__x"), servers=["shortcut"]), "unavailable")
+        self.assertEqual(self.d(tool("mcp__claude-in-chrome__navigate"), servers=["shortcut"]), "deny")
         self.assertTrue(probes.tool_rule_matches("mcp__s__*", "mcp__s__t", None))
         self.assertFalse(probes.tool_rule_matches("mcp__s", "mcp__sx__t", None))
 
