@@ -24,7 +24,7 @@ LEADS = ("pm",)
 DEPTH3 = ("implementor", "reviewer")
 CHILDREN = DEPTH3 + ("planner",)
 CONTROL = ("seat", "librarian")
-ROLES = ("seat", "librarian", "pm", "planner", "implementor", "reviewer")
+ROLES = ("seat", "librarian", "runner", "pm", "planner", "implementor", "reviewer")
 INLINE_LIMIT = 400
 
 
@@ -309,6 +309,13 @@ def poll_agents(snap: dict, st: dict) -> list[dict]:
             with contextlib.suppress(Exception):
                 herdr("pane", "report-metadata", pid, "--source", "prometheus", "--clear-token", "needs")
         if old is None or old == new:
+            continue
+        if role == "runner":
+            if new == "blocked":  # a permission prompt in a quick tab: the operator approves it there
+                tab = _tokens(p).get("item") or "runner"
+                events.append({"kind": "agent", "pane": pid, "role": role, "unit": None, "route_role": "seat",
+                               "line": "[prometheus] needs you — quick-%s (%s) is waiting on a permission prompt "
+                                       "in its tab" % (tab, pid)})
             continue
         if role == "librarian":
             if new == "blocked":

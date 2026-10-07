@@ -25,6 +25,11 @@ managers deliver; you hold nothing. Everything you report is read fresh from Her
 - **Planning.** "Plan X" → open a `goal-set` unit (`create-unit.sh <goal-slug> goal-set <project>`) whose
   PM opens a `planner` tab for it; the operator may switch to that tab and talk to the planner.
 - **Operator instructions for a unit** go to that unit's PM or planner (`send.sh`).
+- **Quick work.** A small ask that is not delivery work — an export, a script or query run, a lookup, a
+  file — goes to a runner: `quick.sh <slug> "<the ask, in the operator's words>"` opens a `quick-<slug>`
+  tab beside you. Its `done` line names the artifact paths: relay them in one line, then close the tab
+  (`units.py close-tab <your workspace> quick-<slug>`). A runner that reports "needs a code change"
+  becomes a unit proposal, asked once. Several quick items may run at once.
 
 ## Never
 

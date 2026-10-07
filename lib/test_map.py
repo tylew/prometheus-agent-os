@@ -68,6 +68,15 @@ class ModelTest(unittest.TestCase):
                                       "unassigned"])
         self.assertEqual(root.status, "working")
 
+    def test_quick_runners_hang_under_the_seat(self):
+        s = snap()
+        s["tabs"].append({"tab_id": "wC:t5", "workspace_id": "wC", "label": "quick-battery-curves"})
+        s["panes"].append(pane("wC:p5", "wC", "wC:t5", "working", role="runner", item="battery-curves"))
+        t = model.build(s, STATE, now=1300)
+        self.assertEqual(keys(t.nodes["wC:p1"]), ["wC:p5"])
+        self.assertEqual(t.nodes["wC:p5"].name, "quick-battery-curves")
+        self.assertNotIn("wC:p5", keys(t.nodes.get("unassigned")) if "unassigned" in t.nodes else [])
+
     def test_dispatcher_running_and_stopped(self):
         t = self.build()
         d = t.nodes["dispatcher"]

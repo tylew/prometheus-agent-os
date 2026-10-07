@@ -115,6 +115,20 @@ class UnitsTest(unittest.TestCase):
             self.assertEqual(st["outbox"][pm["pane_id"]][0]["line"], "[prometheus] ci pass o/r#10")
             self.assertEqual(dispatch.pending_restore(dispatch.snapshot(), st), {})
 
+    def test_quick_opens_a_runner_tab_with_exports_and_brief(self):
+        ws = units.create("sc-1-a", "story", "besstie", ["sc-1"], [])["workspace"]
+        out = units.quick(ws, "Battery Curves CSV", "export the battery curves as a single csv")
+        self.assertEqual((out["label"], out["brief"]), ("quick-battery-curves-csv", "landed (started)"))
+        self.assertTrue(os.path.isdir(out["exports"]))
+        p = next(x for x in self.world()["panes"] if x["pane_id"] == out["pane"])
+        self.assertEqual(p["tokens"], {"role": "runner", "item": "battery-curves-csv"})
+        self.assertIn("--agent prometheus:runner --name quick-battery-curves-csv", p["ran"])
+        self.assertNotIn("dontAsk", p["ran"])
+        brief = open(os.path.join(self.tmp.name, "briefs", "quick-battery-curves-csv.md")).read()
+        self.assertIn("export the battery curves as a single csv", brief)
+        with self.assertRaisesRegex(ValueError, "already open"):
+            units.quick(ws, "battery-curves-csv", "again")
+
     def test_close_refuses_busy_and_untagged(self):
         ws = units.create("sc-1-a", "story", "besstie", ["sc-1"], [])["workspace"]
         units.open_tab(ws, "impl-a", "implementor")

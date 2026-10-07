@@ -22,7 +22,7 @@ import env  # noqa: E402
 import herdr as hz  # noqa: E402
 
 KINDS = ("story", "story-set", "goal-set", "review")
-ROLES = ("pm", "planner", "implementor", "reviewer", "librarian")
+ROLES = ("pm", "planner", "implementor", "reviewer", "librarian", "runner")
 READY_STATES = ("idle", "done")
 BUSY_STATES = ("working", "blocked")
 PASS_ENV = ("PROMETHEUS_STATE_DIR", "PROMETHEUS_FILTER", "PROMETHEUS_EXTERNAL", "PROMETHEUS_KB_ROOT")
@@ -229,6 +229,26 @@ def control_tabs(workspace_id: str) -> list[str]:
     return done
 
 
+# -------------------------------------------------------------- quick work
+
+def quick(workspace_id: str, slug: str, ask: str) -> dict:
+    """One quick work item: a `quick-<slug>` runner tab beside the seat, its exports folder, its brief."""
+    slug = re.sub(r"[^a-z0-9-]+", "-", slug.lower()).strip("-")
+    label = "quick-%s" % slug
+    if _tab_by_label(workspace_id, label):
+        raise ValueError("%s is already open" % label)
+    exports = os.path.join(dispatch.state_dir(), "exports", slug)
+    os.makedirs(exports, exist_ok=True)
+    brief = os.path.join(dispatch.state_dir(), "briefs", "%s.md" % label)
+    os.makedirs(os.path.dirname(brief), exist_ok=True)
+    with open(brief, "w") as fh:
+        fh.write("# %s\n\n## Ask (the operator's words)\n%s\n\n## Exports folder\n%s\n\n"
+                 "## Report to\nThe seat: `send.sh --role seat \"%s done: <paths> — <one line>\"`.\n"
+                 % (label, ask, exports, label))
+    pane_id = open_tab(workspace_id, label, "runner", item=slug)
+    return {"pane": pane_id, "label": label, "exports": exports, "brief": send_brief(pane_id, brief)}
+
+
 # ----------------------------------------------------------------- restore
 
 def session_on_disk(session: str | None) -> bool:
@@ -355,6 +375,10 @@ def main(argv: list[str]) -> int:
     r.add_argument("role", choices=ROLES)
     r.add_argument("brief")
     sub.add_parser("control-tabs").add_argument("workspace")
+    q = sub.add_parser("quick")
+    q.add_argument("workspace")
+    q.add_argument("slug")
+    q.add_argument("ask", nargs="+")
     rs = sub.add_parser("restore")
     rs.add_argument("--unit", action="append", default=[])
     rs.add_argument("--forget", action="append", default=[], help="drop a unit's image instead; repeatable")
@@ -387,6 +411,8 @@ def main(argv: list[str]) -> int:
             print("compact sent to %s" % a.pane)
         elif a.cmd == "refresh":
             print(refresh(a.workspace, a.label, a.role, a.brief))
+        elif a.cmd == "quick":
+            print(json.dumps(quick(a.workspace, a.slug, " ".join(a.ask))))
         elif a.cmd == "control-tabs":
             print("opened: %s" % (", ".join(control_tabs(a.workspace)) or "nothing (both present)"))
         elif a.cmd == "restore":

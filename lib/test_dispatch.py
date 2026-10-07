@@ -188,6 +188,17 @@ class LibrarianReportTest(Base):
         self.assertEqual((again, closed, st["dialogs"]), ([], [], {}))
         h.assert_called_once()
 
+    def test_blocked_runner_asks_the_seat(self):
+        s = snap()
+        s["panes"].append({"pane_id": "wC:p5", "workspace_id": "wC", "agent_status": "working",
+                           "tokens": {"role": "runner", "item": "curves"}})
+        with d.locked_state() as st:
+            d.poll_agents(s, st)
+            s["panes"][-1]["agent_status"] = "blocked"
+            evs = d.poll_agents(s, st)
+        self.assertEqual([(e["route_role"], e["pane"]) for e in evs], [("seat", "wC:p5")])
+        self.assertIn("quick-curves (wC:p5) is waiting on a permission prompt", evs[0]["line"])
+
     def test_image_keeps_units_that_vanish(self):
         s = snap()
         s["tabs"] = [{"tab_id": "wA:t1", "label": "pm"}]

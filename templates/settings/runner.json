@@ -1,0 +1,33 @@
+{
+  "$comment": "Quick-work runner beside the seat. Not dontAsk: the operator may be in the tab and approve a command. Artifacts only — writes are allowed in {state_dir}/exports/ and denied across the workspace tree (projects, docs, plugins); tracker and PR writes are denied.",
+  "permissions": {
+    "allow": [
+      "Read",
+      "Glob",
+      "Grep",
+      "Edit(/{state_dir}/exports/**)",
+      "Bash(send.sh *)",
+      "Bash(report.sh *)",
+      "Bash(git fetch *)",
+      "Bash(git -C * fetch *)",
+      "Bash(git -C * show *)",
+      "Bash(git -C * log *)",
+      "Bash(git -C * ls-tree *)",
+      "Bash(git -C * grep *)",
+      "Bash(python3 */lib/registry.py *)",
+      "Bash(ls *)",
+      "Bash(wc *)",
+      "Bash(head *)"
+    ],
+    "deny": [
+      "Edit(/{workspace}/**)",
+      "Bash(git commit *)",
+      "Bash(git push *)",
+      "Bash(gt *)",
+      "Bash(gh pr create *)",
+      "Bash(gh pr merge *)",
+      "mcp__shortcut__stories-update",
+      "mcp__shortcut__stories-create"
+    ]
+  }
+}

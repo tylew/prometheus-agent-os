@@ -66,7 +66,7 @@ def ago(seconds):
 def agent_name(pane, tab_label):
     t = tokens(pane)
     role = t.get("role") or pane.get("agent") or "shell"
-    if role in CHILD_ROLES:
+    if role in CHILD_ROLES or role == "runner":
         if tab_label and not tab_label.isdigit():
             return tab_label
         return f"{role}-{t['item']}" if t.get("item") else role
@@ -178,6 +178,11 @@ def build(snap, state=None, own_pane="", unit=None, here_tab="", now=None):
         seats = [n for n in top if tokens(tree.raw[n.key]).get("role") == "seat"]
         for n in seats:
             attach(root, n)
+        # quick-work runners hang under the seat that opened them
+        runners = sorted((agent_nodes[p["pane_id"]] for p in panes if role_of(p) == "runner"),
+                         key=lambda n: n.name)
+        for n in runners:
+            attach(seats[0] if seats else root, n)
         detail = f"{len(proposals)} proposal{'s' * (len(proposals) != 1)} · {tree.held} held"
         attach(root, add(NodeView("dispatcher", "dispatcher", "dispatcher", tree.dispatcher, detail),
                          control or {}))
@@ -187,7 +192,7 @@ def build(snap, state=None, own_pane="", unit=None, here_tab="", now=None):
         for wid in sorted(units, key=lambda w: (tokens(units[w]).get("unit") or "", w)):
             attach(root, unit_node(wid))
         stray = [agent_nodes[p["pane_id"]] for p in panes
-                 if p.get("workspace_id") not in units and role_of(p) not in TOP_ROLES]
+                 if p.get("workspace_id") not in units and role_of(p) not in TOP_ROLES + ("runner",)]
         if stray:
             group = add(NodeView("unassigned", "unassigned", "group", "unknown",
                                  f"{len(stray)} pane{'s' * (len(stray) != 1)} without a unit"), {})

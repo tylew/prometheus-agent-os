@@ -67,6 +67,14 @@ send.sh --pane <id> "<line>"
 ```
 Tagged `[prometheus] from <role>@<unit>:`. The only way one agent messages another.
 
+## Quick work — `quick.sh` (the seat)
+
+```
+quick.sh <slug> "<the ask>"     a quick-<slug> runner tab beside the seat; exports in <state>/exports/<slug>/
+```
+Artifacts only: the runner never edits a project, commits or writes the tracker; code changes come back as
+a proposed unit. Its permission prompts reach the seat as needs-you; its result is a `done` line to the seat.
+
 ## Self-report — `report.sh` (every agent)
 
 ```
