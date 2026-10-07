@@ -77,6 +77,15 @@ class ModelTest(unittest.TestCase):
         self.assertEqual(t.nodes["wC:p5"].name, "quick-battery-curves")
         self.assertNotIn("wC:p5", keys(t.nodes.get("unassigned")) if "unassigned" in t.nodes else [])
 
+    def test_another_instances_control_roles_are_left_out(self):
+        s = snap()
+        s["workspaces"].append({"workspace_id": "wT", "label": "trial", "tokens": {}})
+        s["panes"] += [pane("wT:p1", "wT", "wT:t1", role="seat"), pane("wT:p2", "wT", "wT:t2", role="librarian")]
+        t = model.build(s, STATE, now=1300, own_workspace="wC")
+        self.assertNotIn("wT:p1", t.nodes)
+        self.assertNotIn("wT:p2", t.nodes)
+        self.assertIn("wC:p1", t.nodes)
+
     def test_dispatcher_running_and_stopped(self):
         t = self.build()
         d = t.nodes["dispatcher"]

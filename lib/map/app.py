@@ -183,6 +183,7 @@ class App:
             self.tab_id = me.get("tab_id") or self.tab_id
         self.tabs = {t.get("tab_id"): t.get("label") or "" for t in snap.get("tabs") or []}
         self.tree = model.build(snap, load_state(), own_pane=self.own_pane, unit=self.unit,
+                                own_workspace=os.environ.get("HERDR_WORKSPACE_ID", ""),
                                 here_tab=self.tab_id)
         if self.unit:
             ws = next((w for w in snap.get("workspaces") or [] if w.get("workspace_id") == self.unit), {})
@@ -695,7 +696,8 @@ def setup(screen, unit=None):
 
 
 def dump(unit=None):
-    tree = model.build(herdr.snapshot(), load_state(), own_pane=os.environ.get("HERDR_PANE_ID", ""), unit=unit)
+    tree = model.build(herdr.snapshot(), load_state(), own_pane=os.environ.get("HERDR_PANE_ID", ""), unit=unit,
+                       own_workspace=os.environ.get("HERDR_WORKSPACE_ID", ""))
     print(model.to_text(tree.roots) or "(empty)")
     return 0
 

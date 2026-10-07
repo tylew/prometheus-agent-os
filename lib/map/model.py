@@ -78,7 +78,7 @@ def _order(node, raw):
     return (ROLE_ORDER.get(role, 99), node.name.lower(), node.key)
 
 
-def build(snap, state=None, own_pane="", unit=None, here_tab="", now=None):
+def build(snap, state=None, own_pane="", unit=None, here_tab="", now=None, own_workspace=""):
     """Snapshot + dispatcher state → Tree. `unit` (a workspace id) scopes it to that unit."""
     now = time.time() if now is None else now
     state = state if isinstance(state, dict) else {}
@@ -127,11 +127,22 @@ def build(snap, state=None, own_pane="", unit=None, here_tab="", now=None):
     def role_of(p):
         return tokens(p).get("role")
 
-    # control workspace: the dispatcher token, else the seat's workspace
-    control = next((w for w in workspaces if tokens(w).get("dispatcher")), None)
+    # control workspace: the map's own when it holds a seat, else the running dispatcher's, else a seat's.
+    # Another instance's control roles (a trial beside the real one) are left out.
+    seat_ws = {p.get("workspace_id") for p in panes if role_of(p) == "seat"}
+    control = ws_by_id.get(own_workspace) if own_workspace in seat_ws else None
+    control = control or next((w for w in workspaces if tokens(w).get("dispatcher") == "running"), None)
     if control is None:
         seat = next((p for p in panes if role_of(p) == "seat"), None)
         control = ws_by_id.get(seat.get("workspace_id")) if seat else None
+    if control is not None:
+        cid = control.get("workspace_id")
+        panes = [p for p in panes if role_of(p) not in TOP_ROLES + ("runner",) or p.get("workspace_id") == cid]
+        tree.panes = panes
+        keep = {p["pane_id"] for p in panes}
+        for k in [k for k in agent_nodes if k not in keep]:
+            del agent_nodes[k], tree.nodes[k], tree.raw[k]
+        tree.held = sum(n.held for n in agent_nodes.values())
     tree.dispatcher = "running" if tokens(control).get("dispatcher") == "running" else "stopped"
 
     def unit_node(wid):

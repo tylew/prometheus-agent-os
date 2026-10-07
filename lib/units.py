@@ -216,10 +216,11 @@ def control_tabs(workspace_id: str) -> list[str]:
     """Beside the seat: a `librarian` agent tab and a `map` tab, each opened only if missing."""
     snap = _snap()
     done = []
-    if not dispatch.panes_with_role(snap, "librarian"):
+    if not dispatch.panes_with_role(snap, "librarian", workspace_id):
         open_tab(workspace_id, "librarian", "librarian")
         done.append("librarian")
-    if not any(_tokens(p).get("view") == "map" for p in snap.get("panes", [])):
+    if not any(_tokens(p).get("view") == "map" and p.get("workspace_id") == workspace_id
+               for p in snap.get("panes", [])):
         tab = _h("tab", "create", "--workspace", workspace_id, "--label", "map",
                  "--cwd", env.workspace_root(), "--no-focus", *_env_flags("map"))
         pane_id = _first_pane(workspace_id, (tab.get("tab") or tab)["tab_id"])

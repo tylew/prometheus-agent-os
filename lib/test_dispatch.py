@@ -64,6 +64,13 @@ class RouteTest(Base):
         self.assertEqual(d.route(s, {"role": "seat"}), "wC:p1")
         self.assertEqual(d.route(s, {"unit": "sc-1-a", "role": "implementor", "item": "derate"}), "wA:p2")
 
+    def test_control_roles_prefer_the_running_dispatchers_workspace(self):
+        s = snap()
+        s["workspaces"][0]["tokens"] = {}  # an old trial control workspace, dispatcher stopped
+        s["workspaces"].append({"workspace_id": "wR", "label": "real", "tokens": {"dispatcher": "running"}})
+        s["panes"].append({"pane_id": "wR:p1", "workspace_id": "wR", "agent_status": "idle", "tokens": {"role": "seat"}})
+        self.assertEqual(d.route(s, {"role": "seat"}), "wR:p1")
+
     def test_conflict_and_no_match_raise(self):
         s = snap()
         s["workspaces"][2]["tokens"]["prs"] = "o/r#10"

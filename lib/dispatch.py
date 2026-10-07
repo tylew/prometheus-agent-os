@@ -122,6 +122,11 @@ def pane(snap: dict, pane_id: str) -> dict | None:
     return next((p for p in snap.get("panes", []) if p.get("pane_id") == pane_id), None)
 
 
+def control_workspace(snap: dict) -> str | None:
+    live = [w["workspace_id"] for w in snap.get("workspaces", []) if _tokens(w).get("dispatcher") == "running"]
+    return live[0] if len(live) == 1 else os.environ.get("HERDR_WORKSPACE_ID") if len(live) > 1 else None
+
+
 def lead_role(unit: dict) -> str:
     return "pm"
 
@@ -152,7 +157,10 @@ def route(snap: dict, event: dict) -> str:
         return event["to_pane"]
     role = event.get("role", "pm")
     if role in CONTROL:
-        found = panes_with_role(snap, role)
+        # several control workspaces may exist (a trial beside the real one): the running dispatcher's wins
+        control = control_workspace(snap)
+        found = panes_with_role(snap, role, control) if control else []
+        found = found or panes_with_role(snap, role)
         if not found:
             raise RouteError("no %s pane" % role)
         return found[0]["pane_id"]
