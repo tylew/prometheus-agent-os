@@ -1,0 +1,20 @@
+{
+  "$comment": "Template: one proposal per source. kb.py apply writes facts with a final basis; tentative facts, ambiguous mentions and decisions are held in the inbox.",
+  "source": { "kind": "meeting | pr | story | operator | doc", "ref": "<granola:id | owner/repo#n | sc-#####>", "date": "<YYYY-MM-DD>" },
+  "scope": ["general"],
+  "entities": [
+    {
+      "mention": "<name as it appeared>",
+      "type": "person | org | concept | system | topic",
+      "facts": [
+        { "text": "<one fact>", "basis": "decided | merged | stated | confirmed | tentative" }
+      ]
+    }
+  ],
+  "decisions": [
+    { "title": "<decision as a statement>", "context": "", "why": "", "grounded_by": ["<mention or slug>"], "decided_by": ["<mention>"] }
+  ],
+  "edges": [
+    { "from": "<mention or slug>", "edge": "member_of | owns | works_with | defines | part_of | depends_on | grounded_by | decided_by | supersedes | relates_to", "to": "<mention or slug>" }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "prometheus/kb.schema.json",
+  "title": "prometheus knowledge base",
+  "description": "Frontmatter per note type (person, org, concept, system, topic, decision), the edge vocabulary, and the ingest-proposal shape with per-fact basis (decided | merged | stated | confirmed | tentative). Not implemented — phase 2.",
+  "$defs": {
+    "common": {},
+    "person": {},
+    "org": {},
+    "concept": {},
+    "system": {},
+    "topic": {},
+    "decision": {},
+    "edges": {},
+    "proposal": {}
+  }
+}
