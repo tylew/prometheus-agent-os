@@ -101,7 +101,7 @@ elif cmd == ["agent", "send-keys"]:
         p["input"] = ""
 elif cmd == ["pane", "read"]:
     p = find("panes", "pane_id", a[2])
-    print(p.get("screen", "") + "\n" + ("❯ " + (p.get("input") or "")))
+    print(p.get("screen", "Claude Code v0") + "\n" + ("❯ " + (p.get("input") or "")))
     json.dump(w, open(path, "w"))
     sys.exit(0)
 json.dump(w, open(path, "w"))

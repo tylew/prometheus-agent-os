@@ -89,8 +89,25 @@ def submit(pane_id: str, text: str, wait: float = 6.0) -> str:
             if " ".join(text[:40].split()) in _read(pane_id):
                 herdr("agent", "send-keys", pane_id, "enter")
             else:
-                return "not observed"
+                # neither running nor on the input line: the keystrokes were lost, so typing once more
+                # cannot duplicate anything
+                herdr("agent", "prompt", pane_id, text)
     return "not observed"
+
+
+def wait_input_ready(pane_id: str, timeout: float = 90, settle: float = 2.0) -> bool:
+    """Herdr reports a fresh agent idle before its input box accepts keystrokes. Ready = idle/done, the
+    Claude banner and an empty prompt line on screen, unchanged across a short settle."""
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        if _status_of(pane_id) in ("idle", "done"):
+            screen = _read(pane_id)
+            if "Claude Code" in screen and "❯" in screen and not input_busy(pane_id):
+                time.sleep(settle)
+                if _status_of(pane_id) in ("idle", "done") and not input_busy(pane_id):
+                    return True
+        time.sleep(1)
+    return False
 
 
 DIALOG_MARKERS = ("Enter to select", "Esc to cancel", "to navigate", "Do you want to proceed", "Type something")

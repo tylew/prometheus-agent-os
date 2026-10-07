@@ -233,9 +233,8 @@ def send_brief(pane_id: str, brief_path: str, ready_timeout: float = 90, landed_
     """Prompt one line pointing at the brief; confirm it landed by state. Never re-sends."""
     if not os.path.isfile(brief_path):
         raise ValueError("brief not found: %s" % brief_path)
-    st = _wait_ready(pane_id, ready_timeout)
-    if st not in READY_STATES:
-        raise RuntimeError("agent in %s never reached its prompt (last: %s)" % (pane_id, st))
+    if not dispatch.wait_input_ready(pane_id, ready_timeout):
+        raise RuntimeError("agent in %s never reached a ready prompt (state %s)" % (pane_id, _status(pane_id)))
     result = dispatch.submit(pane_id, "Read your brief at %s and begin." % os.path.abspath(brief_path),
                              wait=landed_timeout / 2)
     st = _status(pane_id)
