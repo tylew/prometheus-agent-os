@@ -2,6 +2,6 @@
 # ---
 # name: poll-github
 # description: Emit one JSON line per PR with the operator's review requested or authored by the operator, changed since the cursor in ~/.claude/prometheus/dispatch.json.
-# usage: poll-github.sh
+# usage: poll-github.sh   (prints one JSON event per line; advances cursors)
 # ---
-echo "poll-github: not implemented" >&2; exit 1
+exec python3 "${0:A:h:h:h:h}/lib/events.py" poll-github "$@"

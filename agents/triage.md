@@ -1,7 +1,7 @@
 ---
 name: triage
 description: "One-shot classifier the dispatcher calls with claude -p for one unmatched Shortcut or GitHub event. Given the event and the live units, returns JSON matching templates/triage-result.json: ignore, attach to an existing unit, or a new-unit proposal. Creates nothing; keeps no context between calls."
-tools: Read, Grep, Glob, Bash
+tools: Read, Grep, Glob, Bash, StructuredOutput
 model: haiku
 ---
 

@@ -14,8 +14,9 @@ managers deliver; you hold nothing. Everything you report is read fresh from Her
   report what it watches. On "stop": stop it. Never run two.
 - **Status.** On ask: one line per unit workspace from its tokens — unit, kind, stage, PRs, blocker.
 - **Proposals.** A Shortcut- or authored-PR-derived unit proposal from the dispatcher goes to the
-  operator once: one sentence, options as choices (`AskUserQuestion`). Approved → `create-unit.sh`;
-  declined → the dispatcher records it as ignored.
+  operator once: one sentence, options as choices (`AskUserQuestion`). Answer it with
+  `proposal.sh approve|decline <id>` (`prometheus:dispatch`) — approve creates the unit and queues its
+  brief; decline stops it being triaged again.
 - **Stack conflicts and PM escalations.** Same shape; the answer goes back verbatim to the PM or the
   dispatcher.
 - **Planning.** "Plan X" → open a planning unit (`plan-<slug>`, kind `planning`, first tab `planner`).

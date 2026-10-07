@@ -1,28 +1,67 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "triage result",
-  "description": "Output contract of prometheus:triage for one unmatched event; passed to claude -p --json-schema.",
+  "description": "Output contract of prometheus:triage for one unmatched event; passed to claude -p --json-schema. The dispatcher injects proposal.project as an enum of registry keys and validates the conditional fields (attach \u2192 attach_to, new \u2192 proposal) in code.",
   "type": "object",
-  "required": ["decision", "reason"],
+  "required": [
+    "decision",
+    "reason"
+  ],
   "properties": {
-    "decision": { "enum": ["ignore", "attach", "new"] },
-    "reason": { "type": "string" },
-    "attach_to": { "type": "string", "description": "unit workspace label; required when decision = attach" },
+    "decision": {
+      "enum": [
+        "ignore",
+        "attach",
+        "new"
+      ]
+    },
+    "reason": {
+      "type": "string"
+    },
+    "attach_to": {
+      "type": "string",
+      "description": "unit workspace label; required when decision = attach"
+    },
     "proposal": {
       "type": "object",
       "description": "required when decision = new",
-      "required": ["kind", "project", "name"],
+      "required": [
+        "kind",
+        "project",
+        "name"
+      ],
       "properties": {
-        "kind": { "enum": ["story", "story-set", "planning", "goal-set", "review"] },
-        "project": { "type": "string" },
-        "name": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,47}$" },
-        "stories": { "type": "array", "items": { "type": "string", "pattern": "^sc-[0-9]+$" } },
-        "prs": { "type": "array", "items": { "type": "string", "pattern": "^[^/]+/[^#]+#[0-9]+$" } }
+        "kind": {
+          "enum": [
+            "story",
+            "story-set",
+            "planning",
+            "goal-set",
+            "review"
+          ]
+        },
+        "project": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]{0,47}$"
+        },
+        "stories": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^sc-[0-9]+$"
+          }
+        },
+        "prs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[^/]+/[^#]+#[0-9]+$"
+          }
+        }
       }
     }
-  },
-  "allOf": [
-    { "if": { "properties": { "decision": { "const": "attach" } } }, "then": { "required": ["attach_to"] } },
-    { "if": { "properties": { "decision": { "const": "new" } } }, "then": { "required": ["proposal"] } }
-  ]
+  }
 }

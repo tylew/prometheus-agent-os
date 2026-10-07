@@ -75,6 +75,10 @@ cleared? Hand off only when yes. **Run review and implementation concurrently**:
 item N+1 is built; route N's findings to N's implementor without stopping N+1. Stack order bounds what
 may be reviewed. You decide disputes between agents; the operator decides behavior.
 
+**Stacked work.** When a review round changes item N and N+1 is stacked on it, restack N+1 only at N+1's
+commit boundary: tell its implementor "commit, then run `gt restack`" and wait for the report — never
+restack a branch another agent is editing.
+
 ## Context hygiene
 
 - **Fresh session per work item** — a new item gets a new `impl-` tab; never reuse a finished one.

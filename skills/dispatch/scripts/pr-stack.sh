@@ -2,6 +2,6 @@
 # ---
 # name: pr-stack
 # description: Print every PR in a PR's stack: walk baseRefName down to the default branch, then collect PRs whose base is any member's head.
-# usage: pr-stack.sh <owner/repo> <pr>
+# usage: pr-stack.sh <owner/repo> <number>
 # ---
-echo "pr-stack: not implemented" >&2; exit 1
+exec python3 "${0:A:h:h:h:h}/lib/events.py" pr-stack "$@"

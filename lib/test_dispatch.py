@@ -34,6 +34,7 @@ class Base(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         os.environ["PROMETHEUS_STATE_DIR"] = self.tmp.name
+        os.environ["PROMETHEUS_EXTERNAL"] = "0"
         for k in ("PROMETHEUS_ROLE", "HERDR_WORKSPACE_ID"):
             os.environ.pop(k, None)
 

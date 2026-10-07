@@ -22,6 +22,8 @@ ref: <branch or sha>
 <Pasted, not paraphrased.>
 
 - Write only under `<worktree>`; never the project's main checkout; `samples/` is read-only.
+- Stacked on another item: when the PM says "restack", commit what you have, run `gt restack`, re-run
+  validation, and report.
 
 ## Done when
 <Tests that prove the scenario pass; commits on the branch; draft PR open.> Report: paths changed,

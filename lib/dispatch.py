@@ -260,9 +260,19 @@ def heartbeat(snap: dict, st: dict, minutes: int, now: float | None = None) -> l
 
 # ------------------------------------------------------------------------- tick
 
-def tick(heartbeat_min: int = 30, prompt=None) -> dict:
+def tick(heartbeat_min: int = 30, prompt=None, external: bool | None = None) -> dict:
     snap = snapshot()
+    if external is None:
+        external = os.environ.get("PROMETHEUS_EXTERNAL", "1") == "1"
     with locked_state() as st:
+        log = []
+        if external:
+            import events as ext
+            log = ext.tick(snap, st)
+        seats = panes_with_role(snap, "seat")
+        if seats and st.get("seat_backlog"):
+            for line in st.pop("seat_backlog"):
+                enqueue(st, seats[0]["pane_id"], line)
         events = poll_agents(snap, st) + heartbeat(snap, st, heartbeat_min)
         unrouted = []
         for ev in events:
@@ -273,7 +283,7 @@ def tick(heartbeat_min: int = 30, prompt=None) -> dict:
                 continue
             enqueue(st, target, ev["line"], unit=ev.get("unit"))
         report = deliver(snap, st, prompt)
-        report.update(events=len(events), unrouted=unrouted)
+        report.update(events=len(events), unrouted=unrouted, log=log)
         return report
 
 
@@ -311,7 +321,7 @@ def run(interval: int, heartbeat_min: int) -> int:
         while not stopping["now"]:
             try:
                 r = tick(heartbeat_min)
-                if r["events"] or r["delivered"] or r["unrouted"]:
+                if r["events"] or r["delivered"] or r["unrouted"] or r["log"]:
                     print(time.strftime("%H:%M:%S"), json.dumps(r), flush=True)
             except Exception as exc:  # one bad tick must not end the loop
                 print(time.strftime("%H:%M:%S"), "tick failed:", exc, flush=True)
