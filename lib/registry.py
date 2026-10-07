@@ -158,19 +158,25 @@ def pinned(session_id: str | None = None) -> str | None:
         return None
 
 
-def unit() -> dict:
-    """The current Herdr workspace's prometheus tokens ({} outside a unit or outside Herdr)."""
-    ws = os.environ.get("HERDR_WORKSPACE_ID")
-    if os.environ.get("HERDR_ENV") != "1" or not ws:
-        return {}
+def _herdr_tokens(kind: str, ident: str) -> dict:
     try:
-        out = subprocess.run([os.environ.get("HERDR_BIN", "herdr"), "workspace", "get", ws],
+        out = subprocess.run([os.environ.get("HERDR_BIN", "herdr"), kind, "get", ident],
                              capture_output=True, text=True, timeout=10)
-        info = json.loads(out.stdout).get("result", {}).get("workspace", {})
+        return (json.loads(out.stdout).get("result", {}).get(kind, {}) or {}).get("tokens") or {}
     except (OSError, ValueError, subprocess.SubprocessError):
         return {}
-    toks = info.get("tokens") or {}
-    return toks if toks.get("unit") else {}
+
+
+def unit() -> dict:
+    """This session's unit tokens: its own pane's (a planner tab), else its workspace's; {} outside a unit."""
+    if os.environ.get("HERDR_ENV") != "1":
+        return {}
+    for kind, var in (("pane", "HERDR_PANE_ID"), ("workspace", "HERDR_WORKSPACE_ID")):
+        ident = os.environ.get(var)
+        toks = _herdr_tokens(kind, ident) if ident else {}
+        if toks.get("unit"):
+            return toks
+    return {}
 
 
 def active(cwd: str | None = None, session_id: str | None = None, workspace: str | None = None):

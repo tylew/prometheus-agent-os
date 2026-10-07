@@ -19,7 +19,8 @@ managers deliver; you hold nothing. Everything you report is read fresh from Her
   brief; decline stops it being triaged again.
 - **Stack conflicts and PM escalations.** Same shape; the answer goes back verbatim to the PM or the
   dispatcher.
-- **Planning.** "Plan X" → open a planning unit (`plan-<slug>`, kind `planning`, first tab `planner`).
+- **Planning.** "Plan X" → open a planning unit: `create-unit.sh plan-<slug> planning <project>` adds a
+  `plan-<slug>` planner tab to this workspace; the operator may switch to it and talk to the planner.
 - **Operator instructions for a unit** go to that unit's PM or planner (`send.sh`).
 
 ## Never

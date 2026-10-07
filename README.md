@@ -14,8 +14,8 @@ Then say **begin** (`/prometheus:begin`) to start the dispatcher.
 ## Topology (Herdr)
 
 ```
-control workspace (operator)        panes: seat (orchestrator agent), dispatcher (script)
-  └─ unit workspace "<unit-name>"   one per unit; review stacks created automatically
+control workspace (operator)        tabs: seat (orchestrator agent), dispatcher (script), plan-<slug> (planners)
+  └─ unit workspace "<unit-name>"   one per delivery unit; review stacks created automatically
        ├─ tab pm                    project-manager — the only agent the seat addresses
        ├─ tab impl-<item>           implementor, fresh per work item
        ├─ tab review-<pr>           reviewer, fresh per independent round

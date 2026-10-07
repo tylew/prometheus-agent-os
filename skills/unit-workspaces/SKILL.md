@@ -11,15 +11,19 @@ One Herdr workspace per unit, named for it, tagged with prometheus tokens. Scrip
 ```
 create-unit.sh <name> <story|story-set|planning|goal-set|review> <project> [--stories sc-1,sc-2] [--prs o/r#1,…] [--brief <path>]
 list-units.sh [--json]
-close-unit.sh <workspace-id> [--force]
+close-unit.sh <workspace-id | plan-<slug>> [--force]
 ```
 
-- **Names** — `sc-#####-<slug>` (one story) · `<theme-slug>` (story set) · `plan-<slug>` (planning) ·
-  `<goal-slug>` · `review-<root-pr>-<slug>` (a stack under review).
+- **Names** — `sc-#####-<slug>` (one story) · `<theme-slug>` (story set) · `<goal-slug>` ·
+  `review-<root-pr>-<slug>` (a stack under review) · `plan-<slug>` (planning).
+- **Planning units are tabs**, not workspaces: `create-unit.sh plan-<slug> planning <project>` opens a
+  `plan-<slug>` tab in the control workspace (the seat's) and puts the unit tokens on the planner's pane.
+  `close-unit.sh plan-<slug>` closes that tab. A delivery unit created for a story removes it from every
+  planning unit's `stories`.
 - **Tokens** (source `prometheus`) — workspace: `unit`, `kind`, `project` (a registry key), `stories`,
   `prs`, `stage`; panes: `role`, `item`, `pr`, `worktree`. One writer each: `create-unit.sh` sets the
   workspace tokens; the lead keeps `stage`, `stories`, `prs` current; the session-role hook sets `role`.
-- **Lead** — the first tab, renamed `pm` (or `planner` for `planning`), runs `lib/launch.sh <lead>`.
+- **Lead** — a delivery workspace's first tab, renamed `pm`, runs `lib/launch.sh pm`.
   `--brief` delivers the brief once the agent reaches its prompt.
 - **Close** — refused while a role pane is `working` or `blocked`, or for a workspace without unit tokens.
   Before closing, the lead has removed its worktrees and has no librarian run in flight.

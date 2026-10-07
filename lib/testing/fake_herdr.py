@@ -55,6 +55,8 @@ elif cmd == ["workspace", "create"]:
     w["tabs"].append({"tab_id": tab, "workspace_id": ws, "label": "1"})
     w["panes"].append({"pane_id": pane, "tab_id": tab, "workspace_id": ws, "agent_status": "unknown"})
     res = {"workspace": {"workspace_id": ws}}
+elif cmd == ["pane", "get"]:
+    res = {"pane": find("panes", "pane_id", a[2]) or {}}
 elif cmd == ["workspace", "get"]:
     res = {"workspace": find("workspaces", "workspace_id", a[2]) or {}}
 elif cmd == ["workspace", "report-metadata"]:

@@ -100,6 +100,8 @@ def create(name: str, kind: str, project: str, stories: list[str], prs: list[str
         raise ValueError("kind must be one of %s" % ", ".join(KINDS))
     if any(dispatch._tokens(u).get("unit") == name for u in dispatch.units(_snap())):
         raise ValueError("unit %s already exists" % name)
+    if kind == "planning":
+        return _create_planner(name, project, stories, brief, claude_args)
     root = env.workspace_root()
     if kind != "planning":
         handoff(stories)
@@ -123,6 +125,38 @@ def create(name: str, kind: str, project: str, stories: list[str], prs: list[str
     return out
 
 
+def control_workspace() -> str:
+    """The seat's workspace — where planners live beside the seat and the dispatcher."""
+    seats = dispatch.panes_with_role(_snap(), "seat")
+    ws = seats[0]["workspace_id"] if seats else os.environ.get("HERDR_WORKSPACE_ID")
+    if not ws:
+        raise RuntimeError("no seat pane and no HERDR_WORKSPACE_ID: cannot find the control workspace")
+    return ws
+
+
+def _create_planner(name: str, project: str, stories: list[str], brief: str | None, claude_args) -> dict:
+    """A planning unit is a tab in the control workspace; its tokens live on the planner's pane."""
+    ws = control_workspace()
+    tab = _h("tab", "create", "--workspace", ws, "--label", name, "--cwd", env.workspace_root(), "--no-focus")
+    tab_id = (tab.get("tab") or tab)["tab_id"]
+    pane_id = _first_pane(ws, tab_id)
+    tag_pane(pane_id, role="planner", unit=name, kind="planning", project=project,
+             stories=",".join(stories) or None, stage="planning")
+    _h("pane", "run", pane_id, _launch_cmd("planner", claude_args=claude_args))
+    out = {"workspace": ws, "unit": name, "lead": "planner", "pane": pane_id}
+    if brief:
+        out["brief"] = send_brief(pane_id, brief)
+    return out
+
+
+def tag_unit(unit: dict, **tokens: str) -> None:
+    """Write unit tokens wherever the unit lives: its pane (planner tab) or its workspace."""
+    if unit.get("pane_id"):
+        tag_pane(unit["pane_id"], **tokens)
+    else:
+        tag_workspace(unit["workspace_id"], **tokens)
+
+
 def handoff(stories: list[str]) -> list[str]:
     """A story moving into a delivery unit leaves every planning unit, so its events have one owner."""
     moved = []
@@ -133,7 +167,9 @@ def handoff(stories: list[str]) -> list[str]:
         held = dispatch._csv(t.get("stories"))
         keep = [s for s in held if s not in stories]
         if keep != held:
-            args = ["workspace", "report-metadata", u["workspace_id"], "--source", "prometheus"]
+            where = ["pane", "report-metadata", u["pane_id"]] if u.get("pane_id") else \
+                ["workspace", "report-metadata", u["workspace_id"]]
+            args = where + ["--source", "prometheus"]
             args += ["--token", "stories=%s" % ",".join(keep)] if keep else ["--clear-token", "stories"]
             _h(*args)
             moved += [s for s in held if s in stories]
@@ -146,8 +182,9 @@ def list_units() -> list[dict]:
     for u in dispatch.units(snap):
         t = dispatch._tokens(u)
         lead = dispatch.lead_role(u)
-        leads = dispatch.panes_with_role(snap, lead, u["workspace_id"])
-        rows.append({"workspace": u["workspace_id"], "unit": t.get("unit"), "kind": t.get("kind"),
+        leads = [dispatch.pane(snap, u["pane_id"])] if u.get("pane_id") else \
+            dispatch.panes_with_role(snap, lead, u["workspace_id"])
+        rows.append({"workspace": u.get("pane_id") or u["workspace_id"], "unit": t.get("unit"), "kind": t.get("kind"),
                      "project": t.get("project"), "stage": t.get("stage"),
                      "stories": t.get("stories"), "prs": t.get("prs"),
                      "lead": lead, "lead_status": leads[0].get("agent_status") if leads else "missing"})
@@ -155,7 +192,16 @@ def list_units() -> list[dict]:
 
 
 def close(workspace_id: str, force: bool = False) -> None:
+    """Close a unit by workspace id, or a planning unit by its pane id or label."""
     snap = _snap()
+    planner = next((u for u in dispatch.units(snap) if u.get("pane_id")
+                    and workspace_id in (u["pane_id"], dispatch._tokens(u).get("unit"))), None)
+    if planner:
+        p = dispatch.pane(snap, planner["pane_id"])
+        if p and p.get("agent_status") in BUSY_STATES and not force:
+            raise ValueError("planner %s is %s" % (planner["pane_id"], p.get("agent_status")))
+        _h("tab", "close", p["tab_id"])
+        return
     unit = dispatch.unit_of_workspace(snap, workspace_id)
     if not unit:
         raise ValueError("%s carries no prometheus unit token; refusing" % workspace_id)

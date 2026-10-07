@@ -432,7 +432,7 @@ def _append_token(unit: dict, key: str, value: str) -> None:
     vals = dispatch._csv(dispatch._tokens(unit).get(key))
     if value not in vals:
         vals.append(value)
-        units.tag_workspace(unit["workspace_id"], **{key: ",".join(vals)})
+        units.tag_unit(unit, **{key: ",".join(vals)})
         unit.setdefault("tokens", {})[key] = ",".join(vals)
 
 
@@ -516,7 +516,8 @@ def health(snap: dict, st: dict, now: float | None = None) -> list[str]:
     for u in dispatch.units(snap):
         label = dispatch._tokens(u)["unit"]
         lead = dispatch.lead_role(u)
-        panes = dispatch.panes_with_role(snap, lead, u["workspace_id"])
+        panes = [p for p in [dispatch.pane(snap, u["pane_id"])] if p] if u.get("pane_id") else \
+            dispatch.panes_with_role(snap, lead, u["workspace_id"])
         live = [p for p in panes if p.get("agent")]
         if live:
             sid = (live[0].get("agent_session") or {}).get("value")
@@ -531,6 +532,8 @@ def health(snap: dict, st: dict, now: float | None = None) -> list[str]:
         if panes:
             units._h("pane", "run", panes[0]["pane_id"], units._launch_cmd(lead, claude_args=["--resume", sid]))
             log.append("resumed %s in %s (session %s)" % (lead, panes[0]["pane_id"], sid))
+        elif u.get("pane_id"):
+            continue  # a planner tab that is gone took its tokens with it; the seat reopens planning
         else:
             pane = units.open_tab(u["workspace_id"], lead, lead, claude_args=["--resume", sid])
             log.append("reopened %s for %s in %s (session %s)" % (lead, label, pane, sid))
