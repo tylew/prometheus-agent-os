@@ -31,8 +31,8 @@ then the operator. Nobody else rewrites them.
 4. **Create** — per `tracker`: Backlog, type, epic homed, owner, then estimate; read back. Write
    `story: sc-#####` + `status: created` into the draft, then delete the draft. A draft found with
    `story:` set is already created — delete it, never recreate.
-5. **Propose units** — which new stories form one delivery unit, or join an existing one → the seat.
-   PM scope request → message that PM the id and propose attaching it to their unit.
+5. **Report** — the new story ids to the planner's PM, which keeps them in its unit or proposes a separate
+   unit to the seat.
 
 After creation the description is the record. `design.md` carries the Scenarios block **verbatim** from
 the story; it never forks its own. Any edit to the description: re-fetch, replace only your own

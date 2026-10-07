@@ -38,49 +38,14 @@ class UnitsTest(unittest.TestCase):
         self.assertEqual(w["tabs"][0]["label"], "pm")
         self.assertEqual(out["lead"], "pm")
 
-    def control(self):
-        ws = units._h("workspace", "create", "--label", "control", "--cwd", "/", "--no-focus")["workspace"]["workspace_id"]
-        units.tag_pane(ws + ":p1", role="seat")
-        return ws
-
-    def pane_tokens(self, unit_label):
-        return next(p["tokens"] for p in self.world()["panes"] if p.get("tokens", {}).get("unit") == unit_label)
-
-    def test_planning_unit_is_a_planner_tab_in_the_control_workspace(self):
-        ctrl = self.control()
-        out = units.create("plan-x", "planning", "besstie", [], [])
-        w = self.world()
-        self.assertEqual(out["workspace"], ctrl)
-        self.assertEqual(len(w["workspaces"]), 1)
-        self.assertEqual(self.pane_tokens("plan-x"), {"role": "planner", "unit": "plan-x", "kind": "planning",
-                                                      "project": "besstie", "stage": "planning"})
-        self.assertIn("plan-x", [t["label"] for t in w["tabs"]])
-        import dispatch
-        snap = dispatch.snapshot()
-        self.assertEqual(dispatch.route(snap, {"unit": "plan-x", "role": "pm"}), out["pane"])
-
-    def test_delivery_unit_takes_its_story_out_of_the_planning_unit(self):
-        self.control()
-        units.create("plan-x", "planning", "besstie", ["sc-1", "sc-2"], [])
-        units.create("sc-1-a", "story", "besstie", ["sc-1"], [])
-        self.assertEqual(self.pane_tokens("plan-x")["stories"], "sc-2")
-        units.create("sc-2-b", "story", "besstie", ["sc-2"], [])
-        self.assertNotIn("stories", self.pane_tokens("plan-x"))
-
-    def test_closing_a_planning_unit_closes_its_tab_only(self):
-        ctrl = self.control()
-        units.create("plan-x", "planning", "besstie", [], [])
-        units.close("plan-x")
-        w = self.world()
-        self.assertEqual([x["workspace_id"] for x in w["workspaces"]], [ctrl])
-        self.assertNotIn("plan-x", [t["label"] for t in w["tabs"]])
-
     def test_duplicate_unit_and_bad_kind_refused(self):
         units.create("sc-1-a", "story", "besstie", ["sc-1"], [])
         with self.assertRaises(ValueError):
             units.create("sc-1-a", "story", "besstie", ["sc-1"], [])
         with self.assertRaises(ValueError):
             units.create("x", "epic", "besstie", [], [])
+        with self.assertRaises(ValueError):
+            units.create("plan-x", "planning", "besstie", [], [])
 
     def test_open_tab_tags_role_and_passes_allow_extras(self):
         ws = units.create("sc-1-a", "story", "besstie", ["sc-1"], [])["workspace"]

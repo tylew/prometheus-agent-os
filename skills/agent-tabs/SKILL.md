@@ -13,7 +13,7 @@ send-brief.sh <pane-id> <brief-path>
 close-tab.sh <workspace-id> <label>
 ```
 
-- **Labels** — `impl-<item-slug>`, `review-<pr#>`. Labels may repeat across units; routing uses pane ids.
+- **Labels** — `impl-<item-slug>`, `review-<pr#>`, `planner` (one per unit, opened when it needs stories). Labels may repeat across units; routing uses pane ids.
 - **Launch** — `lib/launch.sh <role>`: role env, merged settings (voltus-besstie off for the session), and
   for implementor / reviewer `--permission-mode dontAsk` with `templates/settings/<role>.json`. Pass the
   project's validation commands as `--allow 'Bash(<cmd> *)'` (`registry.py field packages --key <project>`) for

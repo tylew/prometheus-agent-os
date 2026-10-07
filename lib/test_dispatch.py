@@ -16,7 +16,7 @@ def snap(**over):
         "workspaces": [
             {"workspace_id": "wC", "label": "control", "tokens": {"dispatcher": "running"}},
             {"workspace_id": "wA", "label": "sc-1-a", "tokens": {"unit": "sc-1-a", "kind": "story", "stories": "sc-1", "prs": "o/r#10,o/r#11"}},
-            {"workspace_id": "wB", "label": "plan-x", "tokens": {"unit": "plan-x", "kind": "planning", "stories": "sc-2"}},
+            {"workspace_id": "wB", "label": "goal-x", "tokens": {"unit": "goal-x", "kind": "goal-set", "stories": "sc-2"}},
         ],
         "panes": [
             {"pane_id": "wC:p1", "workspace_id": "wC", "agent_status": "idle", "tokens": {"role": "seat"}},
@@ -50,8 +50,12 @@ class RouteTest(Base):
         self.assertEqual(d.route(s, {"pr": "o/r#11"}), "wA:p1")
         self.assertEqual(d.route(s, {"pr": "o/r#99", "stack": ["o/r#10"]}), "wA:p1")
 
-    def test_planning_unit_routes_lead_to_planner(self):
-        self.assertEqual(d.route(snap(), {"story": "sc-2"}), "wB:p1")
+    def test_planner_is_a_child_reached_by_role(self):
+        s = snap()
+        s["workspaces"][2]["tokens"]["kind"] = "goal-set"
+        s["panes"].append({"pane_id": "wB:p0", "workspace_id": "wB", "agent_status": "idle", "tokens": {"role": "pm"}})
+        self.assertEqual(d.route(s, {"story": "sc-2"}), "wB:p0")
+        self.assertEqual(d.route(s, {"story": "sc-2", "role": "planner"}), "wB:p1")
 
     def test_seat_and_role_within_unit(self):
         s = snap()

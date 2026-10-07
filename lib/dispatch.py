@@ -17,8 +17,9 @@ import sys
 import time
 
 SAFE_STATES = ("idle", "done", "working")
-LEADS = ("pm", "planner")
+LEADS = ("pm",)
 DEPTH3 = ("implementor", "reviewer")
+CHILDREN = DEPTH3 + ("planner",)
 INLINE_LIMIT = 400
 
 
@@ -146,23 +147,15 @@ def _csv(val: str | None) -> list[str]:
 
 
 def units(snap: dict) -> list[dict]:
-    """Live units: delivery workspaces carrying a `unit` token, and planner tabs in the control workspace
-    carrying one on their pane (`pane_id` set — the unit is that pane)."""
-    out = [w for w in snap.get("workspaces", []) if _tokens(w).get("unit")]
-    out += [{"workspace_id": p.get("workspace_id"), "pane_id": p["pane_id"], "tokens": _tokens(p)}
-            for p in snap.get("panes", []) if _tokens(p).get("unit")]
-    return out
+    """Live unit workspaces: those carrying a prometheus `unit` token."""
+    return [w for w in snap.get("workspaces", []) if _tokens(w).get("unit")]
 
 
 def unit_of_workspace(snap: dict, workspace_id: str) -> dict | None:
-    return next((w for w in units(snap) if w["workspace_id"] == workspace_id and not w.get("pane_id")), None)
+    return next((w for w in units(snap) if w["workspace_id"] == workspace_id), None)
 
 
 def unit_of_pane(snap: dict, pane_id: str) -> dict | None:
-    """The pane's own unit (a planner tab), else its workspace's unit."""
-    own = next((u for u in units(snap) if u.get("pane_id") == pane_id), None)
-    if own:
-        return own
     p = pane(snap, pane_id)
     return unit_of_workspace(snap, p.get("workspace_id", "")) if p else None
 
@@ -178,7 +171,7 @@ def pane(snap: dict, pane_id: str) -> dict | None:
 
 
 def lead_role(unit: dict) -> str:
-    return "planner" if _tokens(unit).get("kind") == "planning" else "pm"
+    return "pm"
 
 
 # ---------------------------------------------------------------------- routing
@@ -219,8 +212,6 @@ def route(snap: dict, event: dict) -> str:
     unit = hits[0]
     if role in LEADS:
         role = lead_role(unit)
-        if unit.get("pane_id"):
-            return unit["pane_id"]
     targets = panes_with_role(snap, role, unit["workspace_id"])
     if event.get("item"):
         targets = [p for p in targets if _tokens(p).get("item") == event["item"]] or targets
@@ -311,7 +302,7 @@ def poll_agents(snap: dict, st: dict) -> list[dict]:
         tab = _tokens(p).get("item") or role
         ev = {"kind": "agent", "pane": pid, "role": role, "unit": label, "old": old, "new": new,
               "line": "[prometheus] agent %s %s → %s" % (tab, old, new)}
-        if role in DEPTH3 and (new in ("idle", "done", "blocked") or old == "blocked"):
+        if role in CHILDREN and (new in ("idle", "done", "blocked") or old == "blocked"):
             events.append({**ev, "route_role": "pm"})
         elif role in LEADS and new == "blocked":
             events.append({**ev, "route_role": "seat",

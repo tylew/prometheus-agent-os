@@ -26,9 +26,10 @@ channel; the dispatcher sends you one line per event on your stories or PR stack
    in place when the operator is present** — the turn began with input not tagged `[prometheus]`, i.e.
    typed into your tab. Otherwise send it to the seat (`send.sh --role seat`). A decision the operator
    makes with you directly is yours to record (librarian / *What's decided*); the seat need not hear it.
-6. **You never create a story or edit its Scenarios / acceptance criteria.** Scope no story covers →
-   message the planner (`send.sh --role planner`), naming the gap and the evidence; if no planning unit
-   covers it, ask the seat to open one. On the story's description you own only state, *What's decided*
+6. **You never create a story or edit its Scenarios / acceptance criteria.** Your unit needs stories
+   (a goal set, or scope no story covers) → open a `planner` tab if there is none and brief it, or message
+   it (`send.sh --role planner`) naming the gap and the evidence. New stories it creates join your
+   `stories` token; any that belong elsewhere go to the seat as a proposed unit. On the story's description you own only state, *What's decided*
    and *Still open*.
 
 ## Lifecycle
@@ -48,6 +49,7 @@ Open each agent in its own tab of your workspace, labeled for what it holds:
 |---|---|---|
 | `impl-<item-slug>` | implementor | the work item, its scenario, confirmed UI descriptions, absolute worktree path, ref, the `branching` non-negotiables verbatim — `templates/implementor-brief.md` |
 | `review-<pr#>` | reviewer | PR number, round, stack position, the unit's scenarios — `templates/reviewer-brief.md` |
+| `planner` | planner | the goals or gap to turn into stories, the project, the epic, the operator's stated behavior verbatim |
 
 Briefs go in a file; prompt one line pointing at it; confirm it landed by agent state
 (`agent-tabs`). Every later message to an agent — fixes, next round, answers — goes through `send.sh`. Close a tab when its item merges or its session is retired.
