@@ -38,6 +38,15 @@ class UnitsTest(unittest.TestCase):
         self.assertEqual(w["tabs"][0]["label"], "pm")
         self.assertEqual(out["lead"], "pm")
 
+    def test_delivery_unit_takes_its_story_out_of_the_planning_unit(self):
+        units.create("plan-x", "planning", "besstie", ["sc-1", "sc-2"], [])
+        units.create("sc-1-a", "story", "besstie", ["sc-1"], [])
+        plan = next(w for w in self.world()["workspaces"] if w["tokens"]["unit"] == "plan-x")
+        self.assertEqual(plan["tokens"]["stories"], "sc-2")
+        units.create("sc-2-b", "story", "besstie", ["sc-2"], [])
+        plan = next(w for w in self.world()["workspaces"] if w["tokens"]["unit"] == "plan-x")
+        self.assertNotIn("stories", plan["tokens"])
+
     def test_planning_unit_leads_with_planner(self):
         units.create("plan-x", "planning", "besstie", [], [])
         w = self.world()

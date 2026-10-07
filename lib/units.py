@@ -101,6 +101,8 @@ def create(name: str, kind: str, project: str, stories: list[str], prs: list[str
     if any(dispatch._tokens(u).get("unit") == name for u in dispatch.units(_snap())):
         raise ValueError("unit %s already exists" % name)
     root = env.workspace_root()
+    if kind != "planning":
+        handoff(stories)
     ws = _h("workspace", "create", "--label", name, "--cwd", root, "--no-focus")
     ws_id = (ws.get("workspace") or ws)["workspace_id"]
     lead = "planner" if kind == "planning" else "pm"
@@ -119,6 +121,23 @@ def create(name: str, kind: str, project: str, stories: list[str], prs: list[str
     if brief:
         out["brief"] = send_brief(pane_id, brief)
     return out
+
+
+def handoff(stories: list[str]) -> list[str]:
+    """A story moving into a delivery unit leaves every planning unit, so its events have one owner."""
+    moved = []
+    for u in dispatch.units(_snap()):
+        t = dispatch._tokens(u)
+        if t.get("kind") != "planning":
+            continue
+        held = dispatch._csv(t.get("stories"))
+        keep = [s for s in held if s not in stories]
+        if keep != held:
+            args = ["workspace", "report-metadata", u["workspace_id"], "--source", "prometheus"]
+            args += ["--token", "stories=%s" % ",".join(keep)] if keep else ["--clear-token", "stories"]
+            _h(*args)
+            moved += [s for s in held if s in stories]
+    return moved
 
 
 def list_units() -> list[dict]:
