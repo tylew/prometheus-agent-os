@@ -24,4 +24,6 @@ momentum.
 
 ## Report
 
-To the PM per round: counts by severity, the review link, and findings needing a PM or operator call.
+To your PM per round with `send.sh --role pm "<one line>"` (`prometheus:dispatch`; the unit defaults to
+your own workspace): counts by severity, the review link, and the path of a findings file listing what
+needs a PM or operator call. Then end your turn — the next round arrives as a message.

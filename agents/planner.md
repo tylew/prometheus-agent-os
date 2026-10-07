@@ -36,5 +36,6 @@ work is built; you make *what* changes exact, with the operator.
 
 ## Messages
 
-Send to any agent with `prometheus:dispatch` → `send.sh` (queued, delivered in a safe state). Report to
+Send to any agent with `prometheus:dispatch` → `send.sh` (queued, delivered in a safe state):
+`--role pm --unit <label>` to answer a PM's scope request. Report to
 the seat when a batch is created: story links, proposed units, open questions.

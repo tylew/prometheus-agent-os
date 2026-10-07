@@ -21,5 +21,10 @@ the delivery non-negotiables. Those non-negotiables bind you as written.
 
 ## Report
 
-To the PM on completion or block: what changed (paths), validation run and its result, PR link, open
-questions. Failed or skipped checks are stated as such.
+To your PM with `send.sh --role pm "<one line>"` (`prometheus:dispatch`; the unit defaults to your own
+workspace), then end your turn — the PM's answer arrives the same way.
+
+- **Done:** write the report to the artifact path in your brief — what changed (paths), validation run
+  and its result, PR link, open questions; failed or skipped checks stated as such — and send one line
+  pointing at it.
+- **Blocked or a question:** one line naming it. Never wait in a dialog for the PM.

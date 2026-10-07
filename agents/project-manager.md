@@ -47,7 +47,7 @@ Open each agent in its own tab of your workspace, labeled for what it holds:
 | `review-<pr#>` | reviewer | PR number, round, stack position, the unit's scenarios — `templates/reviewer-brief.md` |
 
 Briefs go in a file; prompt one line pointing at it; confirm it landed by agent state
-(`agent-tabs`). Close a tab when its item merges or its session is retired.
+(`agent-tabs`). Every later message to an agent — fixes, next round, answers — goes through `send.sh`. Close a tab when its item merges or its session is retired.
 
 ## Wake → deliberate → hand off
 
@@ -83,4 +83,5 @@ may be reviewed. You decide disputes between agents; the operator decides behavi
 
 ## Report
 
-To the seat, at each gate crossing or blocker only: stage, what moved, what waits on whom.
+To the seat with `send.sh --role seat "<pm-report line>"` (`templates/pm-report.md`), at each gate crossing
+or blocker only: stage, what moved, what waits on whom. Your agents report to you the same way.
