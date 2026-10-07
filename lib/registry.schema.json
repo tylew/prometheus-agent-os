@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "prometheus/registry.schema.json",
+  "title": "prometheus registry",
+  "description": "Types the committed and machine layers: workspace.json (operator, trackers), projects/<key>.json (one repo each), local.json (per-machine overrides). Not implemented — phase 2.",
+  "$defs": {
+    "workspace": {},
+    "project": {},
+    "local": {}
+  }
+}

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # ---
 # name: registry
-# description: Resolve project facts (root, access, owned_paths, vcs, tracker, deploy, specs, vault area) from the workspace registry at .claude/prometheus/registry.json; never hardcoded in skills.
-# usage: registry.py {active|repo --cwd <dir>|entry --key <key> [--json]|field <name> --key <key>}
+# description: The one resolver over .claude/prometheus/ (workspace.json, projects/<key>.json, local.json) plus the live layer (ledgers, Herdr tokens). active() = which product (override → unit token → pin → cwd → None); repo() = which checkout a git command mutates; check validates against registry.schema.json.
+# usage: registry.py {active|repo --cwd <dir>|entry --key <key>|field <name> --key <key>|owner <path>|tracker <key>|runbook <key> <name>|unit|check} [--json]
 # ---
 import sys
 
