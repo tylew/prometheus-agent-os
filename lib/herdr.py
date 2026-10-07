@@ -72,8 +72,11 @@ def read(pane_id: str) -> str:
 
 def read_ansi(pane_id: str) -> str:
     """The pane's visible screen with SGR colors, for the map's preview."""
-    out = subprocess.run([bin_path(), "pane", "read", pane_id, "--source", "visible", "--ansi"],
-                         capture_output=True, text=True, timeout=5)
+    try:
+        out = subprocess.run([bin_path(), "pane", "read", pane_id, "--source", "visible", "--ansi"],
+                             capture_output=True, text=True, timeout=5)
+    except subprocess.TimeoutExpired as exc:
+        raise HerdrError("herdr pane read %s: timed out" % pane_id, code="timeout") from exc
     if out.returncode != 0:
         raise HerdrError("herdr pane read %s: %s" % (pane_id, out.stderr.strip()[:80]))
     return out.stdout

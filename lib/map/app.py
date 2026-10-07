@@ -14,6 +14,7 @@ import locale
 import os
 import shlex
 import sys
+import threading
 import time
 
 LIB = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -128,6 +129,44 @@ def runs(row):
     return [(c, t, a) for c, t, a, _ in out]
 
 
+class PreviewReader(threading.Thread):
+    """Reads the previewed pane off the UI thread, so a slow or hung `pane read` never stalls or kills the map."""
+
+    def __init__(self):
+        super().__init__(daemon=True)
+        self.lock = threading.Lock()
+        self.want = (None, 0, 0, PREVIEW_SECONDS)  # (pane, width, height, interval)
+        self.result = {"key": None, "size": None, "rows": [], "clipped": False}
+        self.changed = threading.Event()
+        self.poke = threading.Event()
+
+    def request(self, key, width, height, interval):
+        with self.lock:
+            changed = self.want[:3] != (key, width, height)
+            self.want = (key, width, height, interval)
+        if changed:
+            self.poke.set()
+
+    def latest(self):
+        with self.lock:
+            return dict(self.result)
+
+    def run(self):
+        while True:
+            key, width, height, interval = self.want
+            if key and width > 0 and height > 0:
+                try:
+                    rows, clipped = screen.parse(herdr.read_ansi(key), width, height)
+                except Exception:  # noqa: BLE001 — a failed read keeps the last screen
+                    rows = None
+                if rows is not None:
+                    with self.lock:
+                        self.result = {"key": key, "size": (width, height), "rows": rows, "clipped": clipped}
+                    self.changed.set()
+            self.poke.wait(interval)
+            self.poke.clear()
+
+
 class App:
     def __init__(self, screen_, unit=None, preview=True):
         self.screen = screen_
@@ -143,7 +182,7 @@ class App:
         self.preview_on = preview
         self.interact = None  # pane id keys go to
         self.typed = []
-        self.preview = {"key": None, "at": 0.0, "rows": [], "clipped": False}
+        self.reader = PreviewReader()
         self.preview_rect = None  # (y0, x0, y1, x1)
         self.pairs = {}
         self.scroll_y = 0
@@ -186,7 +225,7 @@ class App:
             self.activity.update(self.tree.panes)
         except (OSError, ValueError, TypeError):
             pass  # the sparkline is a nicety; never let it take the map down
-        self.preview["at"] = 0.0
+        self.reader.poke.set()
         self.rebuild()
 
     def rebuild(self):
@@ -242,26 +281,11 @@ class App:
             return self.interact
         return model.preview_target(self.tree, self.selected())
 
-    def read_preview(self, width, height, force=False):
-        key = self.preview_key()
-        pv = self.preview
-        interval = INTERACT_SECONDS if self.interact else PREVIEW_SECONDS
-        now = time.monotonic()
-        if not force and key == pv["key"] and now - pv["at"] < interval and pv.get("size") == (width, height):
-            return
-        rows, clipped = [], False
-        if key:
-            try:
-                rows, clipped = screen.parse(herdr.read_ansi(key), width, height)
-            except herdr.HerdrError:
-                rows = []
-        pv.update(key=key, at=now, rows=rows, clipped=clipped, size=(width, height))
-
     def preview_due(self):
-        if not self.preview_on or not self.preview_rect:
-            return False
-        interval = INTERACT_SECONDS if self.interact else PREVIEW_SECONDS
-        return self.preview_key() and time.monotonic() - self.preview["at"] >= interval
+        if self.reader.changed.is_set():
+            self.reader.changed.clear()
+            return bool(self.preview_on and self.preview_rect)
+        return False
 
     # ---- drawing ------------------------------------------------------------
 
@@ -316,6 +340,8 @@ class App:
             self.draw_map(map_rect)
         if preview_rect:
             self.draw_preview(preview_rect)
+        else:
+            self.reader.request(None, 0, 0, POLL_SECONDS)
         self.draw_footer(h, w)
         self.last_draw = time.monotonic()
         self.screen.noutrefresh()
@@ -402,12 +428,16 @@ class App:
         inner_w, inner_h = w - 4, h - 2
         key = self.preview_key()
         if not key:
+            self.reader.request(None, 0, 0, POLL_SECONDS)
             self.draw_preview_fallback(y0 + 1, x0 + 2, inner_w, inner_h)
             return
         title = f" {'INTERACT ' if self.interact else ''}{self.preview_title(key)} "
         self.put(y0, x0 + 2, views.fit(title, w - 4), border)
-        self.read_preview(inner_w, inner_h)
-        pv = self.preview
+        self.reader.request(key, inner_w, inner_h, INTERACT_SECONDS if self.interact else PREVIEW_SECONDS)
+        pv = self.reader.latest()
+        if pv["key"] != key:
+            self.put(y0 + 1, x0 + 2, "reading…", attr["dim"])
+            return
         if pv["clipped"]:
             self.put(y1 - 1, x1 - 4, "»", attr["accent"])
         for i, row in enumerate(pv["rows"][:inner_h]):
@@ -561,7 +591,7 @@ class App:
             self.flash("nothing to interact with here")
             return
         self.interact = key
-        self.preview["at"] = 0.0
+        self.reader.poke.set()
 
     def open_pane(self):
         key = self.selected()
@@ -686,7 +716,7 @@ class App:
             herdr.call("pane", verb, self.interact, arg, timeout=5)
         except herdr.HerdrError as exc:
             self.flash(f"send failed: {exc}"[:80])
-        self.preview["at"] = 0.0
+        self.reader.poke.set()
 
     # ---- loop ---------------------------------------------------------------
 
@@ -709,6 +739,7 @@ class App:
 
     def run(self):
         self.watcher.start()
+        self.reader.start()
         self.refresh()
         self.draw()
         while True:
