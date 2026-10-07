@@ -18,7 +18,8 @@ managers deliver; you hold nothing. Everything you report is read fresh from Her
   declined → the dispatcher records it as ignored.
 - **Stack conflicts and PM escalations.** Same shape; the answer goes back verbatim to the PM or the
   dispatcher.
-- **Operator instructions for a unit** go to that unit's PM (`herdr agent prompt`).
+- **Planning.** "Plan X" → open a planning unit (`plan-<slug>`, kind `planning`, first tab `planner`).
+- **Operator instructions for a unit** go to that unit's PM or planner (`send.sh`).
 
 ## Never
 

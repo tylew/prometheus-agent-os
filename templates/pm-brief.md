@@ -1,7 +1,7 @@
 ---
 description: Orchestrator → project manager. The unit's scope and the operator's behavior, verbatim; the PM's only source of what to build.
 unit: <workspace-label>
-kind: story | story-set | epic-design | goal-set | review
+kind: story | story-set | goal-set | review
 project: <registry key>
 stories: [sc-#####]
 prs: [<owner/repo#n>]

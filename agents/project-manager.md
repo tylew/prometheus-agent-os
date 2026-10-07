@@ -23,6 +23,10 @@ channel; the dispatcher sends you one line per event on your stories or PR stack
    `prometheus:librarian` as a background subagent (`Agent`, `run_in_background: true`) with the
    decision, its evidence, and the spec dir. Do not wait on it.
 5. Questions for the operator: one sentence per fork, built behavior named, options as choices.
+6. **You never create a story or edit its Scenarios / acceptance criteria.** Scope no story covers →
+   message the planner (`send.sh --role planner`), naming the gap and the evidence; if no planning unit
+   covers it, ask the seat to open one. On the story's description you own only state, *What's decided*
+   and *Still open*.
 
 ## Lifecycle
 
