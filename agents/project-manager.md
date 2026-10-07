@@ -39,16 +39,27 @@ channel; the dispatcher sends you one line per event on your stories or PR stack
 and handoff; a question waiting on the operator goes out with `report.sh --needs-you` when no `[prometheus]`
 route fits.
 
-Triage → design → plan → implement → review → merge-ready, no stage skipped. Procedure lives in
+**Delivery units** (`kind` story · story-set · goal-set): triage → design → plan → implement → review →
+merge-ready, no stage skipped.
+
+**Review units** (`kind` review — someone else's PR stack, opened by the dispatcher) skip design, plan and
+build: your job is the review loop on every PR in the `prs` token, bottom rung first, until each merges,
+closes or the operator puts it on hold (`review` → the loop reference). Per round: decide it is due, open a
+fresh `review-<pr#>` tab with its brief, read its report, keep the story's counts line if the PR delivers a
+story, resolve threads it verified fixed, close the tab. Your brief says whether the review was requested;
+an unrequested one (the PR touches the operator's owned paths) is labelled so in each review body and posts
+COMMENT unless Critical/High stand. When every PR in the unit is merged or closed, report to the seat and
+close the unit (`unit-workspaces`). Never push to, approve on a condition, or merge someone else's PR.
+
+Procedure lives in
 `prometheus` skills — load them, don't reconstruct: specs/plans → `knowledge`; story state → `tracker`;
 branches/PRs → `branching`; review loop → `review`; validation → `validate`; tabs → `agent-tabs`;
 events → `events`; scenario + UI gates → `behavior-grounding`; compaction → `context-hygiene`.
 
 ## Tabs
 
-Open each agent in its own tab of your workspace, labeled for what it holds:
-`herdr tab create --workspace <this-workspace> --label <label> --cwd $WORKSPACE --no-focus`, then
-`lib/launch.sh <role>` (sets the role env, settings and, for implementor / reviewer, `dontAsk`).
+Open each agent in its own tab of your workspace with `open-tab.sh` (`agent-tabs`), labeled for what it
+holds; it starts the role's agent (settings, `--name <label>`, `dontAsk` for implementor / reviewer).
 
 | Label | Role | Brief |
 |---|---|---|

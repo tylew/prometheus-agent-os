@@ -23,6 +23,7 @@ class FakeGitHub:
     def __init__(self):
         self.review, self.authored = [], []
         self.prs = {}
+        self.files = {}  # ref -> [path] for teammates' PRs (pr list --search)
 
     def __call__(self, *args):
         if args[:2] == ("search", "prs"):
@@ -31,6 +32,10 @@ class FakeGitHub:
                     for r in refs]
         if args[:2] == ("pr", "view"):
             return self.prs["%s#%s" % (args[args.index("-R") + 1], args[2])]
+        if args[:2] == ("pr", "list") and "--search" in args:
+            repo = args[args.index("-R") + 1]
+            return [{"number": int(r.rsplit("#", 1)[1]), "files": [{"path": f} for f in fs]}
+                    for r, fs in self.files.items() if r.startswith(repo + "#")]
         if args[:2] == ("pr", "list"):
             repo = args[args.index("-R") + 1]
             return [p for r, p in self.prs.items() if r.startswith(repo + "#") and p["state"] == "OPEN"]
@@ -120,13 +125,33 @@ class HandleTest(Base):
         self.seat()
         self.gh.review = ["o/r#2"]
         self.gh.prs = {"o/r#1": pr(1, "a", "main"), "o/r#2": pr(2, "b", "a"), "o/r#3": pr(3, "c", "b")}
-        verdict = {"decision": "new", "reason": "review", "proposal": {
-            "kind": "review", "project": "besstie", "name": "review-1-thing", "prs": ["o/r#2"]}}
+        self.gh.prs["o/r#2"]["title"] = "brightfield-besstie: Add the CP export button"
         with dispatch.locked_state() as st:
             events = ev.poll_github(self.snap(), st)
-            log = ev.handle(self.snap(), st, events, triage_fn=lambda e, s: verdict, create_fn=self.fake_create)
-        self.assertEqual(self.created, [("review-1-thing", "review", ["o/r#1", "o/r#2", "o/r#3"])])
+            log = ev.handle(self.snap(), st, events, triage_fn=lambda e, s: self.fail("triaged"),
+                            create_fn=self.fake_create)
+        self.assertEqual(self.created, [("review-2-add-the-cp-export-button", "review", ["o/r#1", "o/r#2", "o/r#3"])])
         self.assertIn("created review unit", log[0])
+
+    def test_owned_paths_baseline_then_new_prs_get_units(self):
+        self.seat()
+        self.addCleanup(setattr, ev, "owned_paths_by_repo", ev.owned_paths_by_repo)
+        ev.owned_paths_by_repo = lambda: {"o/r": [("js/besstie/", "besstie")]}
+        self.gh.files = {"o/r#7": ["js/besstie/a.ts"], "o/r#8": ["js/other/b.ts"]}
+        self.gh.prs = {"o/r#7": pr(7, "x", "main"), "o/r#8": pr(8, "y", "main"), "o/r#9": pr(9, "z", "main")}
+        with dispatch.locked_state() as st:
+            first = ev.poll_owned(st, now=1000)
+            self.assertEqual(st["owned"]["prs"], [])  # baseline: already open, not auto-reviewed
+            self.gh.files["o/r#9"] = ["js/besstie/c.ts"]
+            self.assertEqual(ev.poll_owned(st, now=1100), [])  # inside the interval: not polled
+            ev.poll_owned(st, now=1000 + ev.OWNED_INTERVAL)
+            self.assertEqual(st["owned"]["prs"], ["o/r#9"])
+            events = ev.poll_github(self.snap(), st)
+            log = ev.handle(self.snap(), st, events, triage_fn=lambda e, s: self.fail("triaged"),
+                            create_fn=self.fake_create)
+        self.assertIn("1 open teammate PR(s) already touch your owned paths: o/r#7", first[0])
+        self.assertEqual([c[0] for c in self.created], ["review-9-pr-9"])
+        self.assertTrue(any("created review unit" in l for l in log))
 
     def test_stacked_pr_joins_existing_unit_without_triage(self):
         import units

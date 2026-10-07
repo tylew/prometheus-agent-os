@@ -34,7 +34,10 @@ every `INTERVAL`. No socket → full ticks only.
    draft ↔ ready, story state, agent state.
 3. **Route** — by tokens: story id → `stories`, PR (or any PR in its stack) → `prs`, then the unit's
    `pm` (or `planner`) pane. Two units claiming one stack → conflict to the seat; never split.
-4. **Triage** the unmatched new — `prometheus:triage`, fresh per event; verdict validated in code.
+4. **Review units without triage** — an unmatched PR with the operator's review requested, or a teammate's
+   PR touching an editable project's `owned_paths` (polled every `OWNED_INTERVAL`, 600 s; the first poll
+   is a baseline sent to the seat as one line), becomes a `review` unit for its whole stack at once.
+   **Triage** the other unmatched new — `prometheus:triage`, fresh per event; verdict validated in code.
    `ignore` remembered · `attach` appends the token · `new` review request → review unit created for the
    whole stack · any other `new` → proposal to the seat · invalid → `untriaged` to the seat.
    Auto-create is held while any `pm`/`planner` tab sits in a workspace without unit tokens.

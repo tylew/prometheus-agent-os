@@ -27,6 +27,8 @@ DONE_STATES = ("Completed",)
 DROP_STATES = ("Won't Fix",)
 HEALTH_COOLDOWN = 600
 NEW_PER_TICK = int(os.environ.get("PROMETHEUS_NEW_PER_TICK", 3))
+OWNED_INTERVAL = int(os.environ.get("OWNED_INTERVAL", 600))
+REVIEW_SOURCES = ("review-requested", "owned-paths")
 
 
 def run(cmd: list[str], timeout: int = 120, cwd: str | None = None, stdin: str | None = None) -> str:
@@ -150,6 +152,63 @@ def search_prs(query: str, repos: list[str]) -> list[str]:
     return [pr_ref(r["repository"]["nameWithOwner"], r["number"]) for r in rows or []]
 
 
+def owned_paths_by_repo() -> dict:
+    """repo slug → [(owned path, project key)] for editable projects, longest path first."""
+    out = {}
+    try:
+        import registry
+        for key, e in (registry.projects() or {}).items():
+            slug = registry.dig(e, "repo.slug")
+            if e.get("access") == "editable" and slug:
+                for path in e.get("owned_paths") or []:
+                    out.setdefault(slug, []).append((path.rstrip("/") + "/", key))
+    except (ImportError, AttributeError, RuntimeError, ValueError, SystemExit):
+        pass
+    return {k: sorted(v, key=lambda x: -len(x[0])) for k, v in out.items()}
+
+
+def poll_owned(st: dict, now: float | None = None) -> list[str]:
+    """Teammates' open, non-draft PRs touching an owned path — at most every OWNED_INTERVAL. The first
+    poll is a baseline: what is already open goes to the seat as one line, never to automatic units."""
+    now = now or time.time()
+    o = st.setdefault("owned", {"at": 0, "prs": [], "baseline": False})
+    if now - o.get("at", 0) < OWNED_INTERVAL:
+        return []
+    o["at"] = int(now)
+    found = {}
+    for slug, paths in owned_paths_by_repo().items():
+        rows = gh_json("pr", "list", "-R", slug, "--state", "open", "--search", "draft:false -author:@me",
+                       "--json", "number,files", "--limit", "100") or []
+        for row in rows:
+            files = [f.get("path", "") for f in row.get("files") or []]
+            if any(f.startswith(p) for f in files for p, _ in paths):
+                found[pr_ref(slug, row["number"])] = True
+    lines = []
+    if not o.get("baseline"):
+        o["baseline"] = True
+        o["seen_at_baseline"] = sorted(found)
+        if found:
+            lines.append("[prometheus] %d open teammate PR(s) already touch your owned paths: %s — none "
+                         "auto-reviewed; name any to review" % (len(found), ", ".join(sorted(found))))
+    o["prs"] = sorted(r for r in found if r not in o.get("seen_at_baseline", []))
+    return lines
+
+
+def review_verdict(ev: dict) -> dict | None:
+    """A review request or an owned-paths PR needs no model: the repo names the project, the PR the unit."""
+    if ev["kind"] != "pr" or ev.get("source") not in REVIEW_SOURCES:
+        return None
+    repo, num = split_ref(ev["pr"])
+    project = repo_projects().get(repo)
+    if not project:
+        return None
+    slug = re.sub(r"[^a-z0-9]+", "-", re.sub(r"^[\w-]+:\s*", "", ev.get("title") or "").lower()).strip("-")
+    name = ("review-%s-%s" % (num, "-".join(slug.split("-")[:5]))).strip("-")[:48].strip("-")
+    why = "review requested" if ev["source"] == "review-requested" else "touches the operator's owned paths"
+    return {"decision": "new", "reason": why,
+            "proposal": {"kind": "review", "project": project, "name": name, "prs": ev.get("stack") or [ev["pr"]]}}
+
+
 def view_pr(ref: str) -> dict:
     repo, num = split_ref(ref)
     return gh_json("pr", "view", num, "-R", repo, "--json", PR_FIELDS)
@@ -161,9 +220,10 @@ def poll_github(snap: dict, st: dict) -> list[dict]:
         raise RuntimeError("no watched repos (registry or PROMETHEUS_REPOS); GitHub not polled")
     review = set(search_prs("--review-requested=@me", repos))
     authored = set(search_prs("--author=@me", repos))
+    owned = set(st.get("owned", {}).get("prs", []))
     held = {r for u in dispatch.units(snap) for r in dispatch._csv(dispatch._tokens(u).get("prs"))}
     events, fresh = [], 0
-    for ref in sorted(review | authored | held):
+    for ref in sorted(review | authored | owned | held):
         key = "pr:" + ref
         old = st["cursors"].get(key)
         if old is None and ref not in held:
@@ -183,7 +243,8 @@ def poll_github(snap: dict, st: dict) -> list[dict]:
             events.append({
                 "kind": "pr", "pr": ref, "change": change, "title": pr.get("title", ""),
                 "stories": stories_in(pr.get("title"), pr.get("body"), pr.get("headRefName")),
-                "source": "review-requested" if ref in review else ("authored" if ref in authored else "unit"),
+                "source": "review-requested" if ref in review else ("authored" if ref in authored else
+                                                                   ("owned-paths" if ref in owned else "unit")),
                 "line": "[prometheus] pr %s %s — %s" % (ref, change, pr.get("title", "")),
             })
     return events
@@ -449,10 +510,12 @@ def handle(snap: dict, st: dict, events: list[dict], triage_fn=triage, create_fn
             continue  # seen before and not in a unit: already triaged (ignored, proposed or declined)
         if ev["kind"] == "story" and ev["state"] in DONE_STATES + DROP_STATES:
             continue
-        try:
-            verdict = triage_fn(ev, snap)
-        except (RuntimeError, ValueError) as exc:
-            verdict = {"decision": None, "reason": str(exc)[:200]}
+        verdict = review_verdict(ev)
+        if verdict is None:
+            try:
+                verdict = triage_fn(ev, snap)
+            except (RuntimeError, ValueError) as exc:
+                verdict = {"decision": None, "reason": str(exc)[:200]}
         problem = check_verdict(ev, verdict, snap)
         if problem:
             st.setdefault("untriaged", []).append(subject)
@@ -508,11 +571,13 @@ def act(snap: dict, st: dict, ev: dict, verdict: dict, lost: list[str], create_f
     prop = verdict.get("proposal") or {}
     prs = sorted(set(prop.get("prs") or []) | set(ev.get("stack") or []))
     stories = prop.get("stories") or ev.get("stories") or ([ev["story"]] if ev.get("story") else [])
-    auto = ev["kind"] == "pr" and ev.get("source") == "review-requested" and prop.get("kind") == "review"
+    auto = ev["kind"] == "pr" and ev.get("source") in REVIEW_SOURCES and prop.get("kind") == "review"
     if auto and not lost:
+        why = ("review requested from the operator" if ev.get("source") == "review-requested" else
+               "not requested: it touches the operator's owned paths — say so in each review body and post "
+               "COMMENT unless Critical/High stand")
         ws = create_fn(st, prop["name"], "review", prop["project"], stories, prs,
-                       "Review the stack %s (review requested from the operator). %s"
-                       % (", ".join(prs), verdict.get("reason", "")))
+                       "Review the stack %s (%s)." % (", ".join(prs), why))
         return "created review unit %s (%s) for %s" % (prop["name"], ws, ", ".join(prs))
     st["next_pid"] = st.get("next_pid", 0) + 1
     pid = "p%d" % st["next_pid"]
@@ -596,6 +661,11 @@ def health(snap: dict, st: dict, now: float | None = None) -> list[str]:
 
 def tick(snap: dict, st: dict) -> list[str]:
     events, log = [], []
+    try:
+        for line in poll_owned(st):
+            _to_seat(snap, st, line)
+    except (RuntimeError, ValueError, OSError) as exc:
+        log.append("poll_owned failed: %s" % exc)
     for source in (poll_github, poll_shortcut):
         try:
             events += source(snap, st)
