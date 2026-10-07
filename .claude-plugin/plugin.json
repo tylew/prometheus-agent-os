@@ -2,7 +2,7 @@
   "name": "prometheus",
   "displayName": "Prometheus",
   "version": "0.1.0",
-  "description": "Role-based delivery hierarchy on Herdr. An orchestrator spins up one project manager per operator-defined unit of work; each PM leads the full vertical, opening named implementor and reviewer tabs and running a background librarian that records finalized decisions in the knowledge base. Self-contained: procedure skills (branching, review, knowledge, tracker, validate, watch) and the project registry ship in the plugin.",
+  "description": "Role-based delivery OS on Herdr. Say 'begin' in the seat to start a dispatcher that watches Shortcut and GitHub, matches events to unit workspaces by story or PR stack, auto-creates review units and proposes the rest; each unit's project manager leads the full vertical, opening named implementor and reviewer tabs and running a background librarian that records finalized decisions in the knowledge base. Self-contained: procedure skills and the project registry ship in the plugin.",
   "author": {
     "name": "Tyler Lewis",
     "email": "tlewis@voltus.co"

@@ -9,12 +9,14 @@ Role-based delivery hierarchy on Herdr. Design:
 claude --plugin-dir plugins/prometheus --agent prometheus:orchestrator
 ```
 
+Then say **begin** (`/prometheus:begin`) to start the dispatcher.
+
 ## Topology (Herdr)
 
 ```
-control workspace (operator)        panes: orchestrator, orchestrator, …
-  └─ unit workspace "<unit-name>"   one per unit, owned by the orchestrator that created it
-       ├─ tab pm                    project-manager — the orchestrator's only contact
+control workspace (operator)        panes: seat (orchestrator agent), dispatcher (script)
+  └─ unit workspace "<unit-name>"   one per unit; review stacks created automatically
+       ├─ tab pm                    project-manager — the only agent the seat addresses
        ├─ tab impl-<item>           implementor, fresh per work item
        ├─ tab review-<pr>           reviewer, fresh per independent round
        └─ librarian                 background subagent of the PM

@@ -1,5 +1,5 @@
 ---
-description: Project manager → orchestrator. Sent only at a gate crossing or a blocker.
+description: Project manager → seat. Sent only at a gate crossing or a blocker.
 unit: <workspace-label>
 stage: triage | design | plan | implement | review | merge-ready | done
 ---

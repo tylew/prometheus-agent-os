@@ -1,10 +1,10 @@
 ---
 description: Orchestrator → project manager. The unit's scope and the operator's behavior, verbatim; the PM's only source of what to build.
 unit: <workspace-label>
-kind: story | story-set | epic-design | goal-set
+kind: story | story-set | epic-design | goal-set | review
 project: <registry key>
-orchestrator: <orchestrator id>
 stories: [sc-#####]
+prs: [<owner/repo#n>]
 ---
 
 # Unit: <workspace-label>
@@ -19,4 +19,5 @@ stories: [sc-#####]
 <Deadlines, dependencies, things the operator ruled out. Empty if none.>
 
 ## Report to
-`<orchestrator id>` at each gate crossing or blocker — `templates/pm-report.md`.
+The seat, at each gate crossing or blocker — `templates/pm-report.md`. Keep this workspace's `stage`,
+`stories` and `prs` tokens current; every PR you open joins `prs` at once.

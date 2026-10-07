@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "triage result",
+  "description": "Output contract of prometheus:triage for one unmatched event; passed to claude -p --json-schema.",
+  "type": "object",
+  "required": ["decision", "reason"],
+  "properties": {
+    "decision": { "enum": ["ignore", "attach", "new"] },
+    "reason": { "type": "string" },
+    "attach_to": { "type": "string", "description": "unit workspace label; required when decision = attach" },
+    "proposal": {
+      "type": "object",
+      "description": "required when decision = new",
+      "required": ["kind", "project", "name"],
+      "properties": {
+        "kind": { "enum": ["story", "story-set", "epic-design", "goal-set", "review"] },
+        "project": { "type": "string" },
+        "name": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,47}$" },
+        "stories": { "type": "array", "items": { "type": "string", "pattern": "^sc-[0-9]+$" } },
+        "prs": { "type": "array", "items": { "type": "string", "pattern": "^[^/]+/[^#]+#[0-9]+$" } }
+      }
+    }
+  },
+  "allOf": [
+    { "if": { "properties": { "decision": { "const": "attach" } } }, "then": { "required": ["attach_to"] } },
+    { "if": { "properties": { "decision": { "const": "new" } } }, "then": { "required": ["proposal"] } }
+  ]
+}
