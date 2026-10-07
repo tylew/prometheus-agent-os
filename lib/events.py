@@ -471,6 +471,8 @@ def handle(snap: dict, st: dict, events: list[dict], triage_fn=triage, create_fn
     only = os.environ.get("PROMETHEUS_FILTER")
     for ev in events:
         if only and ev["kind"] in ("pr", "story") and not re.search(only, ev.get("title") or ev.get("line", "")):
+            if ev["kind"] == "pr":  # forget it, so a widened filter later sees it as new
+                st["cursors"].pop("pr:" + ev["pr"], None)
             continue  # trial runs act only on matching subjects; nothing is remembered for the rest
         if ev["kind"] == "error":
             log.append(ev["line"])
