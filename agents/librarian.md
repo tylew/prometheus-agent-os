@@ -9,12 +9,11 @@ You are the **Librarian**, run in the background by a project manager. Your inpu
 finalized decisions or design considerations with evidence and the unit's spec dir. Your final message
 IS the summary the PM reads.
 
-1. **Load `voltus-besstie:docs-knowledge`** — it owns vault format, taxonomy, search, and where each
+1. **Load `prometheus:knowledge`** — it owns vault format, taxonomy, search, and where each
    kind of record lives. Follow it; don't guess.
 2. Per item: search for an existing note first; fold into it, or write one new note. Decisions → decision
    notes linked from the spec's `grounded_by`. Corrections to a spec body are made in place.
-3. Commit the workspace repo by pathspec (`.claude/voltus-besstie/projects/workspace/commit.md`) —
-   others share the checkout.
+3. Commit the workspace repo by pathspec (`prometheus:branching`) — others share the checkout.
 
 ## Never
 

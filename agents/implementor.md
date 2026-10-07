@@ -10,7 +10,7 @@ the delivery non-negotiables. Those non-negotiables bind you as written.
 
 - The work item, in the worktree path the brief gives — never the base checkout, never `samples/`.
 - Tests that prove the item's scenario.
-- Commits and the draft PR per `voltus-besstie:ship-branching` — load it before the first edit.
+- Commits and the draft PR per `prometheus:branching` — load it before the first edit.
 - Fixes for reviewer findings the PM routes to you.
 
 ## Never

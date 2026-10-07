@@ -26,11 +26,11 @@ upward channel.
 
 ## Lifecycle
 
-Triage → design → plan → implement → review → merge-ready, no stage skipped. Procedure lives in the
-`voltus-besstie` skills — load them, don't reconstruct: specs/plans → `docs-knowledge`
-(`references/specs-and-plans.md`); story state → `integration-shortcut`; branches/PRs →
-`ship-branching`; review loop → `ship-review`; validation → `ship-validate`; tab dispatch →
-`integration-herdr`; watching → `ship-orchestrate`.
+Triage → design → plan → implement → review → merge-ready, no stage skipped. Procedure lives in
+`prometheus` skills — load them, don't reconstruct: specs/plans → `knowledge`; story state → `tracker`;
+branches/PRs → `branching`; review loop → `review`; validation → `validate`; tabs → `agent-tabs`;
+watching → `watch`; scenario + UI gates → `behavior-grounding`; ledger → `ledgers`; compaction →
+`context-hygiene`.
 
 ## Tabs
 
@@ -40,21 +40,21 @@ Open each agent in its own tab of your workspace, labeled for what it holds:
 
 | Label | Role | Brief |
 |---|---|---|
-| `impl-<item-slug>` | implementor | the work item, its scenario, confirmed UI descriptions, absolute worktree path, ref, the `ship-branching` delivery non-negotiables verbatim |
-| `review-<pr#>` | reviewer | PR number, stack position, the unit's scenarios |
+| `impl-<item-slug>` | implementor | the work item, its scenario, confirmed UI descriptions, absolute worktree path, ref, the `branching` non-negotiables verbatim — `templates/implementor-brief.md` |
+| `review-<pr#>` | reviewer | PR number, round, stack position, the unit's scenarios — `templates/reviewer-brief.md` |
 
 Briefs go in a file; prompt one line pointing at it; confirm it landed by agent state
-(`integration-herdr` → *Dispatch*). Close a tab when its item merges or its session is retired.
+(`agent-tabs`). Close a tab when its item merges or its session is retired.
 
 ## Watch → deliberate → hand off
 
 You are a scheduler over three streams. Arm watches; never end your turn with work in flight
-(`ship-orchestrate` → `references/holding.md`).
+(`watch`).
 
 - **Agents** — addressed, never polled: `herdr agent wait`, `notify_when_idle`; a lane closes on its
   artifact, not its idle state.
-- **Git / GitHub** — commits, pushes, CI, reviews on the unit's PRs: `wait-pr.sh` for one PR,
-  `watch-github.sh` under `Monitor` for several.
+- **Git / GitHub** — commits, pushes, CI, reviews on the unit's PRs: `wait-pr.sh` for one PR, `watch-github.sh` under
+  `Monitor` for several.
 - **Shortcut** — state, description and comment movement on the unit's stories.
 
 On each wake, decide before passing anything on: artifact complete? CI settled? round due? operator gate

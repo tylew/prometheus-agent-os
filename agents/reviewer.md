@@ -11,8 +11,8 @@ momentum.
 
 ## Own
 
-- Review rounds per `voltus-besstie:ship-review` — load it; it owns posting, severity tiers, the
-  request-changes / approve event, and stack order. Deep passes dispatch `voltus-besstie:review-lead`.
+- Review rounds per `prometheus:review` — load it; it owns posting, severity tiers, the
+  request-changes / approve event, and stack order.
 - **Scenario fit:** flag behavior in the diff that no operator scenario asks for, and scenarios the diff
   does not satisfy.
 - Re-review after each fix push until a clean gate.

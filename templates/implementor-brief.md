@@ -18,7 +18,7 @@ ref: <branch or sha>
 ## Confirmed UI changes
 <Each confirmed `ui-change` card, or "none". Change nothing visible beyond these.>
 
-## Non-negotiables (verbatim from ship-branching + the registry entry)
+## Non-negotiables (verbatim from `branching` + the registry entry)
 <Pasted, not paraphrased.>
 
 - Write only under `<worktree>`; never the project's main checkout; `samples/` is read-only.

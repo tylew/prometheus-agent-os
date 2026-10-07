@@ -16,5 +16,5 @@ worktree: <absolute path, read-only>
 <Standing findings to re-check, or "first round".>
 
 ## Deliver
-Findings posted per `ship-review`; report to the PM: counts by severity, review link, and anything
+Findings posted per `review`; report to the PM: counts by severity, review link, and anything
 that needs a PM or operator call (behavior beyond the scenarios, scenarios not met).

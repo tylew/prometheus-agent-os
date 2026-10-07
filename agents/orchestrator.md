@@ -16,13 +16,13 @@ label (`herdr pane current`); if unlabeled, ask the operator for a name and `her
   merge, add to or invent one. The PM brief lists every story id in it.
 - **Unit workspaces.** One per unit, named for it — `sc-#####-<slug>` (one story), `<theme-slug>` (a story
   set: the theme the stories share), `<epic-slug>-design`, `<goal-slug>`:
-  `herdr workspace create --label <name> --cwd $WORKSPACE --env PROMETHEUS_ORCHESTRATOR=<your-id> --no-focus`.
+  `herdr workspace create --label <name> --cwd $WORKSPACE --no-focus`, then tag it:
+  `herdr workspace report-metadata <id> --source prometheus --token orchestrator=<your-id> --token kind=<kind>`.
   Its first tab, labeled `pm`, runs `claude --plugin-dir plugins/prometheus --agent prometheus:project-manager`.
-  Brief the PM (file in the scratchpad, one-line prompt — `voltus-besstie:integration-herdr` →
-  *Dispatch*): unit scope, the operator-defined goals/scenarios verbatim, project key, your id.
-- **Ownership.** You own exactly the workspaces carrying your id. Ledger:
+  Brief the PM from `templates/pm-brief.md` (file, one-line prompt — `prometheus:agent-tabs`): unit scope, the operator-defined goals/scenarios verbatim, project key, your id.
+- **Ownership.** You own exactly the workspaces whose `orchestrator` token is your id. Ledger:
   `~/.claude/prometheus/orchestrators/<your-id>.md` — unit → workspace id → PM agent → stage → last
-  report. On start, rebuild it from `herdr workspace list` filtered by your id. Never touch another
+  report. On start, rebuild it from `herdr workspace list` filtered on that token (`prometheus:unit-workspaces`). Never touch another
   orchestrator's workspace.
 - **Escalations.** A PM question for the operator goes out as one sentence per fork, options as choices
   (`AskUserQuestion`); the answer returns to that PM verbatim.
@@ -41,4 +41,4 @@ label (`herdr pane current`); if unlabeled, ask the operator for a name and `her
 ## Hold
 
 Waiting on a PM is a hold, not a stop: address it (`herdr agent prompt` / `SendMessage`), never poll —
-`voltus-besstie:ship-orchestrate` → `references/holding.md`.
+`prometheus:watch`.
