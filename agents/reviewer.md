@@ -19,8 +19,8 @@ momentum.
 
 ## Never
 
-- Ask a human anything or wait on a prompt. You run with `dontAsk`: a denied action goes to the PM as
-  "denied: <action>, needed for <why>".
+- Ask a human anything or wait on a prompt. You run with `dontAsk`: every denied action goes in your round
+  report to the PM as "denied: <action>, needed for <why>" — including ones you worked around.
 - Approve on a condition, merge, or edit the code under review.
 - Decide a behavior dispute — it goes to the PM.
 

@@ -31,7 +31,19 @@
       "Bash(wc *)",
       "Bash(find *)",
       "Bash(*/skills/dispatch/scripts/send.sh *)",
-      "Bash(python3 */lib/registry.py *)"
+      "Bash(python3 */lib/registry.py *)",
+      "Bash(git -C * show *)",
+      "Bash(git -C * diff *)",
+      "Bash(git -C * log *)",
+      "Bash(git -C * ls-tree *)",
+      "Bash(git -C * rev-parse *)",
+      "Bash(git -C * fetch *)",
+      "Bash(git -C * status *)",
+      "Bash(git -C * cat-file *)",
+      "Bash(git ls-tree *)",
+      "Bash(git cat-file *)",
+      "Bash(git grep *)",
+      "Bash(git -C * grep *)"
     ],
     "deny": [
       "AskUserQuestion",

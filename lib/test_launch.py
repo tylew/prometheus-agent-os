@@ -55,6 +55,11 @@ class LaunchTest(unittest.TestCase):
         self.assertFalse(merged["enabledPlugins"]["voltus-besstie@brightfield-besstie-local"])
         self.assertIn("AskUserQuestion", merged["permissions"]["deny"])
         self.assertNotIn("$comment", merged)
+        rev = run_launch("reviewer", state_dir=self.state.name)
+        self.assertEqual(rev.returncode, 0, rev.stderr)
+        merged = json.load(open(os.path.join(self.state.name, "settings", "reviewer.json")))
+        self.assertIn("Write(%s/reviews/**)" % self.state.name, merged["permissions"]["allow"])
+        self.assertIn("Bash(git -C * show *)", merged["permissions"]["allow"])
 
     def test_extra_args_pass_through(self):
         out = run_launch("pm", "--resume", "abc", state_dir=self.state.name)

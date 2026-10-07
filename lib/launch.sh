@@ -39,6 +39,11 @@ if os.path.exists(role_path):
         else:
             merged[key] = val
 merged.pop("$comment", None)
+state = os.environ.get("PROMETHEUS_STATE_DIR") or os.path.expanduser("~/.claude/prometheus")
+perms = merged.get("permissions") or {}
+for key in ("allow", "deny"):
+    if key in perms:
+        perms[key] = [r.replace("{state_dir}", state) for r in perms[key]]
 extra = [r for r in os.environ.get("PROMETHEUS_EXTRA_ALLOW", "").splitlines() if r.strip()]
 if extra:
     perms = merged.setdefault("permissions", {})

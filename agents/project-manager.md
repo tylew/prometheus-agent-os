@@ -67,7 +67,8 @@ a resumed PM must work with nothing to re-arm. You wake for three things only (`
   (`herdr agent read`), then answer or dismiss the dialog (`herdr agent send-keys`) if it is within the
   agent's brief, else replace the session and report the cause to the seat.
 - **A denied action** reported by an agent — grant it by doing it yourself if it is yours to do, re-brief,
-  or escalate.
+  or escalate. Any denial is also a permission gap: report it to the seat (`send.sh --role seat`, the
+  action and the role) before you close that agent's tab, so the allow-list gets fixed.
 - **A heartbeat** — "no movement on X for N min": check that agent or PR and act, or report the block.
 
 End your turn whenever you are waiting; the next event wakes you.

@@ -23,7 +23,7 @@ typing in your tab — answer in place.
 | `story sc-… <old> → <new>` | | reconcile your plan with the board |
 | `agent <label> working → idle / done` | | read the agent's artifact — completion is the artifact, not the state |
 | `agent <label> … → blocked` | | `herdr agent read <pane>`; answer or dismiss within its brief (`herdr agent send-keys`), else refresh it and tell the seat |
-| `from implementor@…: denied: <action>` | | do it yourself if it is yours, re-brief, or escalate |
+| `from implementor@… / reviewer@…: denied: <action>` | | do it yourself if it is yours, re-brief, or escalate — and report the permission gap to the seat before closing the tab |
 | `heartbeat: no movement in <unit>` | | check the agent or PR that should be moving; act or report the block |
 | `Read your brief at <path> and begin.` | | the unit's brief — start the lifecycle |
 
