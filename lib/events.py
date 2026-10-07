@@ -203,8 +203,7 @@ SHORTCUT_SCHEMA = {
 
 
 SHORTCUT_READ_TOOLS = ["mcp__shortcut__users-get-current", "mcp__shortcut__stories-search",
-                       "mcp__shortcut__stories-get-by-id", "mcp__shortcut__epics-get-by-id",
-                       "mcp__shortcut__workflows-get-by-id", "mcp__shortcut__workflows-get-default"]
+                       "mcp__shortcut__stories-get-by-id"]
 
 
 def claude_json(prompt: str, schema: dict, *, agent: str | None = None, mcp: dict | None = None,
@@ -231,7 +230,8 @@ def claude_json(prompt: str, schema: dict, *, agent: str | None = None, mcp: dic
         denied = sorted({d.get("tool_name", "?") for d in out["permission_denials"]})
         raise RuntimeError("claude -p denied %s; its answer is not trusted" % ", ".join(denied))
     if out.get("is_error") or "structured_output" not in out:
-        raise RuntimeError("claude -p: %s" % str(out.get("result"))[:300])
+        raise RuntimeError("claude -p %s after %s turns, $%.2f: %s" % (
+            out.get("subtype"), out.get("num_turns"), out.get("total_cost_usd") or 0, str(out.get("result"))[:200]))
     return out["structured_output"]
 
 
@@ -242,9 +242,12 @@ def poll_shortcut(snap: dict, st: dict, now: float | None = None) -> list[dict]:
         return []
     since = st["cursors"].get("shortcut:since") or time.strftime("%Y-%m-%d", time.gmtime(now - 7 * 86400))
     held = {s for u in dispatch.units(snap) for s in dispatch._csv(dispatch._tokens(u).get("stories"))}
-    prompt = ("Using only the Shortcut MCP tools: list stories owned by the current user that were updated "
-              "on or after %s, plus these stories regardless of owner: %s. Return id as sc-<number>, name, "
-              "workflow state name, epic name, updated_at. Read only; change nothing."
+    prompt = ("Read-only Shortcut poll. Make exactly these calls and no others:\n"
+              "1. users-get-current — note the mention name.\n"
+              "2. stories-search once with query: owner:<mention> updated:%s..* (the search result already carries "
+              "each story's name, workflow state and epic; do not fetch stories one by one).\n"
+              "3. stories-get-by-id only for these ids, if any: %s.\n"
+              "Return every story from steps 2–3: id as sc-<number>, name, workflow state name, epic name, updated_at."
               % (since, ", ".join(sorted(held)) or "none"))
     mcp = {"shortcut": {"type": "http", "url": os.environ.get("SHORTCUT_MCP_URL", "https://mcp.shortcut.com/mcp")}}
     result = claude_json(prompt, SHORTCUT_SCHEMA, mcp=mcp, allowed=SHORTCUT_READ_TOOLS)
