@@ -36,6 +36,9 @@
             },
             "home_channel": {
               "type": "string"
+            },
+            "signature": {
+              "type": "string"
             }
           }
         },

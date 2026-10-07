@@ -36,7 +36,7 @@ class UnitsTest(unittest.TestCase):
         pane = w["panes"][0]
         self.assertEqual(pane["tokens"], {"role": "pm"})
         self.assertIn("--agent prometheus:project-manager", pane["ran"])
-        self.assertIn("--strict-mcp-config --name pm", pane["ran"])
+        self.assertIn("--name pm", pane["ran"])
         self.assertEqual(pane["agent_name"], "sc-1-a-%s" % pane["pane_id"].replace(":", "-").lower())
         long = units.herdr_name("review-43649-let-users-enter-plc-and", "w1F:p1")
         self.assertEqual((long, len(long) <= 32), ("review-43649-let-users-en-w1f-p1", True))
@@ -128,7 +128,7 @@ class UnitsTest(unittest.TestCase):
         p = next(x for x in self.world()["panes"] if x["pane_id"] == out["pane"])
         self.assertEqual(p["tokens"], {"role": "runner", "item": "battery-curves-csv"})
         self.assertIn("--agent prometheus:runner", p["ran"])
-        self.assertIn("--strict-mcp-config --name quick-battery-curves-csv", p["ran"])
+        self.assertIn("--name quick-battery-curves-csv", p["ran"])
         self.assertNotIn("dontAsk", p["ran"])
         brief = open(os.path.join(self.tmp.name, "briefs", "quick-battery-curves-csv.md")).read()
         self.assertIn("export the battery curves as a single csv", brief)

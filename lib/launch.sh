@@ -75,6 +75,29 @@ ask = [("mcp__%s__%s" % (s, t)) for s in mine if role_name in mcp_map.get("ask_w
        for t in mcp_map["write_tools"].get(s, [])]
 if ask:  # a writer that still asks the operator per call (ask beats allow)
     mperms["ask"] = list(dict.fromkeys(mperms.get("ask", []) + ask))
+# operator awareness + signature, appended to the system prompt; the registry is the one home of both
+LEADS = {"implementor": "your PM (`send.sh --role pm`)", "reviewer": "your PM (`send.sh --role pm`)",
+         "planner": "your PM (`send.sh --role pm`)", "runner": "the seat (`send.sh --role seat`)",
+         "librarian": "the seat (`send.sh --role seat`)", "configurator": "the seat (`send.sh --role seat`)"}
+op = {}
+try:
+    sys.path.insert(0, os.path.join(os.path.dirname(base_path), "..", "..", "lib"))
+    import registry
+    op = (registry.workspace_config(workspace) or {}).get("operator") or {}
+except Exception:  # noqa: BLE001 — no registry: the prompt still carries hierarchy + a generic signature
+    pass
+vals = {"name": op.get("name", "the operator"), "full_name": op.get("full_name", op.get("name", "")),
+        "github": op.get("github", op.get("codeowners_handle", "")).lstrip("@"),
+        "lead": LEADS.get(role_name, "the seat")}
+vals["signature"] = (op.get("signature") or "⚡ Prometheus by instruction of {name}").format(**vals)
+tmpl = open(os.path.join(os.path.dirname(base_path), "..", "operator.md")).read().split("---", 2)[2]
+sections = {}
+for chunk in tmpl.split("<!-- ")[1:]:
+    head, body = chunk.split(" -->", 1)
+    sections[head.split(":")[0].strip()] = body.strip()
+keep = ["operator" if role_name in ("seat", "pm") else "hierarchy", "signature"]
+with open(os.path.join(state, "settings", role_name + ".prompt.md"), "w") as fh:
+    fh.write("\n\n".join(sections[k].format(**vals) for k in keep) + "\n")
 for key in ("allow", "deny", "additionalDirectories"):
     if key in perms:
         perms[key] = [r.replace("{state_dir}", state).replace("{workspace}", workspace) for r in perms[key]]
@@ -88,7 +111,8 @@ os.replace(out + ".tmp", out)
 PY
 
 cmd=(claude --plugin-dir "$plugin_root" --settings "$settings" --agent "prometheus:$agent"
-     --mcp-config "$state_dir/mcp/$role.json" --strict-mcp-config)
+     --mcp-config "$state_dir/mcp/$role.json" --strict-mcp-config
+     --append-system-prompt-file "$settings_dir/$role.prompt.md")
 case $role in
   implementor|reviewer|librarian) cmd+=(--permission-mode dontAsk) ;;
 esac

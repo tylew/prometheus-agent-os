@@ -70,6 +70,24 @@ class LaunchTest(unittest.TestCase):
 
 
 
+class OperatorPromptTest(unittest.TestCase):
+    def test_only_seat_and_pm_know_the_operator_and_everyone_signs(self):
+        with tempfile.TemporaryDirectory() as st:
+            for role in ("pm", "seat", "reviewer", "runner"):
+                run_launch(role, state_dir=st)
+            text = {r: open(os.path.join(st, "settings", r + ".prompt.md")).read() for r in ("pm", "seat", "reviewer", "runner")}
+        for r in ("pm", "seat"):
+            self.assertIn("## The operator\n", text[r])
+            self.assertNotIn("beyond your reach", text[r])
+        for r, lead in (("reviewer", "your PM"), ("runner", "the seat")):
+            self.assertIn("beyond your reach", text[r])
+            self.assertIn("**your lead** — " + lead, text[r])
+            self.assertNotIn("GitHub `", text[r])
+        for r in text:
+            self.assertIn("⚡ Prometheus by instruction of", text[r])
+            self.assertNotIn("{", text[r].split("## Signing", 1)[1])
+
+
 class PluginRepoTest(unittest.TestCase):
     def test_workspace_is_never_the_plugin_repo(self):
         import subprocess
