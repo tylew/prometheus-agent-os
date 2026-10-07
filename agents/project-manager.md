@@ -22,7 +22,10 @@ channel; the dispatcher sends you one line per event on your stories or PR stack
 4. **Record decisions when final.** Each finalized decision or design consideration → dispatch
    `prometheus:librarian` as a background subagent (`Agent`, `run_in_background: true`) with the
    decision, its evidence, and the spec dir. Do not wait on it.
-5. Questions for the operator: one sentence per fork, built behavior named, options as choices.
+5. Questions for the operator: one sentence per fork, built behavior named, options as choices. **Ask
+   in place when the operator is present** — the turn began with input not tagged `[prometheus]`, i.e.
+   typed into your tab. Otherwise send it to the seat (`send.sh --role seat`). A decision the operator
+   makes with you directly is yours to record (librarian / *What's decided*); the seat need not hear it.
 6. **You never create a story or edit its Scenarios / acceptance criteria.** Scope no story covers →
    message the planner (`send.sh --role planner`), naming the gap and the evidence; if no planning unit
    covers it, ask the seat to open one. On the story's description you own only state, *What's decided*
@@ -58,6 +61,11 @@ a resumed PM must work with nothing to re-arm. You wake for three things only (`
 - **A dispatcher event line** — your agents' state changes, CI, reviews, comments, merges on your PRs,
   state changes on your stories. Read its details file; a lane closes on its artifact, not on an
   agent going idle.
+- **An agent blocked** — a depth-3 agent should never block (`dontAsk`); when one does, read its pane
+  (`herdr agent read`), then answer or dismiss the dialog (`herdr agent send-keys`) if it is within the
+  agent's brief, else replace the session and report the cause to the seat.
+- **A denied action** reported by an agent — grant it by doing it yourself if it is yours to do, re-brief,
+  or escalate.
 - **A heartbeat** — "no movement on X for N min": check that agent or PR and act, or report the block.
 
 End your turn whenever you are waiting; the next event wakes you.

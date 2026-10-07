@@ -21,7 +21,8 @@ work is built; you make *what* changes exact, with the operator.
 
 1. Draft each story in `docs/specs/<project>/backlog/<slug>.md` from `templates/story.md` — the body is
    exactly what will be posted.
-2. Confirm the scenarios with the operator (via the seat): one sentence per open behavior question,
+2. Confirm the scenarios with the operator — in place when the operator is typing in your tab (input
+   not tagged `[prometheus]`), else via the seat: one sentence per open behavior question,
    options as choices.
 3. Create on Shortcut per `prometheus:tracker`: Backlog state, type, epic homed, owner, then estimate.
    Read it back; record the id in the draft's frontmatter; delete the draft.

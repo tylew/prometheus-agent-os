@@ -1,0 +1,49 @@
+{
+  "$comment": "Depth-3 implementor: never prompts a human. Launched with --permission-mode dontAsk --settings <this file>; anything not allowed is denied and reported to the PM. open-tab.sh appends the project's registry validation commands to allow.",
+  "permissions": {
+    "defaultMode": "dontAsk",
+    "allow": [
+      "Read",
+      "Glob",
+      "Grep",
+      "Edit",
+      "Write",
+      "Bash(git status *)",
+      "Bash(git diff *)",
+      "Bash(git log *)",
+      "Bash(git show *)",
+      "Bash(git add *)",
+      "Bash(git fetch *)",
+      "Bash(git rev-parse *)",
+      "Bash(git restore *)",
+      "Bash(gt create *)",
+      "Bash(gt modify *)",
+      "Bash(gt restack *)",
+      "Bash(gt sync *)",
+      "Bash(gt log *)",
+      "Bash(gt submit --draft *)",
+      "Bash(gh pr view *)",
+      "Bash(gh pr diff *)",
+      "Bash(gh pr checks *)",
+      "Bash(ls *)",
+      "Bash(cat *)",
+      "Bash(head *)",
+      "Bash(wc *)",
+      "Bash(find *)"
+    ],
+    "deny": [
+      "AskUserQuestion",
+      "Bash(gt submit --publish *)",
+      "Bash(gt merge *)",
+      "Bash(gh pr merge *)",
+      "Bash(gh pr ready *)",
+      "Bash(git push --force *)",
+      "Bash(git stash *)",
+      "Bash(git add -A *)",
+      "Bash(git add . *)",
+      "Bash(thor *)",
+      "mcp__shortcut__stories-update",
+      "mcp__shortcut__stories-create"
+    ]
+  }
+}

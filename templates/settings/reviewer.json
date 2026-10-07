@@ -1,0 +1,37 @@
+{
+  "$comment": "Depth-3 reviewer: never prompts a human, never edits. Launched with --permission-mode dontAsk --settings <this file>; denied actions are reported to the PM.",
+  "permissions": {
+    "defaultMode": "dontAsk",
+    "allow": [
+      "Read",
+      "Glob",
+      "Grep",
+      "Bash(git fetch *)",
+      "Bash(git diff *)",
+      "Bash(git log *)",
+      "Bash(git show *)",
+      "Bash(git worktree add --detach *)",
+      "Bash(gh pr view *)",
+      "Bash(gh pr diff *)",
+      "Bash(gh pr checks *)",
+      "Bash(gh api repos/*/pulls/*/comments *)",
+      "Bash(gh api repos/*/pulls/*/reviews *)",
+      "Bash(semgrep *)",
+      "Bash(ls *)",
+      "Bash(cat *)",
+      "Bash(wc *)",
+      "Bash(find *)"
+    ],
+    "deny": [
+      "AskUserQuestion",
+      "Edit",
+      "Write",
+      "Bash(git commit *)",
+      "Bash(git push *)",
+      "Bash(gt *)",
+      "Bash(gh pr merge *)",
+      "mcp__shortcut__stories-update",
+      "mcp__shortcut__stories-create"
+    ]
+  }
+}
