@@ -8,6 +8,9 @@
   "permissions": {
     "additionalDirectories": [
       "{state_dir}"
+    ],
+    "allow": [
+      "Bash(*/.claude/prometheus/projects/*/*.sh *)"
     ]
   }
 }
