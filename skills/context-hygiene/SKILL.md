@@ -21,3 +21,7 @@ refresh-agent.sh <workspace-id> <label> <role> <brief-path>
 
 No state files: an agent's context is its Claude session; durable facts live in specs, Shortcut, git and
 the KB; live facts in Herdr tokens. The seat holds nothing — `/clear` on it is always safe.
+
+**Respawn** — `respawn.sh <pane> [--force]` restarts an idle agent on its own session with the current
+instructions, settings and MCP access (`--resume … --system-prompt-snapshot off`); the conversation is kept. The
+seat runs it after a configurator change.

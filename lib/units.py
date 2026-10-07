@@ -355,6 +355,33 @@ def restore_all(only: list[str] | None = None, forget: list[str] | None = None) 
     return out
 
 
+# ----------------------------------------------------------------- respawn
+
+def respawn(pane_id: str, force: bool = False, timeout: float = 30) -> str:
+    """Restart the agent in a pane from its own session with the current instructions and settings: the
+    conversation is kept, the system prompt is rebuilt (`--system-prompt-snapshot off`). Idle agents only."""
+    snap = _snap()
+    p = dispatch.pane(snap, pane_id)
+    if not p:
+        raise ValueError("no pane %s" % pane_id)
+    role = _tokens(p).get("role")
+    session = dispatch.session_of(p)
+    if not role or not session:
+        raise ValueError("%s has no prometheus role or no session to resume" % pane_id)
+    if p.get("agent_status") in BUSY_STATES and not force:
+        raise ValueError("%s is %s; respawn at its prompt (or --force)" % (pane_id, p.get("agent_status")))
+    tabs = {t["tab_id"]: t.get("label") for t in snap.get("tabs", [])}
+    label = tabs.get(p.get("tab_id")) or role
+    unit = dispatch.unit_of_pane(snap, pane_id)
+    hz.call("agent", "send-keys", pane_id, "ctrl+c", "ctrl+c")
+    deadline = time.time() + timeout
+    while time.time() < deadline and (dispatch.pane(_snap(), pane_id) or {}).get("agent"):
+        time.sleep(1)
+    start(pane_id, role, unit_name(unit) if unit else "prometheus", label,
+          claude_args=["--resume", session, "--system-prompt-snapshot", "off"])
+    return "respawned %s (%s) on session %s" % (label, pane_id, session)
+
+
 # --------------------------------------------------------- context hygiene
 
 def compact(pane_id: str, focus: str) -> None:
@@ -411,6 +438,9 @@ def main(argv: list[str]) -> int:
     r.add_argument("role", choices=ROLES)
     r.add_argument("brief")
     sub.add_parser("control-tabs").add_argument("workspace")
+    rp = sub.add_parser("respawn")
+    rp.add_argument("pane")
+    rp.add_argument("--force", action="store_true")
     cf = sub.add_parser("configure")
     cf.add_argument("workspace")
     cf.add_argument("slug")
@@ -455,6 +485,8 @@ def main(argv: list[str]) -> int:
             print(json.dumps(configure(a.workspace, a.slug, " ".join(a.issue))))
         elif a.cmd == "quick":
             print(json.dumps(quick(a.workspace, a.slug, " ".join(a.ask))))
+        elif a.cmd == "respawn":
+            print(respawn(a.pane, a.force))
         elif a.cmd == "control-tabs":
             print("opened: %s" % (", ".join(control_tabs(a.workspace)) or "nothing (both present)"))
         elif a.cmd == "restore":

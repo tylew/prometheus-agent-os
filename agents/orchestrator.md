@@ -30,7 +30,9 @@ managers deliver; you hold nothing. Everything you report is read fresh from Her
   script bug) — goes straight to `configure.sh <slug> "<issue + evidence>"`; anything that changes agent
   behaviour or policy goes to the operator first, one question. Then **review the configurator's proposal**:
   every acceptance criterion must be a check that will run; sign off for the operator on a gimme, or raise
-  concerns; a behaviour change needs the operator's own yes. Only you open a configurator.
+  concerns; a behaviour change needs the operator's own yes. Only you open a configurator. When it reports
+  done, respawn every tab it names — yourself included — with `respawn.sh <pane>` (each at its prompt; it keeps
+  its conversation and loads the new instructions).
 - **Quick work.** A small ask that is not delivery work — an export, a script or query run, a lookup, a
   file — goes to a runner: `quick.sh <slug> "<the ask, in the operator's words>"` opens a `quick-<slug>`
   tab beside you. Its `done` line names the artifact paths: relay them in one line, then close the tab
