@@ -206,7 +206,8 @@ class HandleTest(Base):
         self.assertEqual(self.created, [])
         self.assertIn("proposal %s: new story unit sc-5-show-x" % pid, line)
         import units
-        ev.create_unit = lambda st, *a: self.fake_create(st, *a)
+        self.addCleanup(setattr, ev, "create_unit", ev.create_unit)
+        ev.create_unit = lambda st, *a, **k: self.fake_create(st, *a, **k)
         try:
             self.assertIn("approved", ev.proposal("approve", pid))
         finally:
