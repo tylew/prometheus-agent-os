@@ -176,8 +176,8 @@
         "gh api repos/o/r/commits/abc",
         "gh api repos/o/r/compare/a...b",
         {
-          "cmd": "semgrep --config auto {wt}/x.py",
-          "live": "semgrep --config auto --version"
+          "cmd": "semgrep --config p/default --metrics off --quiet {wt}/x.py",
+          "live": "semgrep --config p/default --metrics off --version"
         },
         "gh api repos/o/r/pulls/1/comments --paginate",
         "git -C {wt} log -1",

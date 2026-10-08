@@ -21,7 +21,8 @@ Intent comes from these, never reverse-engineered from the diff:
 
 ## 1. Semgrep first
 
-`semgrep --config auto --sarif <touched paths>` (or `semgrep ci --sarif` where the repo is configured). Fold
+`semgrep --config p/default --metrics off --quiet <touched paths, absolute>` (pinned ruleset:
+semgrep's auto config refuses metrics off) (or `semgrep ci --sarif` where the repo is configured). Fold
 the mechanical hits in so reasoning goes to the semantic class — concurrency, migration safety, money and
 units, security. Absent or denied ⇒ say so under *Covered* and continue.
 
