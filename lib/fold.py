@@ -36,7 +36,10 @@ def plan(snap: dict, lookup=None) -> dict:
     olds = legacy_units(snap)
     stories = [s for u in olds for s in dispatch.token_list(dispatch._tokens(u), "stories")]
     with dispatch.locked_state() as st:
-        (lookup or events.lookup_epics)(st, stories)
+        for _ in range(1 + len(stories) // max(1, events.EPIC_LOOKUP_PER_TICK)):  # batches until all are known
+            if all(x in st.get("story_epic", {}) for x in stories):
+                break
+            (lookup or events.lookup_epics)(st, stories)
         cache = dict(st.get("story_epic", {}))
     out, unhomed = {}, []
     for u in olds:

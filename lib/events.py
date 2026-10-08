@@ -398,7 +398,8 @@ def lookup_epics(st: dict, stories: list[str], fn=None, now: float | None = None
     if not need:
         return
     fn = fn or (lambda ids: claude_json(
-        "Read-only Shortcut lookup. Call stories-get-by-id once for each of these ids and nothing else: %s. "
+        "Read-only Shortcut lookup. Call stories-get-by-id once for each of these ids and nothing else — no "
+        "files, comments, attachments or searches; the story record already carries its epic: %s. "
         "Return each as id sc-<number>, epic_id (the epic's numeric id; empty when none), epic (its name)."
         % ", ".join(i.split("-")[1] for i in ids), EPIC_SCHEMA,
         mcp={"shortcut": {"type": "http", "url": os.environ.get("SHORTCUT_MCP_URL", "https://mcp.shortcut.com/mcp")}},
