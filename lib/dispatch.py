@@ -99,9 +99,14 @@ def _csv(val: str | None) -> list[str]:
     return [v.strip() for v in (val or "").split(",") if v.strip()]
 
 
+def owned(name: str) -> bool:
+    """`prom-test-*` units belong only to e2e (PROMETHEUS_TEST_UNITS=1), never the operator's dispatcher."""
+    return not name.startswith("prom-test-") or os.environ.get("PROMETHEUS_TEST_UNITS") == "1"
+
+
 def units(snap: dict) -> list[dict]:
-    """Live unit workspaces: those carrying a prometheus `unit` token."""
-    return [w for w in snap.get("workspaces", []) if _tokens(w).get("unit")]
+    """Live unit workspaces this dispatcher owns: those carrying a prometheus `unit` token."""
+    return [w for w in snap.get("workspaces", []) if _tokens(w).get("unit") and owned(_tokens(w)["unit"])]
 
 
 def unit_of_workspace(snap: dict, workspace_id: str) -> dict | None:
@@ -402,6 +407,8 @@ def update_image(snap: dict, st: dict) -> None:
     Units not live keep their last image — that is what a Herdr restart leaves to restore."""
     tabs = {t["tab_id"]: t.get("label") for t in snap.get("tabs", [])}
     image = st.setdefault("image", {})
+    for k in [k for k in image if not owned(k)]:
+        del image[k]
     for u in units(snap):
         label = _tokens(u)["unit"]
         agents = []
@@ -419,7 +426,7 @@ def update_image(snap: dict, st: dict) -> None:
 
 def pending_restore(snap: dict, st: dict) -> dict:
     live = {_tokens(u)["unit"] for u in units(snap)}
-    return {k: v for k, v in st.get("image", {}).items() if k not in live}
+    return {k: v for k, v in st.get("image", {}).items() if k not in live and owned(k)}
 
 
 # ------------------------------------------------------------------------- tick

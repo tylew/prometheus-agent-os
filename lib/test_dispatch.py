@@ -218,6 +218,26 @@ class LibrarianReportTest(Base):
         self.assertEqual(list(pending), ["sc-1-a"])
         self.assertEqual(pending["sc-1-a"]["agents"][0], {"label": "pm", "tokens": {"role": "pm"}, "session": "s1"})
 
+    def test_test_units_only_seen_with_flag(self):
+        s = snap()
+        s["workspaces"].append({"workspace_id": "wT", "tokens": {"unit": "prom-test-x"}})
+        with d.locked_state() as st:
+            st["image"]["prom-test-old"] = {"tokens": {"unit": "prom-test-old"}, "agents": []}
+            self.assertNotIn("prom-test-x", [d._tokens(u)["unit"] for u in d.units(s)])
+            self.assertIn("sc-1-a", [d._tokens(u)["unit"] for u in d.units(s)])
+            self.assertNotIn("prom-test-old", d.pending_restore(s, st))
+            d.update_image(s, st)
+            self.assertFalse([k for k in st["image"] if k.startswith("prom-test-")])
+            os.environ["PROMETHEUS_TEST_UNITS"] = "1"
+            try:
+                st["image"]["prom-test-old"] = {"tokens": {"unit": "prom-test-old"}, "agents": []}
+                self.assertIn("prom-test-x", [d._tokens(u)["unit"] for u in d.units(s)])
+                self.assertIn("prom-test-old", d.pending_restore(s, st))
+                d.update_image(s, st)
+                self.assertIn("prom-test-x", st["image"])
+            finally:
+                os.environ.pop("PROMETHEUS_TEST_UNITS")
+
 
 class MergeTest(Base):
     def test_concurrent_send_survives_an_external_tick(self):

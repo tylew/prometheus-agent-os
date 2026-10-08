@@ -25,7 +25,7 @@ def main(argv: list[str]) -> int:
         print("e2e: needs to run inside Herdr", file=sys.stderr)
         return 2
     state = tempfile.mkdtemp(prefix="prom-e2e-", dir=os.path.expanduser("~/.local/state"))
-    os.environ.update(PROMETHEUS_STATE_DIR=state, PROMETHEUS_EXTERNAL="0", PROMETHEUS_FILTER="(?!)",
+    os.environ.update(PROMETHEUS_STATE_DIR=state, PROMETHEUS_EXTERNAL="0", PROMETHEUS_FILTER="(?!)", PROMETHEUS_TEST_UNITS="1",
                       PROMETHEUS_KB_ROOT=os.path.join(state, "kb"))
     import dispatch
     import units
