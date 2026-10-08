@@ -53,7 +53,7 @@ def pr_ref(repo: str, number) -> str:
 
 
 def split_ref(ref: str) -> tuple[str, str]:
-    repo, num = ref.rsplit("#", 1)
+    repo, num = dispatch.canon_ref("prs", ref).rsplit("#", 1)
     return repo, num
 
 
@@ -329,7 +329,7 @@ def poll_shortcut(snap: dict, st: dict, now: float | None = None) -> list[dict]:
     if now - st["cursors"].get("shortcut:polled", 0) < every:
         return []
     since = st["cursors"].get("shortcut:since") or time.strftime("%Y-%m-%d", time.gmtime(now - 7 * 86400))
-    held = {s for u in dispatch.units(snap) for s in dispatch._csv(dispatch._tokens(u).get("stories"))}
+    held = {s for u in dispatch.units(snap) for s in dispatch.token_list(dispatch._tokens(u), "stories")}
     prompt = ("Read-only Shortcut poll. Make exactly these calls and no others:\n"
               "1. users-get-current — note the mention name.\n"
               "2. stories-search once with query: owner:<mention> updated:%s..* (the search result already carries "
@@ -534,7 +534,7 @@ def _imaged_owner(pending: dict, ev: dict) -> str | None:
     prs = set(filter(None, [ev.get("pr"), *ev.get("stack", [])]))
     for name, rec in pending.items():
         t = rec.get("tokens", {})
-        if stories & set(dispatch._csv(t.get("stories"))) or prs & set(dispatch._csv(t.get("prs"))):
+        if stories & set(dispatch.token_list(t, "stories")) or prs & set(dispatch._csv(t.get("prs"))):
             return name
     return None
 

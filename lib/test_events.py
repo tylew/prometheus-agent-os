@@ -86,6 +86,11 @@ class GitHubTest(Base):
         self.assertEqual(ev.pr_changes("o/r#1", a, dict(a, ci="pending")), [])
         self.assertEqual(ev.pr_changes("o/r#1", None, a), ["new"])
 
+    def test_split_ref_refuses_a_bare_number(self):
+        self.assertEqual(ev.split_ref("o/r#1"), ("o/r", "1"))
+        with self.assertRaisesRegex(ValueError, "owner/repo#n"):
+            ev.split_ref("43720")
+
     def test_bot_and_tool_comments_do_not_count(self):
         def c(login, body="hi"):
             return {"author": {"login": login}, "body": body}

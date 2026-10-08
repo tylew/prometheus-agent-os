@@ -68,6 +68,22 @@ class UnitsTest(unittest.TestCase):
         with unittest.mock.patch.dict(os.environ, {"HERDR_PANE_ID": out["pane"]}):
             self.assertEqual(units.main(["tokens", "--stage", "design"]), 0)
         self.assertEqual(self.world()["workspaces"][0]["tokens"]["stage"], "design")
+
+    def test_tokens_refuse_bare_pr_and_canonicalise_bare_story(self):
+        out = units.create("sc-1-a", "story", "besstie", ["sc-1"], ["o/r#10"])
+        with self.assertRaisesRegex(ValueError, "owner/repo#n"):
+            units.set_tokens(out["workspace"], prs="43720")
+        with self.assertRaisesRegex(ValueError, "owner/repo#n"):
+            units.set_tokens(out["workspace"], add_prs=["43720"])
+        self.assertEqual(units.set_tokens(out["workspace"], stories="109355")["stories"], "sc-109355")
+        self.assertEqual(self.world()["workspaces"][0]["tokens"]["prs"], "o/r#10")
+        with self.assertRaisesRegex(ValueError, "owner/repo#n"):
+            units.create("sc-2-b", "story", "besstie", ["sc-2"], ["43720"])
+        self.assertEqual(len(self.world()["workspaces"]), 1)
+        with unittest.mock.patch.dict(os.environ, {"HERDR_PANE_ID": out["pane"]}), \
+                unittest.mock.patch("sys.stderr") as err:
+            self.assertNotEqual(units.main(["tokens", "--add-pr", "43720"]), 0)
+        self.assertIn("owner/repo#n", "".join(c.args[0] for c in err.write.call_args_list))
         with unittest.mock.patch.dict(os.environ, {"HERDR_PANE_ID": "w9:p9"}):
             self.assertEqual(units.main(["tokens", "--stage", "design"]), 1)
 

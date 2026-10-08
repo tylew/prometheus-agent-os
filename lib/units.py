@@ -127,6 +127,7 @@ def create(name: str, kind: str, project: str, stories: list[str], prs: list[str
            brief: str | None = None, claude_args: list[str] | None = None) -> dict:
     if kind not in KINDS:
         raise ValueError("kind must be one of %s" % ", ".join(KINDS))
+    stories, prs = [dispatch.canon_ref("stories", v) for v in stories], [dispatch.canon_ref("prs", v) for v in prs]
     if any(dispatch._tokens(u).get("unit") == name for u in dispatch.units(_snap())):
         raise ValueError("unit %s already exists" % name)
     root = env.workspace_root()
@@ -181,7 +182,7 @@ def set_tokens(workspace_id: str, stage: str | None = None, stories: str | None 
         if whole is None and not extra:
             continue
         base = dispatch._csv(whole) if whole is not None else dispatch._csv(cur.get(key))
-        out[key] = ",".join(dict.fromkeys(base + (extra or [])))
+        out[key] = ",".join(dict.fromkeys(dispatch.canon_ref(key, v) for v in base + (extra or [])))
     if stage:
         out["stage"] = stage
     if not out:

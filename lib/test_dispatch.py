@@ -52,6 +52,11 @@ class RouteTest(Base):
         self.assertEqual(d.route(s, {"pr": "o/r#11"}), "wA:p1")
         self.assertEqual(d.route(s, {"pr": "o/r#99", "stack": ["o/r#10"]}), "wA:p1")
 
+    def test_bare_story_token_still_matches(self):
+        s = snap()
+        s["workspaces"][1]["tokens"]["stories"] = "1"
+        self.assertEqual(d.route(s, {"story": "sc-1"}), "wA:p1")
+
     def test_planner_is_a_child_reached_by_role(self):
         s = snap()
         s["workspaces"][2]["tokens"]["kind"] = "goal-set"

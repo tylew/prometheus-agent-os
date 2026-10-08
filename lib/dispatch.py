@@ -12,6 +12,7 @@ import copy
 import fcntl
 import json
 import os
+import re
 import signal
 import sys
 import time
@@ -99,6 +100,24 @@ def _csv(val: str | None) -> list[str]:
     return [v.strip() for v in (val or "").split(",") if v.strip()]
 
 
+PR_REF_RE = re.compile(r"^[\w.-]+/[\w.-]+#\d+$")
+
+
+def canon_ref(key: str, value: str) -> str:
+    """A `stories` / `prs` token entry in its one form: sc-N (bare N accepted) · owner/repo#n (else ValueError)."""
+    if key == "stories":
+        return "sc-" + value if value.isdigit() else value
+    if not PR_REF_RE.match(value):
+        raise ValueError("PR ref must be owner/repo#n: %r" % value)
+    return value
+
+
+def token_list(tokens: dict, key: str) -> list[str]:
+    """A unit's stories / prs as written; story ids canonical, so a bare id still matches."""
+    vals = _csv(tokens.get(key))
+    return [canon_ref(key, v) for v in vals] if key == "stories" else vals
+
+
 def owned(name: str) -> bool:
     """`prom-test-*` units belong only to e2e (PROMETHEUS_TEST_UNITS=1), never the operator's dispatcher."""
     return not name.startswith("prom-test-") or os.environ.get("PROMETHEUS_TEST_UNITS") == "1"
@@ -152,7 +171,7 @@ def match_units(snap: dict, event: dict) -> list[dict]:
     hits = []
     for u in units(snap):
         t = _tokens(u)
-        if stories & set(_csv(t.get("stories"))) or prs & set(_csv(t.get("prs"))):
+        if stories & set(token_list(t, "stories")) or prs & set(_csv(t.get("prs"))):
             hits.append(u)
     return hits
 
