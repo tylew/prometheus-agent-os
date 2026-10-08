@@ -248,6 +248,47 @@ class HandleTest(Base):
         self.assertEqual(settled, [("sc-7", "Completed")])
 
 
+class ShortcutTest(Base):
+    def test_interval_defaults_to_thirty_minutes(self):
+        os.environ.pop("SHORTCUT_INTERVAL", None)
+        st = {"cursors": {"shortcut:polled": 1000}}
+        calls = []
+        orig, ev.claude_json = ev.claude_json, lambda *a, **k: calls.append(1) or {"stories": []}
+        try:
+            ev.poll_shortcut({}, st, now=1000 + 1799)
+            self.assertEqual(calls, [])
+            ev.poll_shortcut({}, st, now=1000 + 1800)
+        finally:
+            ev.claude_json = orig
+        self.assertEqual(calls, [1])
+
+    def test_budget_scales_with_held_ids_still_open(self):
+        import units
+        units.create("sc-1-a", "story-set", "besstie", ["sc-1", "sc-2", "sc-3"], [])
+        seen = {}
+        orig = ev.claude_json
+        ev.claude_json = lambda prompt, schema, **k: seen.update(prompt=prompt, **k) or {"stories": []}
+        try:
+            ev.poll_shortcut(dispatch.snapshot(), {"cursors": {"story:sc-3": "Completed"}})
+        finally:
+            ev.claude_json = orig
+        self.assertAlmostEqual(seen["budget"], 0.10 + 0.04 * 2)
+        self.assertIn("1, 2", seen["prompt"])
+        self.assertNotIn("3", seen["prompt"].split("ids", 1)[1].split(".")[0])
+
+    def test_failed_oneshot_reports_its_subtype(self):
+        out = json.dumps({"subtype": "error_max_budget_usd", "is_error": True, "num_turns": 15,
+                          "total_cost_usd": 0.3, "stop_reason": "tool_use"})
+        orig = ev.subprocess.run
+        ev.subprocess.run = lambda *a, **k: ev.subprocess.CompletedProcess(a, 1, out, "")
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                ev.claude_json("p", {}, mcp={})
+        finally:
+            ev.subprocess.run = orig
+        self.assertIn("error_max_budget_usd after 15 turns", str(cm.exception))
+
+
 class VerdictTest(Base):
     def test_invalid_verdict_goes_to_seat_untriaged(self):
         seat = self.seat()

@@ -17,7 +17,7 @@ restore.sh [--list] [--unit <name>] [--forget <name>]   units a Herdr restart to
 map.sh [--unit <ws>] [--split]                           the map (drill-down + live preview), here or beside the caller
 ../../../lib/dispatch.py status
 ```
-Env: `INTERVAL` (s, default 60), `HEARTBEAT` (min, 30), `SHORTCUT_INTERVAL` (s, 300),
+Env: `INTERVAL` (s, default 60), `HEARTBEAT` (min, 30), `SHORTCUT_INTERVAL` (s, 1800),
 `PROMETHEUS_NEW_PER_TICK` (3), `PROMETHEUS_STATE_DIR` (default `~/.local/state/prometheus`),
 `PROMETHEUS_FILTER` (regex on PR / story titles — trial runs act only on matches).
 

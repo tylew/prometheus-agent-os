@@ -31,13 +31,14 @@ OWNED_INTERVAL = int(os.environ.get("OWNED_INTERVAL", 600))
 REVIEW_SOURCES = ("review-requested", "owned-paths")
 
 
-def run(cmd: list[str], timeout: int = 120, cwd: str | None = None, stdin: str | None = None) -> str:
+def run(cmd: list[str], timeout: int = 120, cwd: str | None = None, stdin: str | None = None,
+        check: bool = True) -> str:
     try:
         out = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, cwd=cwd,
                              input=stdin if stdin is not None else "")
     except subprocess.TimeoutExpired:
         raise RuntimeError("%s: timed out after %ss" % (" ".join(cmd[:3]), timeout))
-    if out.returncode != 0:
+    if out.returncode != 0 and (check or not out.stdout.strip()):
         raise RuntimeError("%s: %s" % (" ".join(cmd[:3]), (out.stderr or out.stdout).strip()[:300]))
     return out.stdout
 
@@ -290,17 +291,18 @@ SHORTCUT_SCHEMA = {
 }
 
 
-SHORTCUT_READ_TOOLS = ["mcp__shortcut__users-get-current", "mcp__shortcut__stories-search",
-                       "mcp__shortcut__stories-get-by-id"]
+SHORTCUT_READ_TOOLS = ["mcp__shortcut__stories-search", "mcp__shortcut__stories-get-by-id"]
+SHORTCUT_DONE = ("Completed", "Won't Fix")
 
 
 def claude_json(prompt: str, schema: dict, *, agent: str | None = None, mcp: dict | None = None,
-                allowed: list[str] | None = None, model: str = "haiku", timeout: int = 180) -> dict:
+                allowed: list[str] | None = None, model: str = "haiku", timeout: int = 180,
+                budget: float | None = None) -> dict:
     """One-shot claude -p with structured output, outside the workspace so no CLAUDE.md loads."""
     cmd = [os.environ.get("CLAUDE_BIN", "claude"), "-p", "--model", model, "--output-format", "json",
            "--json-schema", json.dumps(schema),
            "--settings", os.path.join(PLUGIN, "templates", "settings", "launch.json"),
-           "--max-budget-usd", os.environ.get("PROMETHEUS_ONESHOT_BUDGET", "0.25")]
+           "--max-budget-usd", "%.2f" % (budget or float(os.environ.get("PROMETHEUS_ONESHOT_BUDGET", "0.25")))]
     if agent:
         cmd += ["--plugin-dir", PLUGIN, "--agent", agent]
     if mcp is not None:
@@ -313,7 +315,7 @@ def claude_json(prompt: str, schema: dict, *, agent: str | None = None, mcp: dic
     if allowed:
         cmd += ["--allowed-tools", ",".join(allowed)]
     # prompt on stdin: --mcp-config is variadic and would swallow a positional prompt
-    out = json.loads(run(cmd, timeout=timeout, cwd=tempfile.gettempdir(), stdin=prompt))
+    out = json.loads(run(cmd, timeout=timeout, cwd=tempfile.gettempdir(), stdin=prompt, check=False))
     if out.get("permission_denials"):
         denied = sorted({d.get("tool_name", "?") for d in out["permission_denials"]})
         raise RuntimeError("claude -p denied %s; its answer is not trusted" % ", ".join(denied))
@@ -325,20 +327,22 @@ def claude_json(prompt: str, schema: dict, *, agent: str | None = None, mcp: dic
 
 def poll_shortcut(snap: dict, st: dict, now: float | None = None) -> list[dict]:
     now = now or time.time()
-    every = int(os.environ.get("SHORTCUT_INTERVAL", 300))
+    every = int(os.environ.get("SHORTCUT_INTERVAL", 1800))
     if now - st["cursors"].get("shortcut:polled", 0) < every:
         return []
     since = st["cursors"].get("shortcut:since") or time.strftime("%Y-%m-%d", time.gmtime(now - 7 * 86400))
     held = {s for u in dispatch.units(snap) for s in dispatch.token_list(dispatch._tokens(u), "stories")}
+    fetch = sorted((s for s in held if st["cursors"].get("story:" + s) not in SHORTCUT_DONE),
+                   key=lambda s: int(s.split("-")[1]))
     prompt = ("Read-only Shortcut poll. Make exactly these calls and no others:\n"
-              "1. users-get-current — note the mention name.\n"
-              "2. stories-search once with query: owner:<mention> updated:%s..* (the search result already carries "
-              "each story's name, workflow state and epic; do not fetch stories one by one).\n"
-              "3. stories-get-by-id only for these ids, if any: %s.\n"
-              "Return every story from steps 2–3: id as sc-<number>, name, workflow state name, epic name, updated_at."
-              % (since, ", ".join(sorted(held)) or "none"))
+              "1. stories-search once with owner \"me\" and updated \"%s..*\" (the result already carries "
+              "each story's name, workflow state and epic; do not fetch those one by one).\n"
+              "2. stories-get-by-id for each of these ids the search did not return: %s.\n"
+              "Return every story from steps 1–2 once: id as sc-<number>, name, workflow state name, epic name, "
+              "updated_at." % (since, ", ".join(s.split("-")[1] for s in fetch) or "none"))
     mcp = {"shortcut": {"type": "http", "url": os.environ.get("SHORTCUT_MCP_URL", "https://mcp.shortcut.com/mcp")}}
-    result = claude_json(prompt, SHORTCUT_SCHEMA, mcp=mcp, allowed=SHORTCUT_READ_TOOLS)
+    result = claude_json(prompt, SHORTCUT_SCHEMA, mcp=mcp, allowed=SHORTCUT_READ_TOOLS,
+                         budget=0.10 + 0.04 * len(fetch))  # ~$0.02 per turn measured; one turn per fetched id
     st["cursors"]["shortcut:polled"] = int(now)
     st["cursors"]["shortcut:since"] = time.strftime("%Y-%m-%d", time.gmtime(now))
     events, fresh = [], 0
