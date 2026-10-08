@@ -1,7 +1,7 @@
 #!/bin/zsh
 # ---
 # name: begin
-# description: Start the OS from the seat — require Herdr; open the `librarian` and `map` tabs beside the seat if missing; restore units a Herdr restart took (restore image); start a `dispatcher` tab running dispatcher.sh unless one runs; print the status. Used by /prometheus:begin.
+# description: Start the OS from the seat — require Herdr; open the `librarian` and `map` tabs beside the seat if missing; restore units a Herdr restart took (restore image); run dispatcher.sh in the `dispatcher` tab (reused, extras closed; units.py dispatcher-pane) unless one runs; print the status. Used by /prometheus:begin.
 # usage: [INTERVAL=<s>] [HEARTBEAT=<min>] begin.sh
 # ---
 set -euo pipefail
@@ -18,14 +18,10 @@ if python3 "$lib/dispatch.py" status >/dev/null; then
   echo "begin: dispatcher already $(python3 "$lib/dispatch.py" status)"
   exit 0
 fi
-workspace=$(python3 "$lib/env.py")
-tab=$(herdr tab create --workspace "$HERDR_WORKSPACE_ID" --label dispatcher --cwd "$workspace" --no-focus \
-      | python3 -c 'import json,sys; r=json.load(sys.stdin)["result"]; print((r.get("tab") or r)["tab_id"])')
-pane=$(herdr pane list --workspace "$HERDR_WORKSPACE_ID" \
-      | python3 -c 'import json,sys; t=sys.argv[1]; print(next(p["pane_id"] for p in json.load(sys.stdin)["result"]["panes"] if p["tab_id"]==t))' "$tab")
+pane=$(python3 "$lib/units.py" dispatcher-pane "$HERDR_WORKSPACE_ID")
 state=${PROMETHEUS_STATE_DIR:+PROMETHEUS_STATE_DIR=${(q)PROMETHEUS_STATE_DIR} }
 state+=${PROMETHEUS_FILTER:+PROMETHEUS_FILTER=${(q)PROMETHEUS_FILTER} }
 state+=${PROMETHEUS_EXTERNAL:+PROMETHEUS_EXTERNAL=${(q)PROMETHEUS_EXTERNAL} }
 herdr pane run "$pane" "${state}HERDR_WORKSPACE_ID=$HERDR_WORKSPACE_ID INTERVAL=${INTERVAL:-60} HEARTBEAT=${HEARTBEAT:-30} ${(q)here}/dispatcher.sh" >/dev/null
 for _ in {1..20}; do python3 "$lib/dispatch.py" status >/dev/null && break; sleep 0.5; done
-echo "begin: dispatcher $(python3 "$lib/dispatch.py" status) in tab $tab (pane $pane)"
+echo "begin: dispatcher $(python3 "$lib/dispatch.py" status) in pane $pane"

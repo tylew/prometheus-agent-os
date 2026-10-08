@@ -2,7 +2,7 @@
 # ---
 # name: units
 # description: Unit workspaces and agent tabs over Herdr — create a unit (workspace, tokens, lead tab), list and close units, open / brief / close agent tabs (role tokens, `herdr agent start` with launch.sh's args, allow-list extras), the control tabs beside the seat (librarian, map), restoring units from the dispatcher's image after a Herdr restart, and context hygiene (compact an idle agent, refresh a session in a new tab). The unit-workspaces, agent-tabs and context-hygiene scripts are thin wrappers over its subcommands.
-# usage: units.py {create|list|tokens|close|open-tab|send-brief|close-tab|compact|refresh|control-tabs|restore} [args]
+# usage: units.py {create|list|tokens|close|open-tab|send-brief|close-tab|compact|refresh|control-tabs|dispatcher-pane|restore} [args]
 # ---
 from __future__ import annotations
 
@@ -288,6 +288,19 @@ def control_tabs(workspace_id: str) -> list[str]:
     return done
 
 
+def dispatcher_pane(workspace_id: str) -> str:
+    """The `dispatcher` tab's pane for a stopped loop: the first such tab reused, extras closed, else a new tab."""
+    tabs = [t["tab_id"] for t in _h("tab", "list", "--workspace", workspace_id).get("tabs", [])
+            if t.get("label") == "dispatcher"]
+    for extra in tabs[1:]:
+        _h("tab", "close", extra)
+    if tabs:
+        return _first_pane(workspace_id, tabs[0])
+    tab = _h("tab", "create", "--workspace", workspace_id, "--label", "dispatcher",
+             "--cwd", env.workspace_root(), "--no-focus")
+    return _first_pane(workspace_id, (tab.get("tab") or tab)["tab_id"])
+
+
 # -------------------------------------------------------------- quick work
 
 def configure(workspace_id: str, slug: str, issue: str) -> dict:
@@ -483,6 +496,7 @@ def main(argv: list[str]) -> int:
     r.add_argument("role", choices=ROLES)
     r.add_argument("brief")
     sub.add_parser("control-tabs").add_argument("workspace")
+    sub.add_parser("dispatcher-pane").add_argument("workspace")
     rp = sub.add_parser("respawn")
     rp.add_argument("pane")
     rp.add_argument("--force", action="store_true")
@@ -546,6 +560,8 @@ def main(argv: list[str]) -> int:
                                         a.add_story, a.add_pr)))
         elif a.cmd == "control-tabs":
             print("opened: %s" % (", ".join(control_tabs(a.workspace)) or "nothing (both present)"))
+        elif a.cmd == "dispatcher-pane":
+            print(dispatcher_pane(a.workspace))
         elif a.cmd == "restore":
             if a.list:
                 with dispatch.locked_state() as st:

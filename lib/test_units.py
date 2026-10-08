@@ -186,6 +186,15 @@ class UnitsTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "no prometheus unit"):
             units.close("wNope")
 
+    def test_dispatcher_pane_reuses_first_tab_and_closes_extras(self):
+        ws = units.create("sc-1-a", "story", "besstie", ["sc-1"], [])["workspace"]
+        first = units.dispatcher_pane(ws)
+        units._h("tab", "create", "--workspace", ws, "--label", "dispatcher")
+        units._h("tab", "create", "--workspace", ws, "--label", "dispatcher")
+        self.assertEqual(units.dispatcher_pane(ws), first)
+        tabs = [t for t in self.world()["tabs"] if t["workspace_id"] == ws and t["label"] == "dispatcher"]
+        self.assertEqual([t["tab_id"] for t in tabs], [first.replace(":p", ":t")])
+
     def test_compact_only_at_prompt(self):
         ws = units.create("sc-1-a", "story", "besstie", ["sc-1"], [])["workspace"]
         pane = units.open_tab(ws, "impl-a", "implementor")
