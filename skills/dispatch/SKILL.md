@@ -64,7 +64,7 @@ outbox. **The librarian** gets one batch per turn: held while it works, `/clear`
 **Command form (dontAsk roles).** Never `cd` — after `builtin cd` every relative path or `git` is denied,
 a relative `cd` too, and the tab already starts in its worktree. Elsewhere: `git -C <abs>` and absolute paths. `&&` / `;` and
 pipes into `grep` / `head` / `wc` pass when every part is allowed. Files outside the worktree (plugin
-skills, briefs) → the Read tool, not `cat`. No `$(…)`, no `awk`. A denied form is rewritten in this shape,
+skills, briefs, `docs/kb/`) → the Read / Grep tools, not `cat` / `grep`. No `$(…)`, no `awk`. A denied form is rewritten in this shape,
 never dropped silently.
 
 ```

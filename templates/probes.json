@@ -44,7 +44,10 @@
           "live": false
         },
         "gh api repos/o/r/issues/1/comments --paginate --jq .",
-        "Write({state_dir}/reviews/x.md)"
+        "Write({state_dir}/reviews/x.md)",
+        "npm --prefix {wt}/js run jslint brightfield-besstie",
+        "npm --prefix {wt}/js run check:types brightfield-besstie",
+        "CI=true npm --prefix {wt}/js run test brightfield-besstie"
       ],
       "ask": [
         "mcp__launchdarkly__update-feature-flag",
@@ -60,7 +63,9 @@
         },
         "gh api repos/o/r/issues/1/comments -f body=x",
         "gh api repos/o/r/issues/1/comments -X POST",
-        "gh api repos/o/r/issues/1/comments --input body.json"
+        "gh api repos/o/r/issues/1/comments --input body.json",
+        "CI=true npm --prefix {wt}/js run test brightfield-besstie -- -u",
+        "CI=true npm --prefix {wt}/js run test brightfield-besstie -- --updateSnapshot"
       ]
     },
     "planner": {
@@ -115,7 +120,10 @@
         "mcp__shortcut__stories-get-by-id",
         "git -C {wt} status --short && ls {state_dir}",
         "gh api repos/o/r/issues/1/comments --paginate --jq .",
-        "Write({state_dir}/reviews/x.md)"
+        "Write({state_dir}/reviews/x.md)",
+        "npm --prefix {wt}/js run jslint brightfield-besstie",
+        "npm --prefix {wt}/js run check:types brightfield-besstie",
+        "CI=true npm --prefix {wt}/js run test brightfield-besstie"
       ],
       "deny": [
         {
@@ -157,7 +165,9 @@
         },
         "gh api repos/o/r/issues/1/comments -f body=x",
         "gh api repos/o/r/issues/1/comments -X POST",
-        "gh api repos/o/r/issues/1/comments --input body.json"
+        "gh api repos/o/r/issues/1/comments --input body.json",
+        "CI=true npm --prefix {wt}/js run test brightfield-besstie -- -u",
+        "CI=true npm --prefix {wt}/js run test brightfield-besstie -- --updateSnapshot"
       ]
     },
     "reviewer": {
@@ -201,7 +211,11 @@
         "mcp__claude-in-chrome__file_upload",
         "mcp__claude-in-chrome__upload_image",
         "git -C {wt} status --short && ls {state_dir}",
-        "gh api repos/o/r/issues/1/comments --paginate --jq ."
+        "gh api repos/o/r/issues/1/comments --paginate --jq .",
+        "npm --prefix {wt}/js run jslint brightfield-besstie",
+        "npm --prefix {wt}/js run check:types brightfield-besstie",
+        "CI=true npm --prefix {wt}/js run test brightfield-besstie",
+        "Grep({workspace}/docs/kb)"
       ],
       "deny": [
         "mcp__claude-in-chrome__gif_creator",
@@ -234,7 +248,9 @@
         },
         "gh api repos/o/r/issues/1/comments -f body=x",
         "gh api repos/o/r/issues/1/comments -X POST",
-        "gh api repos/o/r/issues/1/comments --input body.json"
+        "gh api repos/o/r/issues/1/comments --input body.json",
+        "CI=true npm --prefix {wt}/js run test brightfield-besstie -- -u",
+        "CI=true npm --prefix {wt}/js run test brightfield-besstie -- --updateSnapshot"
       ]
     },
     "librarian": {

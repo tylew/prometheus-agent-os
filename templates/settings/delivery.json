@@ -1,5 +1,5 @@
 {
-  "$comment": "Shared base for the delivery roles (pm, implementor, reviewer): a role file opts in with \"extends\": [\"delivery\"] and lib/launch.sh merges launch.json → this → the role (lists add up). Holds the reads all three need, the review artifact write under {state_dir}/reviews/, and the PR conversation read (gh api …/issues/*/comments) — read-only: every write form on an issues path is denied. A rule lives here or in a role file, never both.",
+  "$comment": "Shared base for the delivery roles (pm, implementor, reviewer): a role file opts in with \"extends\": [\"delivery\"] and lib/launch.sh merges launch.json → this → the role (lists add up). Holds the reads all three need, the review artifact write under {state_dir}/reviews/, and the PR conversation read (gh api …/issues/*/comments) — read-only: every write form on an issues path is denied. FE validation runs in the npm --prefix <worktree>/js form (no cd); test only with CI=true, snapshot writes (-u / --updateSnapshot) denied. A rule lives here or in a role file, never both.",
   "permissions": {
     "allow": [
       "Read",
@@ -36,7 +36,10 @@
       "Bash(make -C * run_test *)",
       "Edit(/{state_dir}/reviews/**)",
       "Bash(gh api repos/*/issues/*/comments)",
-      "Bash(gh api repos/*/issues/*/comments *)"
+      "Bash(gh api repos/*/issues/*/comments *)",
+      "Bash(npm --prefix * run jslint *)",
+      "Bash(npm --prefix * run check:types *)",
+      "Bash(CI=true npm --prefix * run test *)"
     ],
     "deny": [
       "Bash(gh api repos/*/issues/* -f *)",
@@ -45,7 +48,9 @@
       "Bash(gh api repos/*/issues/* --raw-field *)",
       "Bash(gh api repos/*/issues/* -X *)",
       "Bash(gh api repos/*/issues/* --method *)",
-      "Bash(gh api repos/*/issues/* --input *)"
+      "Bash(gh api repos/*/issues/* --input *)",
+      "Bash(*npm --prefix * run test * -u*)",
+      "Bash(*npm --prefix * run test *--updateSnapshot*)"
     ]
   }
 }
