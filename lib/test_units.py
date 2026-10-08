@@ -19,6 +19,19 @@ class UnitsTest(unittest.TestCase):
         self.brief = os.path.join(self.tmp.name, "brief.md")
         open(self.brief, "w").write("brief")
 
+    def test_lists_past_herdrs_token_cap_survive_in_full(self):
+        out = units.create("sc-1-a", "story", "besstie", ["sc-1"], [])
+        prs = ["voltusdev/voltus#%d" % n for n in range(43700, 43710)]
+        units.set_tokens(out["workspace"], add_prs=prs)
+        token = self.world()["workspaces"][0]["tokens"]["prs"]
+        self.assertLessEqual(len(token), 80)
+        self.assertTrue(all(p in prs for p in token.split(",")))  # whole entries only
+        row = next(r for r in units.list_units() if r["unit"] == "sc-1-a")
+        self.assertEqual(row["prs"], ",".join(prs))
+        units.close(out["workspace"])
+        import members
+        self.assertNotIn("sc-1-a", members.load())
+
     def tearDown(self):
         self.tmp.cleanup()
         for k in ("HERDR_BIN", "FAKE_HERDR_WORLD", "PROMETHEUS_STATE_DIR"):

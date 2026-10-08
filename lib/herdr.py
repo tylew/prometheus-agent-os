@@ -62,7 +62,8 @@ def call(*args: str, timeout: float = 30) -> dict:
 
 
 def snapshot() -> dict:
-    return call("api", "snapshot").get("snapshot", {})
+    import members  # unit lists Herdr's 80-character tokens cannot hold
+    return members.overlay(call("api", "snapshot").get("snapshot", {}))
 
 
 def read(pane_id: str) -> str:

@@ -20,6 +20,7 @@ sys.path.insert(0, LIB)
 import dispatch  # noqa: E402
 import env  # noqa: E402
 import herdr as hz  # noqa: E402
+import members  # noqa: E402
 import registry  # noqa: E402
 
 KINDS = ("epic", "story", "story-set", "goal-set", "review")  # the four old kinds retire after the fold
@@ -55,11 +56,16 @@ def _first_pane(workspace_id: str, tab_id: str | None = None) -> str:
 
 
 def tag_workspace(workspace_id: str, **tokens: str) -> None:
+    """Unit lists go to members.json in full; their tokens get the display copy Herdr can hold."""
+    lists = {k: v for k, v in tokens.items() if k in members.LISTS and v is not None}
+    if lists:
+        unit = tokens.get("unit") or _tokens(dispatch.unit_of_workspace(_snap(), workspace_id) or {}).get("unit")
+        members.save(unit, lists)
     args = ["workspace", "report-metadata", workspace_id, "--source", "prometheus"]
     for k, v in tokens.items():
         if v is None:
             continue
-        args += ["--token", "%s=%s" % (k, v)]
+        args += ["--token", "%s=%s" % (k, members.display(v) if k in lists else v)]
     _h(*args)
 
 
@@ -210,6 +216,7 @@ def close(workspace_id: str, force: bool = False) -> None:
     if busy and not force:
         raise ValueError("agents still working or blocked: %s" % ", ".join(busy))
     _h("workspace", "close", workspace_id)
+    members.forget(unit_name(unit))
     with dispatch.locked_state() as st:
         st.get("image", {}).pop(unit_name(unit), None)
 
