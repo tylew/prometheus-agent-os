@@ -1,0 +1,6 @@
+{
+  "$comment": "Seat additions to launch.json: the KB writes the librarian subagent makes when the seat records a decision.",
+  "extends": [
+    "kb-writer"
+  ]
+}

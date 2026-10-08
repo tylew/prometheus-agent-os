@@ -12,7 +12,14 @@
           "cmd": "report.sh waiting on operator",
           "live": "report.sh --help"
         },
-        "mcp__shortcut__stories-get-by-id"
+        "mcp__shortcut__stories-get-by-id",
+        "Write({state_dir}/kb-proposals/x.json)",
+        {
+          "cmd": "kb.sh apply {state_dir}/kb-proposals/x.json --dry-run",
+          "live": "kb.sh apply {state_dir}/kb-proposals/none.json --dry-run",
+          "why": "the librarian runs as a background subagent under its caller's permissions and cannot prompt"
+        },
+        "git commit -m \"kb: fold decisions\" -- docs/kb/x.md"
       ],
       "deny": [
         "mcp__shortcut__stories-update",
@@ -47,7 +54,14 @@
         "Write({state_dir}/reviews/x.md)",
         "npm --prefix {wt}/js run jslint brightfield-besstie",
         "npm --prefix {wt}/js run check:types brightfield-besstie",
-        "CI=true npm --prefix {wt}/js run test brightfield-besstie"
+        "CI=true npm --prefix {wt}/js run test brightfield-besstie",
+        "Write({state_dir}/kb-proposals/x.json)",
+        {
+          "cmd": "kb.sh apply {state_dir}/kb-proposals/x.json --dry-run",
+          "live": "kb.sh apply {state_dir}/kb-proposals/none.json --dry-run",
+          "why": "the librarian runs as a background subagent under its caller's permissions and cannot prompt"
+        },
+        "git commit -m \"kb: fold decisions\" -- docs/kb/x.md"
       ],
       "ask": [
         "mcp__launchdarkly__update-feature-flag",

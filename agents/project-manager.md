@@ -23,9 +23,10 @@ until it is folded into its epic.)
    it is added, modified, removed or updated, and what changes about it; the page it is on and a
    general description of where on that page. Build waits on the operator's confirmation.
 4. **Record decisions when final.** Each finalized decision or design consideration → write a batch file
-   (`templates/decision-record.md` per decision, its evidence, the spec dir) and send it to the
-   librarian beside the seat: `send.sh --role librarian "decisions for <unit>: <path>"`. Do not wait; its
-   one-line answer arrives as an event.
+   (`templates/decision-record.md` per decision, its evidence, the spec dir) and start the librarian on
+   it as a background subagent: `Agent` with `subagent_type: "prometheus:librarian"`,
+   `run_in_background: true`, prompt `decisions for <unit>: <path>`. Do not wait; its final message is the
+   answer. A `needs operator:` line in it is a question for the operator (point 5).
 5. Questions for the operator: one sentence per fork, built behavior named, options as choices. **Ask
    in place when the operator is present** — the turn began with input not tagged `[prometheus]`, i.e.
    typed into your tab. Otherwise send it to the seat (`send.sh --role seat`). A decision the operator

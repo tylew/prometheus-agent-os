@@ -151,21 +151,13 @@ class LibrarianReportTest(Base):
                            "tokens": {"role": "librarian"}})
         return s
 
-    def test_librarian_is_reached_from_any_unit_and_cleared_before_each_batch(self):
-        os.environ.update(PROMETHEUS_ROLE="pm", HERDR_WORKSPACE_ID="wA")
+    def test_the_librarian_tab_is_never_cleared_by_delivery(self):
+        os.environ.update(PROMETHEUS_ROLE="seat", HERDR_WORKSPACE_ID="wC")
         sent = []
         with d.locked_state() as st:
-            self.assertEqual(d.send(self.lib_snap(), st, "decisions for sc-1-a: /b.md", role="librarian"), "wC:p2")
+            d.enqueue(st, "wC:p2", "[prometheus] a note for the operator's librarian")
             d.deliver(self.lib_snap(), st, prompt=lambda p, t: sent.append(t))
-        self.assertEqual(sent, ["/clear", "[prometheus] from pm@sc-1-a: decisions for sc-1-a: /b.md"])
-
-    def test_a_working_librarian_is_never_queued_behind(self):
-        s = self.lib_snap()
-        s["panes"][-1]["agent_status"] = "working"
-        with d.locked_state() as st:
-            d.enqueue(st, "wC:p2", "[prometheus] batch 2")
-            r = d.deliver(s, st, prompt=lambda p, t: self.fail("delivered"))
-        self.assertEqual(r["held"], ["wC:p2"])
+        self.assertNotIn("/clear", sent)
 
     def test_needs_you_flags_the_pane_and_asks_the_seat(self):
         world = os.path.join(self.tmp.name, "world.json")

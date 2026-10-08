@@ -23,6 +23,6 @@ close-unit.sh <workspace-id> [--force]
 - **Lead** — a delivery workspace's first tab, renamed `pm`, runs `lib/launch.sh pm`.
   `--brief` delivers the brief once the agent reaches its prompt.
 - **Close** — refused while a role pane is `working` or `blocked`, or for a workspace without unit tokens.
-  Before closing, the lead has removed its worktrees and sent its last decision batch to the librarian.
+  Before closing, the lead has removed its worktrees and had the librarian subagent record its last decision batch.
 - **The dispatcher opens epic units** on the first event in an epic and appends every story and PR of the
   epic as its events arrive; the seat opens one by hand only for "plan X" in an epic with no unit yet.

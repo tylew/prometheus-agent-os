@@ -1,0 +1,12 @@
+{
+  "$comment": "Shared base for a session that runs the librarian as a background subagent (pm, seat) and for the librarian tab itself: a subagent inherits its caller's permissions and cannot show a prompt, so every write the librarian makes is allowed here — the ingest proposal under {state_dir}/kb-proposals/, kb.py, a pathspec commit of the workspace repo, the story read that verifies a binding.",
+  "permissions": {
+    "allow": [
+      "Edit(/{state_dir}/kb-proposals/**)",
+      "Bash(python3 */lib/kb.py *)",
+      "Bash(kb.sh *)",
+      "Bash(git commit *)",
+      "mcp__shortcut__stories-get-by-id"
+    ]
+  }
+}

@@ -54,7 +54,7 @@ Per pane, at most one line per tick (`templates/event-line.md`), details in the 
 the agent is `idle`, `done` or `working` (Claude Code queues typed input); never `blocked` — typed text
 would answer the open dialog; an open choice dialog or text on the prompt line also holds it. Prompts go in
 with `herdr agent prompt --wait` (resent only on `agent_prompt_stalled`). Undelivered lines wait in the
-outbox. **The librarian** gets one batch per turn: held while it works, `/clear`ed before each delivery.
+outbox.
 
 ## Messaging — `send.sh`
 
@@ -71,7 +71,6 @@ never dropped silently.
 send.sh --role pm "<one line>"                  to your own unit's lead
 send.sh --role planner --unit <label> "<line>"  to another unit's role
 send.sh --role seat "<line>"                     to the operator's seat
-send.sh --role librarian "<line>"                the KB writer beside the seat
 send.sh --pane <id> "<line>"
 ```
 Tagged `[prometheus] from <role>@<unit>:`. The only way one agent messages another.
@@ -92,7 +91,7 @@ the evidence and carries on with what it can:
 
 ```
 worker (implementor · reviewer · planner) → its PM        send.sh --role pm   "gap: <what> — evidence: <denial / path>"
-PM · runner · librarian                    → the seat      send.sh --role seat "gap: <what> — evidence: …"
+PM · runner                                → the seat      send.sh --role seat "gap: <what> — evidence: …"
 seat: triage — gimme (mechanical: allow-list, path, script bug, lint) → configure.sh <slug> "<issue + evidence>"
                changes what an agent decides or does → one question to the operator first
 ```

@@ -37,7 +37,7 @@ reviewer's own loop clears it by approving once the counts reach zero; the autho
 
 3. **Design-affecting → PM / operator before any code.** The confirmed spec (`design.md`, `plan.md`) is a
    read-only contract: the delta is a decision record (`templates/decision-record.md` →
-   `send.sh --role librarian`), and a change to Scenarios or acceptance criteria goes to the planner
+   the librarian subagent, `project-manager` → point 4), and a change to Scenarios or acceptance criteria goes to the planner
    (`stories`). Material change ⇒ the story moves back to `in_development` (`tracker`).
 
 4. **Fix one at a time — never batch.** The PM routes each finding to the item's implementor: one finding →

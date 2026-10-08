@@ -298,11 +298,7 @@ def take_deliveries(snap: dict, st: dict, real: bool = True) -> tuple[dict, list
         if p.get("agent_status") not in SAFE_STATES or (real and input_busy(pane_id)):
             report["held"].append(pane_id)
             continue
-        librarian = _tokens(p).get("role") == "librarian"
-        if librarian and p.get("agent_status") == "working":
-            report["held"].append(pane_id)  # one batch per turn: never queue behind a running batch
-            continue
-        sends.append({"pane": pane_id, "items": items, "clear": librarian})
+        sends.append({"pane": pane_id, "items": items})
         st["outbox"].pop(pane_id)
         report["delivered"].append(pane_id)
     return report, sends
@@ -313,8 +309,6 @@ def send_all(sends: list[dict], prompt=None) -> list[dict]:
     failed = []
     for d in sends:
         try:
-            if d["clear"]:
-                clear(d["pane"]) if prompt is None else prompt(d["pane"], "/clear")
             # a queued slash command (/compact …) goes alone and unwrapped, after the messages
             slash = [i for i in d["items"] if i["line"].startswith("/")]
             rest = [i for i in d["items"] if not i["line"].startswith("/")]
@@ -325,11 +319,6 @@ def send_all(sends: list[dict], prompt=None) -> list[dict]:
         except Exception:  # noqa: BLE001 — a failed send is requeued, never lost
             failed.append(d)
     return failed
-
-
-def clear(pane_id: str) -> None:
-    herdr("agent", "prompt", pane_id, "/clear")
-    time.sleep(1.5)
 
 
 # ------------------------------------------------------------------ agent state

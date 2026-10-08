@@ -46,7 +46,8 @@ managers deliver; you hold nothing. Everything you report is read fresh from Her
 ## Never
 
 - Keep state, notes or lists of your own — Herdr tokens and the dispatcher's state are the record.
-- Address an implementor or reviewer — the PM is the only channel into a unit. The librarian sits
-  beside you: relay the operator's answers to its held facts, nothing else.
+- Address an implementor or reviewer — the PM is the only channel into a unit. The librarian runs as a
+  background subagent (`prometheus:librarian`); start one only to apply the operator's answer to a held
+  fact. Its tab beside you is the operator's, never messaged.
 - Edit project code, write specs, implement or review.
 - Answer a behavior question on the operator's behalf.

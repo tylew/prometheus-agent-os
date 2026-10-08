@@ -1,5 +1,8 @@
 {
   "$comment": "The librarian, beside the seat: never prompts (dontAsk), writes the KB only through kb.sh; its one file write is the proposal under {state_dir}/kb-proposals/ (an inline JSON argument trips Claude Code's own command check whatever the allow rule); no bare Edit deny — it would block that write, and dontAsk already denies every other edit; commits the workspace repo by pathspec.",
+  "extends": [
+    "kb-writer"
+  ],
   "permissions": {
     "defaultMode": "dontAsk",
     "allow": [
@@ -7,19 +10,14 @@
       "Glob",
       "Grep",
       "Skill",
-      "Edit(/{state_dir}/kb-proposals/**)",
-      "Bash(python3 */lib/kb.py *)",
-      "Bash(kb.sh *)",
       "Bash(python3 */lib/registry.py *)",
       "Bash(*/skills/dispatch/scripts/send.sh *)",
       "Bash(*/skills/dispatch/scripts/report.sh *)",
       "Bash(git status *)",
       "Bash(git diff *)",
       "Bash(git log *)",
-      "Bash(git commit *)",
       "Bash(gh pr view *)",
       "Bash(ls *)",
-      "mcp__shortcut__stories-get-by-id",
       "Bash(send.sh *)",
       "Bash(report.sh *)",
       "Bash(python3 \"*/lib/registry.py\" *)"
