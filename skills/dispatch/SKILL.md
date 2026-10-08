@@ -31,7 +31,9 @@ every `INTERVAL`. No socket → full ticks only.
    PRs the operator authored, every PR a unit holds. Shortcut: one `claude -p` (Haiku, Shortcut MCP only,
    read-only tools). Agent panes: one `herdr api snapshot`, `agent_status` diffed.
 2. **Filter** — only next-move changes: CI terminal, review, new comment, merged / closed, new commits,
-   draft ↔ ready, story state, agent state.
+   draft ↔ ready, story state, agent state. A PR's changes in one tick make one line. Posts from the
+   operator's account that carry the signature, and body-less reviews (thread replies), are prometheus's
+   own — never news.
 3. **Route** — by tokens: story id → `stories`, PR (or any PR in its stack) → `prs`; else by **epic**: the
    event's stories → their epic (`story_epic` cache: the Shortcut poll returns epic ids; uncached stories get
    one batched read-only lookup per tick) → the unit whose `epic` token matches. The story and stack join
@@ -41,6 +43,14 @@ every `INTERVAL`. No socket → full ticks only.
    line to the seat — or a story of the operator's). A story with **no epic**, or a PR with **no story**,
    goes to the seat once to be homed and routes on its next change. Opening is held while units await
    restore or carry no tokens. (`PROMETHEUS_EPIC_UNITS=0` restores the older triage → proposal path.)
+   **Inside the unit, a PR's line goes to whoever holds the PR** (`lib/rounds.py`): CI, reviews and comments
+   → the implementor whose `pr` token names it (`report.sh --holds`), else a reviewer working on it, else
+   the PM; a teammate's CI with no holder → no one. New, merged, closed, ready / draft → always the PM.
+   **Review rounds open themselves**: a PR whose round was briefed (`send-brief` to a `review-<pr#>` tab) is
+   in the loop. On a teammate's PR, new commits open the next round once the head has been still for
+   `PROMETHEUS_ROUND_SETTLE` (300 s): the finished `review-` tab closes, a fresh one is briefed from the
+   last brief (round + 1, *Is a round due?* first) and the PM gets one line. On the operator's own PR the PM
+   runs `rounds.sh next <pr>` after its round comment. `rounds.sh hold <pr>` (`--off`) is the PM's veto.
 5. **Settle** — story Completed / Won't Fix → `kb.py inbox settle`.
 6. **Heartbeat** · **Health** (a lead whose agent exited → `claude --resume <session>`) · **Deliver**.
 7. **Restore image** — per live unit: tokens, and per agent tab its label, pane tokens and Claude session.
@@ -69,6 +79,7 @@ never dropped silently.
 
 ```
 send.sh --role pm "<one line>"                  to your own unit's lead
+send.sh --role implementor --pr <o/r#n> "<line>"   the implementor holding that PR (error if none)
 send.sh --role planner --unit <label> "<line>"  to another unit's role
 send.sh --role seat "<line>"                     to the operator's seat
 send.sh --pane <id> "<line>"
@@ -97,11 +108,12 @@ seat: triage — gimme (mechanical: allow-list, path, script bug, lint) → conf
 ```
 The configurator proposes acceptance criteria; the seat signs off or raises concerns (for the operator).
 
-## Quick work — `quick.sh` (the seat)
+## Your line on the map — `report.sh`
 
 ```
 report.sh "<one line>"              your line on the map (status token)
 report.sh --needs-you "<question>"  red flag + the question to the seat, with your pane id to answer
+report.sh --holds <o/r#n>           this tab now holds the PR: its CI / review / comment lines come here
 report.sh --clear
 ```
 The needs-you flag clears when you next work. A PM / planner with the operator in its tab asks in place.

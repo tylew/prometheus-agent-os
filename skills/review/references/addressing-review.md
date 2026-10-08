@@ -1,7 +1,9 @@
 # Addressing review on the operator's own PR — PM + implementor
 
-Review landed on a PR this unit authored. The PM triages, decides, replies and resolves; the implementor
-fixes and validates (it cannot post to GitHub). Self-review before requesting a human:
+Review landed on a PR this unit authored. The reviewer's findings file goes straight to the implementor
+holding the PR: it ingests, triages and fixes (steps 1, 2, 4), sending the PM what needs a decision and then
+its dispositions file. The PM decides what was escalated, replies, resolves and posts the round comment
+(5–7), then `rounds.sh next <pr>` (the implementor cannot post to GitHub). Self-review before requesting a human:
 [self-review.md](self-review.md).
 
 **Two loops.** Steps 1–7 are one **round**: one review's comments, worked to a push. Step 8 is the outer
@@ -40,7 +42,7 @@ reviewer's own loop clears it by approving once the counts reach zero; the autho
    the librarian subagent, `project-manager` → point 4), and a change to Scenarios or acceptance criteria goes to the planner
    (`stories`). Material change ⇒ the story moves back to `in_development` (`tracker`).
 
-4. **Fix one at a time — never batch.** The PM routes each finding to the item's implementor: one finding →
+4. **Fix one at a time — never batch.** The implementor holding the PR: one finding →
    one change → touched-package validation (`packages[].validate`). The implementor reports, per thread, the
    commit and what changed. One logical change per finding keeps thread ↔ diff honest.
 
@@ -95,7 +97,7 @@ reviewer's own loop clears it by approving once the counts reach zero; the autho
    the delta against threads left unanswered, and they come back.
 
 8. **Hold for the next round — do not end here.** Re-requesting is a wait, not a handoff: end the turn; the
-   dispatcher wakes the PM on a review, comment, new commits or merge. A round is due again on the reviewer's
+   dispatcher wakes the implementor holding the PR on a review or comment, and the PM on a merge. A round is due again on the reviewer's
    three triggers read from the author's side ([review-loop.md](review-loop.md) → *Is a round due?*): new
    findings, a reply on a thread the author owns, a re-request of the operator.
 

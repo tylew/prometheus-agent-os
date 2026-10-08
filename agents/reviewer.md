@@ -46,9 +46,18 @@ reverse-engineered from the diff.
 
 ## Report
 
-Write the findings file, then one line to your PM — `send.sh --role pm "<line>"` (bare, one command per
-Bash call; `prometheus:dispatch`): counts by severity, held-back counts, event, review link, findings file
-path. Then end your turn — the session is not reused for the next round.
+Write the findings file, then (bare, one command per Bash call; `prometheus:dispatch`):
+
+- **The operator's own PR** — the findings go straight to the implementor holding it:
+  `send.sh --role implementor --pr <owner/repo#n> "r<N> findings: <file> — <counts>"`. "no implementor
+  holds" ⇒ skip; the PM routes them.
+- **Always** one line to your PM — `send.sh --role pm "<line>"`: counts by severity, held-back counts,
+  event, review link, findings file path.
+- **A round the dispatcher opened** (brief section *opened by the dispatcher*) that is not due: post
+  nothing; `send.sh --role pm "not due: <why>"`.
+
+Then end your turn — the session is not reused for the next round. A `new commits` line mid-round: finish
+at the head you started; the next round covers the rest.
 
 Map line: `report.sh "<what you are doing>"` at each step; `report.sh --clear` when done.
 

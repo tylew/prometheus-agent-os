@@ -198,6 +198,10 @@ def route(snap: dict, event: dict) -> str:
     if role in LEADS:
         role = lead_role(unit)
     targets = panes_with_role(snap, role, unit["workspace_id"])
+    if event.get("holds"):
+        targets = [p for p in targets if event["holds"] in _csv(_tokens(p).get("pr"))]
+        if not targets:
+            raise RouteError("no %s holds %s in %s" % (role, event["holds"], _tokens(unit)["unit"]))
     if event.get("item"):
         targets = [p for p in targets if _tokens(p).get("item") == event["item"]] or targets
     if not targets:
@@ -216,13 +220,13 @@ def enqueue(st: dict, pane_id: str, line: str, details: dict | None = None,
 # ------------------------------------------------------------------------- send
 
 def send(snap: dict, st: dict, message: str, *, pane_id: str | None = None,
-         role: str | None = None, unit: str | None = None) -> str:
+         role: str | None = None, unit: str | None = None, pr: str | None = None) -> str:
     """Agent-to-agent: tag with sender role@unit, resolve the target, queue it."""
     me_role = os.environ.get("PROMETHEUS_ROLE", "operator")
     my_unit = unit_of_pane(snap, os.environ.get("HERDR_PANE_ID", "")) or \
         unit_of_workspace(snap, os.environ.get("HERDR_WORKSPACE_ID", ""))
     my_label = _tokens(my_unit).get("unit") if my_unit else "control"
-    event = {"to_pane": pane_id, "role": role or "pm", "unit": unit or (my_label if my_unit else None)}
+    event = {"to_pane": pane_id, "role": role or "pm", "unit": unit or (my_label if my_unit else None), "holds": pr}
     if event["role"] in CONTROL:
         event["unit"] = None
     target = route(snap, event)
@@ -231,11 +235,19 @@ def send(snap: dict, st: dict, message: str, *, pane_id: str | None = None,
     return target
 
 
-def report(snap: dict, st: dict, text: str, needs: bool = False, clear: bool = False) -> str:
-    """An agent's own map line (`status` token); --needs-you also flags it and asks the seat."""
+def report(snap: dict, st: dict, text: str, needs: bool = False, clear: bool = False,
+           holds: str | None = None) -> str:
+    """An agent's own map line (`status` token); --needs-you also flags it and asks the seat; --holds adds a
+    PR to the pane's `pr` token, so that PR's events come here."""
     me = os.environ.get("HERDR_PANE_ID")
     if not me:
         raise RouteError("report needs HERDR_PANE_ID (run inside an agent pane)")
+    if holds:
+        prs = _csv(_tokens(pane(snap, me) or {}).get("pr"))
+        if holds not in prs:
+            herdr("pane", "report-metadata", me, "--source", "prometheus", "--token", "pr=%s" % ",".join(prs + [holds]))
+        if not text:
+            return "holds %s" % ",".join(prs + [holds] if holds not in prs else prs)
     if clear:
         herdr("pane", "report-metadata", me, "--source", "prometheus", "--clear-token", "status",
               "--clear-token", "needs")
@@ -631,10 +643,12 @@ def main(argv: list[str]) -> int:
     g.add_argument("--pane")
     g.add_argument("--role", choices=list(ROLES))
     s.add_argument("--unit")
+    s.add_argument("--pr", help="owner/repo#n: the --role tab whose pr token holds it")
     s.add_argument("message", nargs="+")
     rp = sub.add_parser("report")
     rp.add_argument("--needs-you", action="store_true")
     rp.add_argument("--clear", action="store_true")
+    rp.add_argument("--holds", metavar="OWNER/REPO#N", help="this pane now holds the PR: its events come here")
     rp.add_argument("text", nargs="*")
     sub.add_parser("poll-agents")
     rt = sub.add_parser("route")
@@ -666,18 +680,18 @@ def main(argv: list[str]) -> int:
     with locked_state() as st:
         if a.cmd == "send":
             try:
-                target = send(snap, st, " ".join(a.message), pane_id=a.pane, role=a.role, unit=a.unit)
+                target = send(snap, st, " ".join(a.message), pane_id=a.pane, role=a.role, unit=a.unit, pr=a.pr)
             except RouteError as exc:
                 print("send: %s" % exc, file=sys.stderr)
                 return 1
             print("queued for %s" % target)
             poke()
         elif a.cmd == "report":
-            if not a.clear and not a.text:
-                print("report: give a line, or --clear", file=sys.stderr)
+            if not a.clear and not a.text and not a.holds:
+                print("report: give a line, --holds, or --clear", file=sys.stderr)
                 return 2
             try:
-                print(report(snap, st, " ".join(a.text), needs=a.needs_you, clear=a.clear))
+                print(report(snap, st, " ".join(a.text), needs=a.needs_you, clear=a.clear, holds=a.holds))
                 poke()
             except RouteError as exc:
                 print("report: %s" % exc, file=sys.stderr)

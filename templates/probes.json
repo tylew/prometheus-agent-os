@@ -61,7 +61,15 @@
           "live": "kb.sh apply {state_dir}/kb-proposals/none.json --dry-run",
           "why": "the librarian runs as a background subagent under its caller's permissions and cannot prompt"
         },
-        "git commit -m \"kb: fold decisions\" -- docs/kb/x.md"
+        "git commit -m \"kb: fold decisions\" -- docs/kb/x.md",
+        {
+          "cmd": "rounds.sh hold o/r#1",
+          "live": "rounds.sh list"
+        },
+        {
+          "cmd": "rounds.sh next o/r#1",
+          "live": "rounds.sh list"
+        }
       ],
       "ask": [
         "mcp__launchdarkly__update-feature-flag",
@@ -137,7 +145,12 @@
         "Write({state_dir}/reviews/x.md)",
         "npm --prefix {wt}/js run jslint brightfield-besstie",
         "npm --prefix {wt}/js run check:types brightfield-besstie",
-        "CI=true npm --prefix {wt}/js run test brightfield-besstie"
+        "CI=true npm --prefix {wt}/js run test brightfield-besstie",
+        {
+          "cmd": "report.sh --holds o/r#1",
+          "live": "report.sh --help"
+        },
+        "Write({state_dir}/reviews/o-r-1-r2-dispositions.md)"
       ],
       "deny": [
         {
@@ -229,7 +242,11 @@
         "npm --prefix {wt}/js run jslint brightfield-besstie",
         "npm --prefix {wt}/js run check:types brightfield-besstie",
         "CI=true npm --prefix {wt}/js run test brightfield-besstie",
-        "Grep({workspace}/docs/kb)"
+        "Grep({workspace}/docs/kb)",
+        {
+          "cmd": "send.sh --role implementor --pr o/r#1 \"r2 findings\"",
+          "live": "send.sh --help"
+        }
       ],
       "deny": [
         "mcp__claude-in-chrome__gif_creator",

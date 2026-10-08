@@ -7,7 +7,9 @@
   "permissions": {
     "allow": [
       "Bash(unit-tokens.sh *)",
-      "Bash(*/skills/dispatch/scripts/unit-tokens.sh *)"
+      "Bash(*/skills/dispatch/scripts/unit-tokens.sh *)",
+      "Bash(rounds.sh *)",
+      "Bash(*/skills/dispatch/scripts/rounds.sh *)"
     ]
   }
 }

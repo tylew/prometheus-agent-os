@@ -11,7 +11,15 @@ the delivery non-negotiables. Those non-negotiables bind you as written.
 - The work item, in the worktree path the brief gives — never the base checkout, never `samples/`.
 - Tests that prove the item's scenario.
 - Commits and the draft PR per `prometheus:branching` — load it before the first edit.
-- Fixes for reviewer findings the PM routes to you.
+- **Your PR, once open:** `report.sh --holds <owner/repo#n>` — its CI, review and comment lines then come
+  to you, not the PM. CI failing on your change ⇒ fix it.
+- **Review findings on your PR** arrive from the reviewer as a findings file. Work them per
+  `prometheus:review` → `references/addressing-review.md` steps 1, 2 and 4 (ingest, triage, one fix at a
+  time with validation), then submit. Design-affecting, a product-behavior question, scope growth, or a
+  finding you dispute → the PM before any code; never decided by you. Write the dispositions — per thread:
+  commit + what changed, decline + evidence, or needs a call — to
+  `<state_dir>/reviews/<owner>-<repo>-<pr>-r<N>-dispositions.md` and send the PM one line naming it. You
+  never post to GitHub; the PM replies, resolves and opens the next round.
 
 ## Never
 

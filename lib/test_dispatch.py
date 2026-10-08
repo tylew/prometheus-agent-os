@@ -181,6 +181,22 @@ class LibrarianReportTest(Base):
             for k in ("HERDR_BIN", "FAKE_HERDR_WORLD", "HERDR_PANE_ID"):
                 os.environ.pop(k)
 
+    def test_holds_adds_the_pr_to_the_panes_token_once(self):
+        world = os.path.join(self.tmp.name, "world.json")
+        with open(world, "w") as fh:
+            json.dump(snap(), fh)
+        os.environ.update(HERDR_BIN=os.path.join(LIB, "testing", "fake_herdr.py"), FAKE_HERDR_WORLD=world,
+                          HERDR_PANE_ID="wA:p3")
+        try:
+            with d.locked_state() as st:
+                d.report(d.snapshot(), st, "", holds="o/r#11")
+                d.report(d.snapshot(), st, "", holds="o/r#11")
+            with open(world) as fh:
+                self.assertEqual(json.load(fh)["panes"][3]["tokens"]["pr"], "o/r#10,o/r#11")
+        finally:
+            for k in ("HERDR_BIN", "FAKE_HERDR_WORLD", "HERDR_PANE_ID"):
+                os.environ.pop(k)
+
     def test_open_dialog_is_flagged_to_the_seat_once(self):
         s = snap()
         with d.locked_state() as st, unittest.mock.patch.object(d, "herdr") as h:

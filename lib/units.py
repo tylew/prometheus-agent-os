@@ -255,10 +255,21 @@ def link_worktree(worktree: str, project: str) -> list[str]:
     return made
 
 
-def send_brief(pane_id: str, brief_path: str) -> str:
-    """Prompt one line pointing at the brief; Herdr confirms a turn started (resent only on a stall)."""
+def send_brief(pane_id: str, brief_path: str, record_loop: bool = True) -> str:
+    """Prompt one line pointing at the brief; Herdr confirms a turn started (resent only on a stall).
+    A reviewer's brief puts its PR in the review loop: later rounds open themselves (rounds.py)."""
     if not os.path.isfile(brief_path):
         raise ValueError("brief not found: %s" % brief_path)
+    if record_loop:
+        snap = _snap()
+        p = dispatch.pane(snap, pane_id) or {}
+        ref = _tokens(p).get("pr")
+        unit = dispatch.unit_of_pane(snap, pane_id)
+        tab = next((t.get("label") for t in snap.get("tabs", []) if t.get("tab_id") == p.get("tab_id")), "")
+        if _tokens(p).get("role") == "reviewer" and ref and unit and tab.startswith("review-"):
+            import rounds
+            with dispatch.locked_state() as st:
+                rounds.record(st, ref, _tokens(unit)["unit"], unit["workspace_id"], brief_path)
     result = dispatch.submit(pane_id, "Read your brief at %s and begin." % os.path.abspath(brief_path))
     if result == "stalled":
         raise RuntimeError("brief never started a turn in %s (state %s)" % (pane_id, _status(pane_id)))

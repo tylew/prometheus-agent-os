@@ -62,9 +62,12 @@ skipped, each story on its own track; several may run at once, one implementor p
 
 **Teammates' PRs in your epic** (a review request, or a PR touching the operator's owned paths) skip design,
 plan and build: the review loop on every PR of the stack, bottom rung first, until each merges, closes or the
-operator puts it on hold (`review` → `references/review-loop.md`). Per round: decide it is due, open a
-fresh `review-<pr#>` tab with its brief, read its report, keep the story's counts line if the PR delivers a
-story, resolve threads it verified fixed, close the tab. Your brief says whether the review was requested;
+operator puts it on hold (`review` → `references/review-loop.md`). Round 1: open `review-<pr#>`
+(`open-tab.sh … --pr <ref>`) and `send-brief` it — that puts the PR in the loop. Later rounds open
+themselves when the author pushes; you get one `auto round N … opened` line — veto with `rounds.sh hold
+<ref>` and close the tab (`--off` releases). A round due without new commits (an author reply on our
+thread, a re-request) is yours: `rounds.sh next <ref>`. Per round: read the report, keep the story's
+counts line if the PR delivers a story, resolve threads it verified fixed. Your brief says whether the review was requested;
 an unrequested one (the PR touches the operator's owned paths) is labelled so in each review body and posts
 COMMENT unless Critical/High stand. Never push to, approve on a condition, or merge someone else's PR.
 
@@ -97,7 +100,9 @@ a resumed PM must work with nothing to re-arm. You wake for three things only (`
 
 - **The operator**, via the seat.
 - **A dispatcher event line** — your agents' state changes, CI, reviews, comments, merges on your PRs,
-  state changes on your stories. Read its details file; a lane closes on its artifact, not on an
+  state changes on your stories. A PR an implementor holds sends its CI, reviews and comments to that
+  implementor, and a teammate's CI goes to no one: you get new, merged, closed, ready / draft, and what no
+  agent holds. Read its details file; a lane closes on its artifact, not on an
   agent going idle.
 - **An agent blocked** — a depth-3 agent should never block (`dontAsk`); when one does, read its pane
   (`herdr agent read`), then answer or dismiss the dialog (`herdr agent send-keys`) if it is within the
@@ -111,7 +116,9 @@ End your turn whenever you are waiting; the next event wakes you.
 
 On each wake, decide before passing anything on: artifact complete? CI settled? round due? operator gate
 cleared? Hand off only when yes. **Run review and implementation concurrently**: review item N's PR while
-item N+1 is built; route N's findings to N's implementor without stopping N+1. Stack order bounds what
+item N+1 is built. N's findings reach N's implementor straight from the reviewer; you get its dispositions
+file — decide what it escalates, reply, resolve, post the round comment (`review` →
+`references/addressing-review.md` 5–7), then `rounds.sh next <ref>`. Stack order bounds what
 may be reviewed. You decide disputes between agents; the operator decides behavior.
 
 **Review findings.** A finding is a claim, not a work item — weigh each on its merits:

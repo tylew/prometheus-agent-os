@@ -1,8 +1,11 @@
 # The review loop — the PM's side
 
 **The loop belongs to the PM, not to whoever runs a round.** *(Home.)* A reviewer runs **one round** in a
-fresh `review-<pr>` session and ends — the design, not a half-review. The PM decides when the next round
-is due, briefs it, writes the story line, resolves threads, puts on and clears holds, and closes the unit.
+fresh `review-<pr>` session and ends — the design, not a half-review. The PM briefs round 1, writes the
+story line, resolves threads, puts on and clears holds, and closes the unit. Later rounds open themselves
+(`prometheus:dispatch` → *Review rounds open themselves*): on a teammate's PR when new commits settle, on
+the operator's own PR when the PM runs `rounds.sh next <pr>` after its round comment; the opened reviewer
+runs *Is a round due?* first.
 It never polls, arms a `Monitor`, runs `/loop` or background-waits: it ends its turn, and dispatcher event
 lines (new commits, CI terminal, reviews, comments, merged/closed, agent state, heartbeat) wake it
 (`events`). Every PR the loop holds sits in the unit's `prs` token before its first round, so its events
@@ -34,7 +37,8 @@ findings files, `requested` (pending request of the operator: `gh pr view <pr> -
 
 ## Is a round due?
 
-On every wake about a PR the loop holds. **Labels first, every time:**
+Run by the reviewer of a dispatcher-opened round, and by the PM for a trigger with no new commits (author
+reply, re-request ⇒ `rounds.sh next <pr>`). **Labels first, every time:**
 `gh pr view <pr> --json labels --jq '[.labels[].name]'`. A failed read is a hold, not an absence.
 
 | label | means | the loop |
@@ -64,8 +68,9 @@ when the round posts. A re-request of a stack rung above one that is not closed 
 
 ## A follow-up round
 
-Close the previous `review-<pr>` tab; brief a **fresh** reviewer session (one round per session) with the
-prior findings files and current `open_threads`. The reviewer re-checks our threads first, then reviews
+The dispatcher closes the finished `review-<pr>` tab and briefs a **fresh** reviewer session (one round per
+session) from the last brief, round + 1; the reviewer reads the prior findings files and `open_threads`
+fresh. The reviewer re-checks our threads first, then reviews
 only what moved (SKILL.md → *Earlier rounds*).
 
 ## After a round lands
@@ -111,6 +116,8 @@ choices), for:
   that will not parse. A failed round is never "no findings" and never approves. Notify once per cause; say
   when it clears;
 - **the operator puts it on hold.**
+
+**No round opens itself on a held PR**: `rounds.sh hold <pr>` with every hold, `--off` when it clears.
 
 **Published as a label.** Putting a hold on ⇒ `gh pr edit <pr> --repo <slug> --add-label HUMAN_NEEDED`, in
 the same turn as the fork; what a person is needed for stays in the round's own text. Clearing: only a hold

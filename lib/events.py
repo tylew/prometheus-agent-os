@@ -19,6 +19,7 @@ LIB = os.path.dirname(os.path.abspath(__file__))
 PLUGIN = os.path.dirname(LIB)
 sys.path.insert(0, LIB)
 import dispatch  # noqa: E402
+import rounds  # noqa: E402
 
 STORY_RE = re.compile(r"\bsc[-_ ]?(\d{4,})\b|shortcut\.com/[^/\s]+/story/(\d+)", re.I)
 PR_FIELDS = ("number,title,body,state,isDraft,mergedAt,closedAt,headRefName,baseRefName,"
@@ -260,17 +261,22 @@ def poll_github(snap: dict, st: dict) -> list[dict]:
             continue
         new = fingerprint(pr, _ignore_authors(split_ref(ref)[0]), own)
         st["cursors"][key] = new
-        for change in pr_changes(ref, old, new):
-            if change == "new" and ref in held:
-                continue
-            events.append({
-                "kind": "pr", "pr": ref, "change": change, "title": pr.get("title", ""),
-                "stories": stories_in(pr.get("title"), pr.get("body"), pr.get("headRefName")),
-                "source": "review-requested" if ref in review else ("authored" if ref in authored else
-                                                                   ("owned-paths" if ref in owned else "unit")),
-                "line": "[prometheus] pr %s %s — %s" % (ref, change, pr.get("title", "")),
-            })
+        changes = [c for c in pr_changes(ref, old, new) if not (c == "new" and ref in held)]
+        if not changes:
+            continue
+        events.append({
+            "kind": "pr", "pr": ref, "changes": changes, "change": "new" if "new" in changes else changes[0],
+            "title": pr.get("title", ""), "author": new["author"], "head": new["head"],
+            "stories": stories_in(pr.get("title"), pr.get("body"), pr.get("headRefName")),
+            "source": "review-requested" if ref in review else ("authored" if ref in authored else
+                                                               ("owned-paths" if ref in owned else "unit")),
+            "line": pr_line(ref, changes, pr.get("title", "")),
+        })
     return events
+
+
+def pr_line(ref: str, changes: list[str], title: str) -> str:
+    return "[prometheus] pr %s %s — %s" % (ref, " · ".join(changes), title)
 
 
 def pr_stack(ref: str, _cache: dict | None = None) -> list[str]:
@@ -613,6 +619,11 @@ def handle(snap: dict, st: dict, events: list[dict], triage_fn=triage, create_fn
             for sid in ev_stories:
                 if sid not in dispatch.token_list(dispatch._tokens(unit), "stories"):
                     _append_token(unit, "stories", sid)
+            if ev["kind"] == "pr":
+                for target, changes in rounds.targets(snap, st, unit, ev, own_posts()[0]).items():
+                    dispatch.enqueue(st, target, pr_line(ev["pr"], changes, ev.get("title", "")),
+                                     details=dict(ev, changes=changes), unit=label)
+                continue
             target = dispatch.route(snap, {"unit": label, "role": "pm"})
             dispatch.enqueue(st, target, ev["line"], details=ev, unit=label)
             continue
@@ -848,6 +859,7 @@ def tick(snap: dict, st: dict) -> list[str]:
         except (RuntimeError, ValueError, OSError) as exc:
             log.append("%s failed: %s" % (source.__name__, exc))
     log += handle(snap, st, events, settle_fn=settle)
+    log += rounds.fire(snap, st)
     log += health(snap, st)
     return log
 
