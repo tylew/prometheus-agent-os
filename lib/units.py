@@ -399,8 +399,8 @@ def respawn(pane_id: str, force: bool = False, timeout: float = 30) -> str:
     while (live := dispatch.pane(_snap(), pane_id) or {}).get("agent"):
         if time.time() >= deadline:
             raise ValueError("%s did not exit (%s); left running" % (pane_id, live.get("agent_status")))
-        if time.time() >= keys_at:  # esc leaves a sub-view (agents list, dialog) where ctrl+c does not quit
-            hz.call("agent", "send-keys", pane_id, "esc", "ctrl+c", "ctrl+c")
+        if time.time() >= keys_at:  # ctrl+c x2 backgrounds the chat into the agents view; again there, it quits
+            hz.call("agent", "send-keys", pane_id, "ctrl+c", "ctrl+c")
             keys_at = time.time() + 5
         time.sleep(1)
     start(pane_id, role, unit_name(unit) if unit else "prometheus", label,

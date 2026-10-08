@@ -192,10 +192,10 @@ class UnitsTest(unittest.TestCase):
             except ValueError as exc:
                 return exc, call, start
 
-    def test_respawn_sends_esc_first_and_resumes_once_the_agent_exits(self):
-        out, call, start = self._respawn(live_polls=2)
+    def test_respawn_repeats_ctrl_c_until_the_agent_exits_then_resumes(self):
+        out, call, start = self._respawn(live_polls=6)
         self.assertIn("respawned pm", out)
-        self.assertEqual(call.call_args_list[0].args, ("agent", "send-keys", "w1F:p1", "esc", "ctrl+c", "ctrl+c"))
+        self.assertEqual([c.args for c in call.call_args_list], [("agent", "send-keys", "w1F:p1", "ctrl+c", "ctrl+c")] * 2)
         start.assert_called_once()
         self.assertEqual(start.call_args.kwargs["claude_args"],
                          ["--resume", "s-1", "--system-prompt-snapshot", "off"])
