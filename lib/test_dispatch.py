@@ -285,13 +285,24 @@ class AgentsHeartbeatTest(Base):
         self.assertIn("derate working → idle", evs[0]["line"])
 
     def test_heartbeat_once_per_quiet_spell(self):
-        now = time.time()
+        now, s = time.time(), snap()
+        s["panes"][2]["agent_status"] = "idle"  # the fixture's implementor is working: not a quiet spell
         with d.locked_state() as st:
             st["last_change"]["sc-1-a"] = int(now - 3600)
-            first = d.heartbeat(snap(), st, 30, now=now)
-            second = d.heartbeat(snap(), st, 30, now=now + 60)
+            first = d.heartbeat(s, st, 30, now=now)
+            second = d.heartbeat(s, st, 30, now=now + 60)
         self.assertEqual([e["unit"] for e in first], ["sc-1-a"])
         self.assertEqual(second, [])
+
+    def test_no_heartbeat_while_a_worker_is_working(self):
+        now, s = time.time(), snap()
+        for p in s["panes"]:
+            if p.get("tokens", {}).get("role") in d.DEPTH3:
+                p["agent_status"] = "working"
+        with d.locked_state() as st:
+            st["last_change"]["sc-1-a"] = int(now - 3600)
+            self.assertEqual(d.heartbeat(s, st, 30, now=now), [])
+            self.assertEqual(st["last_change"]["sc-1-a"], int(now))
 
 
 class LoopTest(Base):

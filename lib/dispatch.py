@@ -400,6 +400,9 @@ def heartbeat(snap: dict, st: dict, minutes: int, now: float | None = None) -> l
                    if p.get("workspace_id") == u["workspace_id"] and _tokens(p).get("role") in DEPTH3]
         if not workers:
             continue
+        if any(p.get("agent_status") == "working" for p in workers):
+            st["last_change"][label] = int(now)  # an agent at work is movement, messages or not
+            continue
         last = st["last_change"].setdefault(label, int(now))
         if now - last < minutes * 60 or st["beats"].get(label, 0) > last:
             continue
