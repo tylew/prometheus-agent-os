@@ -91,6 +91,24 @@ def is_noise(author: str, body: str, ignore: list[str] | None = None) -> bool:
     return any(m in (body or "")[:400] for m in NOISE_BODY)
 
 
+def own_posts() -> tuple[str, str]:
+    """(operator login, rendered signature): prometheus posts as the operator, and its own posts are no news."""
+    try:
+        import registry
+        op = (registry.workspace_config() or {}).get("operator") or {}
+    except (ImportError, RuntimeError, ValueError, OSError):
+        return "", ""
+    sig = (op.get("signature") or "⚡ Prometheus by instruction of {name}").format(
+        name=op.get("name", ""), full_name=op.get("full_name", ""), github=op.get("github", ""))
+    return op.get("github", ""), sig
+
+
+def is_own(author: str, body: str, own: tuple[str, str] | None) -> bool:
+    """A signed post, or a body-less review (thread replies), from the operator's account is prometheus's own."""
+    login, sig = own or ("", "")
+    return bool(login) and author == login and (not (body or "").strip() or bool(sig) and sig in body)
+
+
 def _ignore_authors(repo: str) -> list[str]:
     try:
         import registry
@@ -100,11 +118,12 @@ def _ignore_authors(repo: str) -> list[str]:
         return []
 
 
-def fingerprint(pr: dict, ignore: list[str] | None = None) -> dict:
-    reviews = [r for r in pr.get("latestReviews") or []
-               if not is_noise((r.get("author") or {}).get("login", ""), r.get("body", ""), ignore)]
-    comments = [c for c in pr.get("comments") or []
-                if not is_noise((c.get("author") or {}).get("login", ""), c.get("body", ""), ignore)]
+def fingerprint(pr: dict, ignore: list[str] | None = None, own: tuple[str, str] | None = None) -> dict:
+    def news(x):
+        who, body = (x.get("author") or {}).get("login", ""), x.get("body", "")
+        return not is_noise(who, body, ignore) and not is_own(who, body, own)
+    reviews = [r for r in pr.get("latestReviews") or [] if news(r)]
+    comments = [c for c in pr.get("comments") or [] if news(c)]
     last = max(reviews, key=lambda r: r.get("submittedAt") or "", default={})
     state = "merged" if pr.get("mergedAt") else (pr.get("state") or "").lower()
     return {"state": state, "draft": bool(pr.get("isDraft")), "head": pr.get("headRefOid"),
@@ -125,7 +144,7 @@ def pr_changes(ref: str, old: dict | None, new: dict) -> list[str]:
         out.append(new["state"])
     if new["ci"] != old["ci"] and new["ci"] in ("pass", "fail"):
         out.append("ci %s" % new["ci"])
-    if new["review_at"] != old["review_at"] and new["review"]:
+    if new["review_at"] > old.get("review_at", "") and new["review"]:  # a dismissed review falls back to an older one
         out.append("review %s" % new["review"])
     if new["comments"] > old["comments"]:
         out.append("%d new comment(s)" % (new["comments"] - old["comments"]))
@@ -226,7 +245,7 @@ def poll_github(snap: dict, st: dict) -> list[dict]:
     authored = set(search_prs("--author=@me", repos))
     owned = set(st.get("owned", {}).get("prs", []))
     held = {r for u in dispatch.units(snap) for r in dispatch._csv(dispatch._tokens(u).get("prs"))}
-    events, fresh = [], 0
+    events, fresh, own = [], 0, own_posts()
     for ref in sorted(review | authored | owned | held):
         key = "pr:" + ref
         old = st["cursors"].get(key)
@@ -239,7 +258,7 @@ def poll_github(snap: dict, st: dict) -> list[dict]:
         except (RuntimeError, ValueError) as exc:
             events.append({"kind": "error", "line": "gh %s: %s" % (ref, exc)})
             continue
-        new = fingerprint(pr, _ignore_authors(split_ref(ref)[0]))
+        new = fingerprint(pr, _ignore_authors(split_ref(ref)[0]), own)
         st["cursors"][key] = new
         for change in pr_changes(ref, old, new):
             if change == "new" and ref in held:

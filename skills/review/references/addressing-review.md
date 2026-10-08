@@ -71,6 +71,8 @@ reviewer's own loop clears it by approving once the counts reach zero; the autho
      one bullet, what held and what changed; Mediums/Lows grouped by cause; each decision with its cost and
      what now pins it; each decline with its evidence; validation with real counts and CI state on this
      head (never imply a pending check passed); PR-description claims this round made false, corrected.
+   - ends with the signature line (system prompt → *Signing outward content*): the dispatcher reads an
+     unsigned post from the operator's account as the operator's own and wakes the PM with it.
 
    Then:
    - **This loop's own `CHANGES_REQUESTED` is not dismissed** — its next round verifies and supersedes it.

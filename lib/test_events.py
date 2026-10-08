@@ -94,6 +94,21 @@ class GitHubTest(Base):
         self.assertEqual(ev.pr_changes("o/r#1", a, dict(a, ci="pending")), [])
         self.assertEqual(ev.pr_changes("o/r#1", None, a), ["new"])
 
+    def test_a_dismissed_review_falling_back_is_no_news(self):
+        a = dict(ev.fingerprint(pr(1, "h", "main")), review="sp:COMMENTED", review_at="2026-10-08T22:32:00Z")
+        b = dict(a, review="xd:COMMENTED", review_at="2026-10-08T20:50:00Z")
+        self.assertEqual(ev.pr_changes("o/r#1", a, b), [])
+
+    def test_prometheus_own_posts_are_no_news(self):
+        own = ("op", "⚡ Prometheus by instruction of Op")
+        p = pr(1, "h", "main", comments=[
+            {"author": {"login": "op"}, "body": "round addressed\n\n⚡ Prometheus by instruction of Op"},
+            {"author": {"login": "op"}, "body": "a note typed by hand"}],
+            reviews=[{"author": {"login": "op"}, "state": "COMMENTED", "submittedAt": "t2", "body": ""},
+                     {"author": {"login": "bob"}, "state": "APPROVED", "submittedAt": "t1", "body": "lgtm"}])
+        f = ev.fingerprint(p, own=own)
+        self.assertEqual((f["comments"], f["review"]), (1, "bob:APPROVED"))
+
     def test_split_ref_refuses_a_bare_number(self):
         self.assertEqual(ev.split_ref("o/r#1"), ("o/r", "1"))
         with self.assertRaisesRegex(ValueError, "owner/repo#n"):
