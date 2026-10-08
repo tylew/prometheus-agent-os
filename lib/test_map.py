@@ -352,53 +352,97 @@ class EpicTest(unittest.TestCase):
         rows = [(a.key, story, pr) for a, story, pr in t.nodes["unit:wF"].rows]
         self.assertEqual(rows, [("wF:p1", None, None), ("wF:p2", "sc-5", "#20")])
 
-    def test_epic_level_story_groups(self):
+    def test_epic_level_is_a_board(self):
         t = self.build()
-        groups = {g.name: g for g in t.groups["unit:wE"]}
-        self.assertEqual(list(groups), ["sc-1", "sc-2", "sc-3"])
-        self.assertEqual(groups["sc-1"].sub, "implement")
-        self.assertEqual(groups["sc-3"].sub, "stage ?")
-        self.assertEqual([(p["mark"], p["label"]) for p in groups["sc-1"].prs], [("✓", "#10"), ("!", "#11")])
-        self.assertEqual([(p["mark"], p["label"], p["author"]) for p in groups["sc-2"].prs],
-                         [("⟳", "#12", "alice"), ("●", "x/y#5", "")])
-        self.assertEqual(keys(groups["sc-1"].agents), ["wE:p2"])
-        self.assertEqual(keys(groups["sc-2"].agents), ["wE:p3"])
-        self.assertEqual(groups["sc-3"].agents, [])
-        self.assertEqual(keys(t.loose["unit:wE"]), ["wE:p4"])  # the planner, beside the groups
+        node = t.nodes["unit:wE"]
+        self.assertEqual([(r["story"], r["stage"]) for r in node.board],
+                         [("sc-1", "implement"), ("sc-2", "review"), ("sc-3", "?")])
+        self.assertEqual([(p["label"], p["mark"]) for p in node.board[0]["prs"]], [("#10", "✓"), ("#11", "!")])
+        self.assertEqual(node.board[0]["url"], "https://app.shortcut.com/acme/story/1")
+        crew = {a.key: (stories, [p["label"] for p in prs]) for a, stories, prs in node.crew}
+        self.assertEqual(crew, {"wE:p2": (["sc-1"], ["#11", "#10"]), "wE:p3": (["sc-2"], ["#12", "x/y#5"]),
+                                "wE:p4": (["sc-3"], [])})
         hub, spokes = model.level(t, ["unit:wE"])
         self.assertEqual(hub.key, "wE:p1")
-        self.assertEqual(keys(spokes), ["wE:p2", "wE:p3", "wE:p4"])
-        self.assertEqual(t.nodes["unit:wE"].name, "Grid programs")
+        self.assertEqual(keys(spokes), ["wE:p2", "wE:p3", "wE:p4"])  # planner included, PM not
+        self.assertEqual(node.name, "Grid programs")
+        self.assertEqual(t.nodes["unit:wB"].board, [])  # an older unit keeps its PM-over-agents level
+        hub, spokes = model.level(t, ["unit:wB"])
+        self.assertEqual((hub.key, spokes), ("wB:p1", []))
 
-    def test_epic_level_render(self):
+    def test_multi_tie_spans_a_stack(self):
+        s = epic_snap()
+        s["panes"].append(pane("wE:p5", "wE", "wE:t5", "working", role="reviewer", pr="o/r#10, #12",
+                               status="r2 on #12"))
+        t = model.build(s, EPIC_STATE, operator="tylew")
+        crew = {a.key: (stories, [p["label"] for p in prs]) for a, stories, prs in t.nodes["unit:wE"].crew}
+        self.assertEqual(crew["wE:p5"], (["sc-1", "sc-2"], ["#10", "#12", "#11", "x/y#5"]))
+        self.assertEqual(model.crew_of(t.nodes["unit:wE"], "sc-1"), ["wE:p2", "wE:p5"])
+        self.assertEqual(model.crew_of(t.nodes["unit:wE"], "sc-2"), ["wE:p5", "wE:p3"])
+        row = next(r for r in t.nodes["unit:wE"].rows if r[0].key == "wE:p5")
+        self.assertEqual(row[1:], ("sc-1", "#10"))  # the seat list keeps one story / PR: what it works on now
+        idle = pane("wE:p6", "wE", "wE:t6", role="implementor")
+        self.assertEqual(model.touches(idle, [], {}, {}), ([], []))
+        self.assertIn("  (nothing yet)", views.board_text(model.build(
+            {**s, "panes": s["panes"] + [idle]}, EPIC_STATE).nodes["unit:wE"]))
+
+    def test_every_story_listed_and_prs_without_one(self):
+        s = epic_snap()
+        s["workspaces"][1]["tokens"]["stories"] += ",sc-4"
+        s["workspaces"][1]["tokens"]["prs"] += ",o/r#13"
+        t = model.build(s, EPIC_STATE, operator="tylew")
+        node = t.nodes["unit:wE"]
+        self.assertEqual([r["story"] for r in node.board], ["sc-1", "sc-2", "sc-3", "sc-4", None])
+        self.assertEqual(model.crew_of(node, "sc-4"), [])
+        self.assertEqual([p["label"] for p in node.board[-1]["prs"]], ["#13"])
+        lines = views.board_text(node)
+        self.assertIn("stories (4)", lines)
+        self.assertIn("sc-4     ?         —", lines)
+        self.assertIn("no story           #13·", lines)
+
+    def board(self, sel, width=120):
         t = self.build()
-        hub, spokes = model.level(t, ["unit:wE"])
-        spokes[1].selected = True
-        canvas, boxes = views.render_level(hub, t.groups["unit:wE"] + t.loose["unit:wE"], 120,
-                                           hub_title="Grid programs · 77")
+        hub, _ = model.level(t, ["unit:wE"])
+        return views.render_epic(hub, t.nodes["unit:wE"], width, sel=sel, hub_title="Grid programs · 77")
+
+    def style_at(self, canvas, text):
+        for y, line in enumerate(canvas.text().splitlines()):
+            if text in line:
+                return canvas.rows[y][line.index(text)][1]
+        raise AssertionError(text)
+
+    def test_cross_highlight(self):
+        canvas, boxes = self.board("story:wE:sc-2")
+        self.assertEqual(self.style_at(canvas, "review #12"), "hl")
+        self.assertEqual(self.style_at(canvas, "impl sc-1"), "name")
+        self.assertEqual(self.style_at(canvas, "sc-2 review"), "selname")
+        self.assertEqual(views.hot(self.build().nodes["unit:wE"], "story:wE:sc-2"), (set(), set(), {"wE:p3"}))
+        canvas, boxes = self.board("wE:p2")
+        self.assertEqual(self.style_at(canvas, "sc-1 implement"), "hl")
+        self.assertEqual(self.style_at(canvas, "sc-2 review"), "name")
+        self.assertEqual(self.style_at(canvas, "#11!"), "hl")
+        self.assertEqual(self.style_at(canvas, "impl sc-1"), "selname")
+        y0, y1, x0, _ = boxes["wE:p2"]
+        self.assertEqual((y1 - y0, canvas.text().splitlines()[y0][x0]), (1, "▸"))
+
+    def test_board_side_by_side_and_stacked(self):
+        canvas, boxes = self.board("story:wE:sc-1", 100)
         text = canvas.text()
         self.assertIn("Grid programs · 77", text)
-        self.assertIn("▣ sc-1 implement", text)
-        self.assertIn("▣ sc-3 stage ?", text)
-        self.assertIn("✓ #10  ! #11", text)
-        self.assertIn("⟳ #12 @alice  ● x/y#5", text)
-        self.assertIn("(no agent)", text)
-        self.assertIn("┌", text)
-        for key in ("wE:p1", "wE:p2", "wE:p3", "wE:p4"):
-            self.assertIn(key, boxes)
-        self.assertNotIn("story:wE:sc-1", boxes)
-        y, y1, x0, x1 = boxes["wE:p3"]
-        self.assertEqual(y, y1)
-        self.assertIn("review #12", text.splitlines()[y][x0:x1 + 1])
+        heads = [y for y, line in enumerate(text.splitlines()) if "stories (3)" in line or "agents (3)" in line]
+        self.assertEqual(len(set(heads)), 1)  # one header row: side by side
+        self.assertGreater(boxes["wE:p2"][2], boxes["story:wE:sc-1"][3])
+        self.assertIn("▸sc-1 implement #10✓ #11!", text)
+        self.assertIn("sc-2 review    #12⟳ @alice x/y#5●", text)
         self.assertIn("https://github.com/o/r/pull/12", [u for *_, u in canvas.links])
-        self.assertTrue(views.animate_edges(canvas, {"story:wE:sc-2"}, 0))
-
-    def test_older_unit_keeps_its_level(self):
-        t = self.build()
-        self.assertNotIn("unit:wB", t.groups)
-        hub, spokes = model.level(t, ["unit:wB"])
-        self.assertEqual(hub.key, "wB:p1")
-        self.assertEqual(spokes, [])
+        for width in (50, 30, 22):
+            canvas, boxes = self.board("wE:p3", width)
+            for row in canvas.text().splitlines():
+                self.assertLessEqual(len(row), width)
+            self.assertGreater(boxes["wE:p2"][0], boxes["story:wE:sc-3"][1])  # agents below the stories
+            self.assertEqual(boxes["wE:p2"][2], 0)
+        self.assertIn("@alice", self.board("wE:p3", 30)[0].text())  # a long PR list wraps, nothing dropped
+        self.assertIn("x/y#5●", self.board("wE:p3", 30)[0].text())
 
     def test_dump_covers_the_new_levels(self):
         text = model.to_text(self.build())
@@ -407,10 +451,48 @@ class EpicTest(unittest.TestCase):
         self.assertIn("│    ↗ sc-1  sc-2  sc-3  #10  #11  #12  x/y#5", text)
         self.assertIn("[Grid programs]", text)
         self.assertIn("   epic Grid programs · 77 — sc-1 implement, sc-2 in review", text)
-        self.assertIn("├─ ▣ sc-2 review\n│    ⟳ #12 @alice  ● x/y#5\n│    · review #12 [working] — round 2", text)
-        self.assertIn("├─ ▣ sc-3 stage ?\n│    (no agent)", text)
-        self.assertIn("└─ ○ planner-epic-77 [idle]  — planning sc-3", text)
+        self.assertIn("   stories (3)\n   sc-1 implement #10✓ #11!\n   sc-2 review    #12⟳ @alice x/y#5●\n"
+                      "   sc-3 ?         —\n   agents (3)\n   impl sc-1 ○  ! fixing #11\n     sc-1 · #11 #10", text)
+        self.assertIn("   planner-epic-77 ○  planning sc-3\n     sc-3", text)
         self.assertIn("[rev-b]\n○ pm [idle]  — review r1", text)
+
+
+class BoardNavTest(unittest.TestCase):
+    def app(self):
+        from map import app as mapapp
+        a = mapapp.App(None, unit="wE")
+        a.tree = model.build(epic_snap(), EPIC_STATE, operator="tylew", story_slug="acme")
+        a.rebuild()
+        return a
+
+    def test_columns_and_enter(self):
+        import curses
+        from unittest import mock
+        from map import app as mapapp
+        a = self.app()
+        self.assertEqual(a.selected(), "story:wE:sc-1")
+        self.assertEqual(a.target(a.selected()), "wE:p2")  # a story previews the first agent touching it
+        a.handle(curses.KEY_DOWN)
+        self.assertEqual(a.selected(), "story:wE:sc-2")
+        a.handle(curses.KEY_RIGHT)
+        self.assertEqual(a.selected(), "wE:p3")  # the agent on sc-2
+        a.handle(curses.KEY_DOWN)
+        self.assertEqual(a.selected(), "wE:p4")
+        a.handle(curses.KEY_DOWN)
+        self.assertEqual(a.selected(), "wE:p4")  # stays in its column
+        a.handle(curses.KEY_LEFT)
+        self.assertEqual(a.selected(), "story:wE:sc-3")
+        with mock.patch.object(mapapp, "open_url") as opened:
+            a.handle("\n")
+        opened.assert_called_once_with("https://app.shortcut.com/acme/story/3")
+        a.handle("\t")
+        a.handle("\r")
+        self.assertEqual(a.interact, "wE:p4")
+        a.interact = None
+        a.select("story:wE:sc-1")
+        a.handle(curses.KEY_LEFT)
+        self.assertEqual(a.path, [])
+        self.assertEqual(a.selected(), "unit:wE")
 
 
 class IconsTest(unittest.TestCase):

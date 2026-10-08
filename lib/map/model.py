@@ -1,6 +1,6 @@
 # ---
 # name: map.model
-# description: Pure model for the prometheus map — a Herdr snapshot (workspace + pane tokens from source prometheus) plus a read-only dispatch.json overlay (outbox held counts, proposals, last_change ages) → a Tree of NodeViews with per-unit activity stats, and drill-down levels (system: seat → units · unit: PM → its agents · control: seat → librarian, runners, proposals, strays). No I/O.
+# description: Pure model for the prometheus map — a Herdr snapshot (workspace + pane tokens from source prometheus) plus a read-only dispatch.json overlay (outbox held counts, proposals, last_change ages) → a Tree of NodeViews with per-unit activity stats, and drill-down levels (system: seat → units · epic: PM over a board of every story and every agent with all the stories / PRs it touches · older unit: PM → its agents · control: seat → librarian, runners, proposals, strays). No I/O.
 # usage: imported (from map import model); tree = model.build(snapshot, state, own_pane=...); model.level(tree, path) → (hub, spokes)
 # ---
 # Tree building adapted from Horchestra's agentmap.py (https://github.com/SimoneDaniotti/horchestra),
@@ -10,7 +10,7 @@ from __future__ import annotations
 import re
 import time
 
-from .views import STATUS, NodeView, count_line, mark_line, seat_line
+from .views import STATUS, NodeView, board_text, count_line, mark_line, seat_line
 
 STORY_RE = re.compile(r"\bsc-(\d+)\b")
 PR_NUM_RE = re.compile(r"#(\d+)\b")
@@ -36,8 +36,6 @@ class Tree:
         self.held = 0
         self.counts = {}  # agent status -> n, over every shown agent
         self.needs = 0
-        self.groups = {}  # epic unit key -> [story group NodeViews]
-        self.loose = {}  # epic unit key -> [agent NodeViews tied to no story]
 
 
 def tokens(item):
@@ -106,9 +104,7 @@ def links(t, story_slug=None):
     """[(label, url or None)] for a unit's stories then PRs."""
     out = []
     for story in csv(t.get("stories")):
-        num = story.split("-", 1)[-1]
-        url = f"https://app.shortcut.com/{story_slug}/story/{num}" if story_slug and num.isdigit() else None
-        out.append((story, url))
+        out.append((story, story_url(story, story_slug)))
     prs = csv(t.get("prs"))
     default = default_repo(prs)
     for pr in prs:
@@ -150,29 +146,45 @@ def stage_map(val):
     return out
 
 
-def tie(pane, prs, pr_stories, recs):
-    """(story, pr ref) an agent works on now: item / pr tokens, a reviewer's PR → its stories, else its
-    status line; a story's PR is its first open one."""
+def touches(pane, prs, pr_stories, recs):
+    """([stories], [PR refs]) an agent touches: its item / pr tokens (csv), story and PR refs in its status
+    line, the stories of those PRs and the PRs of those stories. The first of each is what it works on now:
+    item before pr before status line; a story's open PRs before its merged / closed ones."""
     t = tokens(pane)
     text = t.get("status") or ""
-    story = story_of(t.get("item"))
-    pr = t.get("pr") or None
-    if pr and not story:
-        story = next(iter(pr_stories.get(pr) or []), None)
-    if not story:
-        story = story_of(text)
-    if not pr:
-        for m in PR_NUM_RE.finditer(text):
-            pr = next((r for r in prs if r.endswith("#" + m.group(1))), None)
-            if pr:
-                break
-    if not pr and story:
-        mine = [r for r in prs if story in pr_stories.get(r, [])]
-        live = [r for r in mine if (recs.get(r) or {}).get("state") not in ("merged", "closed")]
-        pr = next(iter(live or mine), None)
-    if pr and not story:
-        story = next(iter(pr_stories.get(pr) or []), None)
-    return story, pr
+    stories, refs = [], []
+
+    def add(seq, val):
+        if val and val not in seq:
+            seq.append(val)
+
+    def resolve(ref):
+        num = ref.rpartition("#")[2]
+        return ref if ref in prs or not num.isdigit() else next((r for r in prs if r.endswith("#" + num)), ref)
+
+    for item in csv(t.get("item")):
+        add(stories, story_of(item))
+    for ref in csv(t.get("pr")):
+        add(refs, resolve(ref))
+    for ref in list(refs):
+        for s in pr_stories.get(ref) or []:
+            add(stories, s)
+    for m in STORY_RE.finditer(text):
+        add(stories, f"sc-{m.group(1)}")
+    for m in PR_NUM_RE.finditer(text):
+        ref = next((r for r in prs if r.endswith("#" + m.group(1))), None)
+        add(refs, ref)
+        for s in pr_stories.get(ref) or []:
+            add(stories, s)
+    mine = [r for r in prs if any(s in pr_stories.get(r, []) for s in stories)]
+    for r in sorted(mine, key=lambda r: (recs.get(r) or {}).get("state") in ("merged", "closed")):
+        add(refs, r)
+    return stories, refs
+
+
+def story_url(story, story_slug):
+    num = story.split("-", 1)[-1]
+    return f"https://app.shortcut.com/{story_slug}/story/{num}" if story_slug and num.isdigit() else None
 
 
 def _dict(val):
@@ -273,7 +285,7 @@ def build(snap, state=None, own_pane="", here_tab="", now=None, own_workspace=""
         if isinstance(changed, (int, float)):
             node.age = ago(now - changed)
         node.lead = tree.nodes[pm["pane_id"]] if pm else None
-        epic_unit(tree, key, node, t, mine, pm, cursors, story_epic, operator)
+        epic_unit(tree, key, node, t, mine, pm, cursors, story_epic, operator, story_slug)
         add(node, w)
         tree.units.append(key)
         tree.pm[key] = pm["pane_id"] if pm else None
@@ -303,8 +315,9 @@ def build(snap, state=None, own_pane="", here_tab="", now=None, own_workspace=""
     return tree
 
 
-def epic_unit(tree, key, node, t, mine, pm, cursors, story_epic, operator):
-    """A unit's stories, PRs with status marks, agent rows (story · PR now) and, for an epic, its story groups."""
+def epic_unit(tree, key, node, t, mine, pm, cursors, story_epic, operator, story_slug=None):
+    """A unit's stories, PRs with status marks, agent rows (story · PR now) and, for an epic, its board:
+    every story with its stage and PRs, and every agent but the PM with all the stories and PRs it touches."""
     prs = csv(t.get("prs"))
     default = default_repo(prs)
     recs = {r: _dict(cursors.get("pr:" + r)) for r in prs}
@@ -317,10 +330,15 @@ def epic_unit(tree, key, node, t, mine, pm, cursors, story_epic, operator):
     if node.unit_kind == "epic":
         node.name = named.get("name") or t.get("unit")
 
-    ties = {p["pane_id"]: tie(p, prs, pr_stories, recs) for p in mine}
+    ties = {p["pane_id"]: touches(p, prs, pr_stories, recs) for p in mine}
+
+    def now(p):
+        s, r = ties[p["pane_id"]]
+        return (s[0] if s else None), (r[0] if r else None)
+
     order = list(stories) + [s for s in stages if s not in stories]
     for p in mine:
-        s = ties[p["pane_id"]][0]
+        s = now(p)[0]
         if s and s not in order and tokens(p).get("role") not in ("pm", "planner"):
             order.append(s)
     unplaced = []
@@ -334,7 +352,7 @@ def epic_unit(tree, key, node, t, mine, pm, cursors, story_epic, operator):
 
     needs_on = {}
     for p in mine:
-        pr = ties[p["pane_id"]][1]
+        pr = now(p)[1]
         if pr:
             needs_on[pr] = needs_on.get(pr, False) or tree.nodes[p["pane_id"]].needs
     records = {}
@@ -347,43 +365,32 @@ def epic_unit(tree, key, node, t, mine, pm, cursors, story_epic, operator):
 
     rank = {s: i for i, s in enumerate(order)}
     lead = [p for p in mine if p is pm]
-    rest = sorted((p for p in mine if p is not pm),
-                  key=lambda p: rank.get(ties[p["pane_id"]][0], len(rank)))
-    node.rows = [(tree.nodes[p["pane_id"]], ties[p["pane_id"]][0],
-                  pr_label(ties[p["pane_id"]][1], default) if ties[p["pane_id"]][1] else None)
-                 for p in lead + rest]
+    rest = sorted((p for p in mine if p is not pm), key=lambda p: rank.get(now(p)[0], len(rank)))
+    node.rows = []
+    for p in lead + rest:
+        s, r = now(p)
+        node.rows.append((tree.nodes[p["pane_id"]], s, pr_label(r, default) if r else None))
 
     if node.unit_kind != "epic":
         return
     wid = key.split(":", 1)[1]
-    groups, loose = [], []
-    by_story = {}
-    for s in order:
-        g = NodeView(f"story:{wid}:{s}", s, "story", "idle")
-        g.sub = stages.get(s) or "stage ?"
-        g.prs = [records[r] for r in prs if s in pr_stories[r]]
-        if len(order) == 1:
-            g.prs += [records[r] for r in unplaced]
-        by_story[s] = g
-        groups.append(g)
-    if unplaced and len(order) != 1:
-        g = NodeView(f"story:{wid}:-", "no story", "story", "idle")
-        g.prs = [records[r] for r in unplaced]
-        groups.append(g)
+    node.board = [{"key": f"story:{wid}:{s}", "story": s, "stage": stages.get(s) or "?",
+                   "url": story_url(s, story_slug), "prs": [records[r] for r in prs if s in pr_stories[r]]}
+                  for s in order]
+    if unplaced:
+        node.board.append({"key": f"story:{wid}:-", "story": None, "stage": "", "url": None,
+                           "prs": [records[r] for r in unplaced]})
+    node.crew = []
     for p in rest:
-        s = ties[p["pane_id"]][0]
-        agent = tree.nodes[p["pane_id"]]
-        if tokens(p).get("role") != "planner" and s in by_story:
-            by_story[s].agents.append(agent)
-        else:
-            loose.append(agent)
-    for g in groups:
-        sts = {a.status for a in g.agents}
-        g.status = next((st for st in ("working", "blocked", "idle", "done") if st in sts), "unknown")
-        g.flag = sum(a.needs for a in g.agents)
-        g.held = sum(a.held for a in g.agents)
-    tree.groups[key] = groups
-    tree.loose[key] = loose
+        s, r = ties[p["pane_id"]]
+        node.crew.append((tree.nodes[p["pane_id"]], s,
+                          [records.get(ref) or {"ref": ref, "label": pr_label(ref, default), "url": pr_url(ref),
+                                                "author": "", "mark": "·", "stories": []} for ref in r]))
+
+
+def crew_of(node, story):
+    """Keys of the agents on an epic's board that touch `story`."""
+    return [a.key for a, stories, _ in node.crew if story in stories]
 
 
 def seat_node(tree):
@@ -409,8 +416,8 @@ def level(tree, path):
     if top in tree.units:
         pm = tree.pm.get(top)
         hub = tree.nodes[pm] if pm else tree.nodes[top]
-        if top in tree.groups:
-            return hub, [a for g in tree.groups[top] for a in g.agents] + tree.loose[top]
+        if tree.nodes[top].unit_kind == "epic":
+            return hub, [a for a, _, _ in tree.nodes[top].crew]
         return hub, [tree.nodes[k] for k in tree.workers[top]]
     return None, []
 
@@ -435,10 +442,6 @@ def preview_target(tree, key):
 
 def unit_of(tree, key):
     return next((u for u in tree.units if key == tree.pm.get(u) or key in tree.workers[u]), None)
-
-
-def agent_text(a, lead):
-    return f"{lead}· {a.name} [{STATUS[a.status][1]}]" + (f" — {a.detail}" if a.detail else "")
 
 
 def row_text(a, story, pr):
@@ -476,17 +479,6 @@ def to_text(tree):
         if node.links:
             lines.append(f"{pad}↗ " + "  ".join(label for label, _ in node.links))
 
-    def group(g, lead):
-        lines.append(f"{lead}▣ {g.name} {g.sub}".rstrip())
-        pad = "│    " if lead.startswith("├") else "     "
-        if g.prs:
-            lines.append(pad + "  ".join(f"{p['mark']} {p['label']}" + (f" @{p['author']}" if p["author"] else "")
-                                         for p in g.prs))
-        for a in g.agents:
-            lines.append(agent_text(a, pad))
-        if not g.agents:
-            lines.append(f"{pad}(no agent)")
-
     def block(hub, spokes, title=None, each=row):
         if title:
             lines.append("")
@@ -501,7 +493,7 @@ def to_text(tree):
         block(hub, spokes, "[control]")
     for u in tree.units:
         node = tree.nodes[u]
-        if u not in tree.groups:
+        if node.unit_kind != "epic":
             block(*level(tree, [u]), f"[{node.name}]")
             continue
         hub, _ = level(tree, [u])
@@ -512,13 +504,7 @@ def to_text(tree):
         lines.append("   epic " + " · ".join(v for v in (node.name, node.ident) if v) + (f" — {stage}" if stage else ""))
         if node.prs:
             lines.append("   PRs " + mark_line(node.prs))
-        spokes = tree.groups[u] + tree.loose[u]
-        for i, s in enumerate(spokes):
-            lead = "└─ " if i == len(spokes) - 1 else "├─ "
-            if s.kind == "story":
-                group(s, lead)
-            else:
-                row(s, lead)
+        lines += ["   " + line for line in board_text(node)]
     return "\n".join(lines)
 
 
