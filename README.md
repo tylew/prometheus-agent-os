@@ -31,4 +31,9 @@ role's allow-list, and adds `--permission-mode dontAsk` for implementor and revi
 their own instructions for role behavior; the workspace file is rewritten at cutover.
 No state files: ownership + stage are Herdr tokens; each agent's context is its Claude session.
 
+**Icons:** the map draws agent logos and state marks from the bundled "Herdr Agent Icons Max" font
+(`assets/fonts/`, MIT, from herdr-radar). The map installs it per user on first run and uses it from the
+next start; `python3 lib/map/icons.py install` installs it now. `PROMETHEUS_MAP_ICONS=text` keeps plain
+symbols.
+
 Layout + phase status: the design's *File layout*. Self-contained: no other plugin is required.
