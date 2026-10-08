@@ -51,6 +51,54 @@ STATE = {
 }
 
 
+def epic_snap():
+    """Two epic units and one older review unit."""
+    return {
+        "workspaces": [
+            {"workspace_id": "wC", "label": "control", "tokens": {"dispatcher": "running"}},
+            {"workspace_id": "wE", "label": "grid", "tokens": {
+                "unit": "epic-77-grid", "kind": "epic", "epic": "77", "project": "besstie",
+                "stories": "sc-1,sc-2,sc-3", "prs": "o/r#10,o/r#11,o/r#12,x/y#5",
+                "stage": "sc-1 implement, sc-2 in review", "stages": "sc-1=implement,sc-2=review"}},
+            {"workspace_id": "wF", "label": "billing", "tokens": {
+                "unit": "epic-88-billing", "kind": "epic", "epic": "88", "project": "besstie",
+                "stories": "sc-5", "prs": "o/r#20,o/r#21"}},
+            {"workspace_id": "wB", "label": "b", "tokens": {"unit": "rev-b", "kind": "review", "prs": "o/r#30"}},
+        ],
+        "tabs": [{"tab_id": "wE:t2", "workspace_id": "wE", "label": "impl sc-1"},
+                 {"tab_id": "wE:t3", "workspace_id": "wE", "label": "review #12"}],
+        "panes": [
+            pane("wC:p1", "wC", "wC:t1", "idle", role="seat"),
+            pane("wE:p1", "wE", "wE:t1", "working", role="pm", status="sc-2 in review"),
+            pane("wE:p2", "wE", "wE:t2", "idle", role="implementor", item="sc-1", status="fixing #11", needs="1"),
+            pane("wE:p3", "wE", "wE:t3", "working", role="reviewer", pr="o/r#12", status="round 2"),
+            pane("wE:p4", "wE", "wE:t4", "idle", role="planner", item="epic-77", status="planning sc-3"),
+            pane("wF:p1", "wF", "wF:t1", "idle", role="pm"),
+            pane("wF:p2", "wF", "wF:t2", "working", role="implementor", item="sc-5-fix", status="tests"),
+            pane("wB:p1", "wB", "wB:t1", "idle", role="pm", status="review r1"),
+        ],
+    }
+
+
+def pr_rec(state="open", draft=False, ci="pass", decision="", stories=(), author="tylew"):
+    return {"state": state, "draft": draft, "ci": ci, "decision": decision, "review": "",
+            "stories": list(stories), "author": author}
+
+
+EPIC_STATE = {
+    "cursors": {
+        "pr:o/r#10": pr_rec(decision="APPROVED", stories=["sc-1"]),
+        "pr:o/r#11": pr_rec(draft=True, ci="pending", stories=["sc-1"]),
+        "pr:o/r#12": pr_rec(decision="REVIEW_REQUIRED", stories=["sc-2"], author="alice"),
+        "pr:x/y#5": pr_rec(state="merged", stories=["sc-2"]),
+        "pr:o/r#20": pr_rec(decision="CHANGES_REQUESTED", stories=["sc-5"], author="bob", ci="fail"),
+        "pr:o/r#21": pr_rec(ci="fail", stories=["sc-5"]),
+        "pr:o/r#30": pr_rec(decision="APPROVED", author="carol"),
+    },
+    "story_epic": {"sc-1": {"id": 77, "name": "Grid programs"}, "sc-5": {"id": 88, "name": "Billing"}},
+}
+
+
 def keys(nodes):
     return [n.key for n in nodes]
 
@@ -170,7 +218,8 @@ class ModelTest(unittest.TestCase):
     def test_to_text(self):
         text = model.to_text(self.build())
         self.assertTrue(text.startswith("dispatcher running"))
-        self.assertIn("◼ sc-1-a  (story · implement)  ●2 ○1  !1  ✉2  5m ago", text)
+        self.assertIn("└─ ◼ sc-1-a · story  ● pm  1 sc  ⚑1  ✉2  5m", text)
+        self.assertIn("     ● reviewer-sc-1  sc-1  #10 — sc-1 · o/r#10", text)
         self.assertIn("[sc-1-a]", text)
         self.assertIn("[control]", text)
 
@@ -258,6 +307,110 @@ class ViewsTest(unittest.TestCase):
         (canvas, _), _, _ = self.render(["unit:wA"], 80)
         self.assertTrue(views.animate_edges(canvas, {"wA:p3"}, 0))
         self.assertFalse(views.animate_edges(canvas, set(), 0))
+
+
+class EpicTest(unittest.TestCase):
+    def build(self):
+        return model.build(epic_snap(), EPIC_STATE, operator="tylew", story_slug="acme")
+
+    def line(self, t, key):
+        return "".join(seg[0] for seg in views.seat_line(t.nodes[key]))
+
+    def test_seat_level_compact_lines(self):
+        t = self.build()
+        hub, spokes = model.level(t, [])
+        self.assertEqual(keys(spokes), ["unit:wE", "unit:wF", "unit:wB"])
+        self.assertEqual(self.line(t, "unit:wE"), "◼ Grid programs · 77  ● pm  3 sc · ✓1 ⟳1 ●1 !1  ⚑1")
+        self.assertEqual(self.line(t, "unit:wF"), "◼ Billing · 88  ○ pm  1 sc · ✗1 !1")
+        self.assertEqual(self.line(t, "unit:wB"), "◼ rev-b · review  ○ pm  0 sc · ✓1")
+        canvas, boxes = views.render_seat(hub, spokes, 90)
+        text = canvas.text()
+        self.assertIn("├─  ◼ Grid programs · 77", text)
+        self.assertIn("└─  ◼ rev-b · review", text)
+        self.assertNotIn("@", text)
+        self.assertNotIn("╔", text)
+        self.assertEqual(boxes["unit:wE"][0], boxes["unit:wE"][1])  # one line
+        self.assertEqual(boxes["unit:wF"][0] + 1, boxes["unit:wB"][0])
+        self.assertEqual(len(canvas.edges), 3)
+        spokes[0].selected = True
+        self.assertIn("├─▸ ◼ Grid programs", views.render_seat(hub, spokes, 90)[0].text())
+
+    def test_teammate_ci_failure_is_not_needs_you(self):
+        t = self.build()
+        marks = {p["label"]: (p["mark"], p["author"]) for p in t.nodes["unit:wF"].prs}
+        self.assertEqual(marks, {"#20": ("✗", "bob"), "#21": ("!", "")})
+        # no operator configured: every author shows
+        t = model.build(epic_snap(), EPIC_STATE)
+        self.assertEqual(t.nodes["unit:wE"].prs[0]["author"], "tylew")
+
+    def test_preview_agent_rows(self):
+        t = self.build()
+        rows = [(a.key, story, pr) for a, story, pr in t.nodes["unit:wE"].rows]
+        self.assertEqual(rows, [("wE:p1", "sc-2", "#12"), ("wE:p2", "sc-1", "#11"), ("wE:p3", "sc-2", "#12"),
+                                ("wE:p4", "sc-3", None)])
+        self.assertEqual(model.row_text(*t.nodes["unit:wE"].rows[2]), "● review #12  sc-2  #12 — round 2")
+        rows = [(a.key, story, pr) for a, story, pr in t.nodes["unit:wF"].rows]
+        self.assertEqual(rows, [("wF:p1", None, None), ("wF:p2", "sc-5", "#20")])
+
+    def test_epic_level_story_groups(self):
+        t = self.build()
+        groups = {g.name: g for g in t.groups["unit:wE"]}
+        self.assertEqual(list(groups), ["sc-1", "sc-2", "sc-3"])
+        self.assertEqual(groups["sc-1"].sub, "implement")
+        self.assertEqual(groups["sc-3"].sub, "stage ?")
+        self.assertEqual([(p["mark"], p["label"]) for p in groups["sc-1"].prs], [("✓", "#10"), ("!", "#11")])
+        self.assertEqual([(p["mark"], p["label"], p["author"]) for p in groups["sc-2"].prs],
+                         [("⟳", "#12", "alice"), ("●", "x/y#5", "")])
+        self.assertEqual(keys(groups["sc-1"].agents), ["wE:p2"])
+        self.assertEqual(keys(groups["sc-2"].agents), ["wE:p3"])
+        self.assertEqual(groups["sc-3"].agents, [])
+        self.assertEqual(keys(t.loose["unit:wE"]), ["wE:p4"])  # the planner, beside the groups
+        hub, spokes = model.level(t, ["unit:wE"])
+        self.assertEqual(hub.key, "wE:p1")
+        self.assertEqual(keys(spokes), ["wE:p2", "wE:p3", "wE:p4"])
+        self.assertEqual(t.nodes["unit:wE"].name, "Grid programs")
+
+    def test_epic_level_render(self):
+        t = self.build()
+        hub, spokes = model.level(t, ["unit:wE"])
+        spokes[1].selected = True
+        canvas, boxes = views.render_level(hub, t.groups["unit:wE"] + t.loose["unit:wE"], 120,
+                                           hub_title="Grid programs · 77")
+        text = canvas.text()
+        self.assertIn("Grid programs · 77", text)
+        self.assertIn("▣ sc-1 implement", text)
+        self.assertIn("▣ sc-3 stage ?", text)
+        self.assertIn("✓ #10  ! #11", text)
+        self.assertIn("⟳ #12 @alice  ● x/y#5", text)
+        self.assertIn("(no agent)", text)
+        self.assertIn("┌", text)
+        for key in ("wE:p1", "wE:p2", "wE:p3", "wE:p4"):
+            self.assertIn(key, boxes)
+        self.assertNotIn("story:wE:sc-1", boxes)
+        y, y1, x0, x1 = boxes["wE:p3"]
+        self.assertEqual(y, y1)
+        self.assertIn("review #12", text.splitlines()[y][x0:x1 + 1])
+        self.assertIn("https://github.com/o/r/pull/12", [u for *_, u in canvas.links])
+        self.assertTrue(views.animate_edges(canvas, {"story:wE:sc-2"}, 0))
+
+    def test_older_unit_keeps_its_level(self):
+        t = self.build()
+        self.assertNotIn("unit:wB", t.groups)
+        hub, spokes = model.level(t, ["unit:wB"])
+        self.assertEqual(hub.key, "wB:p1")
+        self.assertEqual(spokes, [])
+
+    def test_dump_covers_the_new_levels(self):
+        text = model.to_text(self.build())
+        self.assertIn("├─ ◼ Grid programs · 77  ● pm  3 sc · ✓1 ⟳1 ●1 !1  ⚑1", text)
+        self.assertIn("│    ○ impl sc-1  sc-1  #11 — fixing #11", text)
+        self.assertIn("│    ↗ sc-1  sc-2  sc-3  #10  #11  #12  x/y#5", text)
+        self.assertIn("[Grid programs]", text)
+        self.assertIn("   epic Grid programs · 77 — sc-1 implement, sc-2 in review", text)
+        self.assertIn("├─ ▣ sc-2 review\n│    ⟳ #12 @alice  ● x/y#5\n│    · review #12 [working] — round 2", text)
+        self.assertIn("├─ ▣ sc-3 stage ?\n│    (no agent)", text)
+        self.assertIn("└─ ○ planner-epic-77 [idle]  — planning sc-3", text)
+        self.assertIn("[rev-b]\n○ pm [idle]  — review r1", text)
 
 
 class IconsTest(unittest.TestCase):

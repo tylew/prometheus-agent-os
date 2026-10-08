@@ -1,6 +1,6 @@
 # ---
 # name: map.app
-# description: The prometheus map's curses front end — the primary view and navigation: header stats top-right (dispatcher, agents, status counts, needs-you, proposals, held), one drill-down level at a time (seat → units, each listing its agents and numbered story / PR links that 1-9 or a click open · unit PM → its agents · seat → control), radar icon-font logos when installed, a live preview of the selected agent (a unit previews its PM) mirrored from `herdr pane read --ansi`, and an interact mode that forwards keystrokes to the previewed pane. Redraws on Herdr events (herdr.Watcher) with a poll fallback. Also --dump (every level as text, no curses) and --split (map only, ~32 columns right of the caller).
+# description: The prometheus map's curses front end — the primary view and navigation: header stats top-right (dispatcher, agents, status counts, needs-you, proposals, held), one drill-down level at a time (seat → one compact line per epic unit, with the selected epic's agent list beside it — each agent's story, PR and status line, focusable with →/l — and numbered story / PR links that 1-9 or a click open · epic → its PM over one group per story: PRs with status marks, teammates' @author, the agents working it · older unit → PM over its agents · seat → control), radar icon-font logos when installed, a live preview of the selected agent (a unit previews the agent picked in its list, its PM by default) mirrored from `herdr pane read --ansi`, and an interact mode that forwards keystrokes to the previewed pane. Redraws on Herdr events (herdr.Watcher) with a poll fallback. Also --dump (every level as text, no curses) and --split (map only, ~32 columns right of the caller).
 # usage: python3 lib/map [--unit <workspace_id>] [--dump | --split]
 # ---
 # Ported from Horchestra's agentmap.py (https://github.com/SimoneDaniotti/horchestra),
@@ -41,6 +41,8 @@ MAP_MIN_ROWS = 10
 NOTICE_SECONDS = 6.0
 SPLIT_WIDTH = 32
 SPARK_WINDOW = 600
+SEAT_SPARK = 10  # activity cells on a seat line
+LIST_LINK_ROWS = 2
 CTRL_RBRACKET = 29
 SPECIAL_KEYS = {
     curses.KEY_UP: "up", curses.KEY_DOWN: "down", curses.KEY_LEFT: "left", curses.KEY_RIGHT: "right",
@@ -74,6 +76,9 @@ def help_lines():
         ("MAP", None),
         ("arrows  hjkl", "move between nodes"),
         ("Tab", "next node"),
+        ("→  l (seat)", "into the selected epic's agent list"),
+        ("↑↓ jk (list)", "pick the agent the preview follows"),
+        ("←  h  Esc (list)", "back to the epic list"),
         ("Enter, 2×click", "drill into a unit / the seat"),
         ("Esc  Bksp  u", "back up a level"),
         ("i, click preview", "interact with the previewed agent"),
@@ -87,9 +92,13 @@ def help_lines():
         ("", None),
         ("MARKS", None),
         ("! / !N", "needs you / N below"),
+        ("⚑N", "agents in the epic need you"),
         ("✉N", "held in dispatcher outbox"),
         ("?N", "proposals waiting"),
-        ("╔═╗ ┏━┓ ╭─╮", "unit · seat · agent"),
+        ("✓ ✗ ⟳", "PR approved · changes requested · in review"),
+        ("◌ ● !", "PR draft · merged · needs you"),
+        ("@login", "a teammate's PR"),
+        ("╔═╗ ┏━┓ ╭─╮ ┌─┐", "unit · seat · agent · story"),
     ]
 
 
@@ -99,6 +108,14 @@ def story_slug():
     except Exception:  # noqa: BLE001 — links degrade to labels
         return None
     return next((t.get("org_slug") for t in trackers.values() if isinstance(t, dict) and t.get("org_slug")), None)
+
+
+def operator_login():
+    """The operator's GitHub login (workspace.json → operator.github); None when unset."""
+    try:
+        return ((registry.workspace_config() or {}).get("operator") or {}).get("github") or None
+    except Exception:  # noqa: BLE001 — every PR then shows its author
+        return None
 
 
 def open_url(url):
@@ -241,7 +258,11 @@ class App:
         self.last_draw = 0.0
         self.notice = (0.0, "")
         self.slug = story_slug()
+        self.operator = operator_login()
         self.last_key = 0.0
+        self.focus = "map"  # "agents": the seat level's keys move in the selected epic's agent list
+        self.agent_sel = {}  # unit key -> agent key the preview follows
+        self.list_scroll = 0
 
     # ---- data ---------------------------------------------------------------
 
@@ -259,7 +280,7 @@ class App:
         self.tabs = {t.get("tab_id"): t.get("label") or "" for t in snap.get("tabs") or []}
         self.tree = model.build(snap, load_state(), own_pane=self.own_pane,
                                 own_workspace=os.environ.get("HERDR_WORKSPACE_ID", ""), here_tab=self.tab_id,
-                                story_slug=self.slug)
+                                story_slug=self.slug, operator=self.operator)
         now = time.monotonic()
         for pane in self.tree.panes:
             key, status = pane.get("pane_id"), pane.get("agent_status")
@@ -284,6 +305,8 @@ class App:
         if sel not in keys:
             sel = spokes[0].key if spokes else hub.key
         self.select(sel)
+        if self.focus == "agents" and not self.seat_unit():
+            self.focus = "map"
         if self.interact and self.interact not in self.tree.nodes:
             self.interact = None
             self.flash("agent closed; interact ended")
@@ -302,11 +325,35 @@ class App:
         for n in self.order():
             n.selected = n.key == key
 
+    def seat_unit(self):
+        """The unit selected on the seat level, else None."""
+        sel = self.selected()
+        return sel if not self.path and sel in self.tree.units else None
+
+    def agent_choice(self, unit):
+        """The agent a seat-level unit previews: the one picked in its list, else its first row (the PM)."""
+        keys = [a.key for a, _, _ in self.tree.nodes[unit].rows]
+        cur = self.agent_sel.get(unit)
+        return cur if cur in keys else (keys[0] if keys else None)
+
+    def target(self, key):
+        if not self.path and key in self.tree.units:
+            return self.agent_choice(key)
+        return model.preview_target(self.tree, key)
+
+    def step_agent(self, d):
+        unit = self.seat_unit()
+        keys = [a.key for a, _, _ in self.tree.nodes[unit].rows] if unit else []
+        if not keys:
+            return
+        cur = self.agent_choice(unit)
+        self.agent_sel[unit] = keys[max(0, min(len(keys) - 1, keys.index(cur) + d))]
+
     def sparks(self, width):
         """Unit key -> a sparkline of its agents' activity over SPARK_WINDOW."""
         if self.path:
             return {}
-        count = max(4, views.spoke_width(self.spokes, width) - 4)
+        count = SEAT_SPARK
         now = time.time()
         out = {}
         for key in self.tree.units:
@@ -324,7 +371,7 @@ class App:
     def preview_key(self):
         if self.interact:
             return self.interact
-        return model.preview_target(self.tree, self.selected())
+        return self.target(self.selected())
 
     def preview_due(self):
         if self.reader.changed.is_set():
@@ -384,7 +431,14 @@ class App:
         elif self.hub:
             self.draw_map(map_rect)
         if preview_rect:
-            self.draw_preview(preview_rect)
+            unit = self.seat_unit()
+            if unit and not self.show_help:
+                preview_rect = self.draw_agent_list(preview_rect, unit)
+                self.preview_rect = preview_rect
+            if preview_rect:
+                self.draw_preview(preview_rect)
+            else:
+                self.reader.request(None, 0, 0, POLL_SECONDS)
         else:
             self.reader.request(None, 0, 0, POLL_SECONDS)
         self.draw_footer(h, w)
@@ -423,12 +477,21 @@ class App:
         width, view_h = x1 - x0 - 1, y1 - y0
         unit = self.path[-1] if self.path and self.path[-1] in self.tree.units else None
         hub_links = self.tree.nodes[unit].links if unit and self.hub.key != unit else None
-        canvas, boxes = views.render_level(self.hub, self.spokes, width, spark=self.sparks(width),
-                                           hub_links=hub_links)
+        drawn = self.spokes
+        if not self.path:
+            canvas, boxes = views.render_seat(self.hub, self.spokes, width, spark=self.sparks(width))
+        else:
+            title = None
+            if unit in self.tree.groups:
+                node = self.tree.nodes[unit]
+                drawn = self.tree.groups[unit] + self.tree.loose[unit]
+                title = " · ".join(v for v in (node.name, node.ident) if v) if self.hub.key != unit else None
+            canvas, boxes = views.render_level(self.hub, drawn, width, spark=self.sparks(width),
+                                               hub_links=hub_links, hub_title=title)
         self.boxes = boxes
         if self.animate:
             frame = int(time.monotonic() / FRAME_SECONDS)
-            working = {n.key for n in self.spokes if n.status == "working"}
+            working = {n.key for n in drawn if n.status == "working"}
             self.animating = views.animate_edges(canvas, working, frame)
         box = boxes.get(self.selected())
         if box:
@@ -447,6 +510,73 @@ class App:
         if not self.spokes:
             empty = "no units open" if not self.path else "no agents below"
             self.put(y0 + boxes[self.hub.key][1] + 2, x0 + 2, empty, self.styles["dim"])
+
+    def draw_agent_list(self, rect, unit):
+        """The selected epic's agents above the live preview: name, status, story, PR, status line.
+        Returns the rect left for the live preview, or None when there is no room."""
+        y0, x0, y1, x1 = rect
+        attr = self.styles
+        node = self.tree.nodes[unit]
+        rows = node.rows
+        w = x1 - x0
+        inner = w - 4
+        link_rows = views.wrap_segments(views.link_line(node.links), inner)[:LIST_LINK_ROWS] if node.links else []
+        want = 2 + len(link_rows) + max(1, len(rows))
+        room = y1 - y0
+        h = min(want, max(5, room // 2)) if room - want < 8 else want
+        h = min(h, room)
+        focused = self.focus == "agents"
+        border = attr["accent"] | curses.A_BOLD if focused else attr["dim"]
+        self.put(y0, x0, "┌" + "─" * (w - 2) + "┐", border)
+        for y in range(y0 + 1, y0 + h - 1):
+            self.put(y, x0, "│", border)
+            self.put(y, x1 - 1, "│", border)
+        self.put(y0 + h - 1, x0, "└" + "─" * (w - 2) + "┘", border)
+        stage = model.tokens(self.tree.raw.get(unit)).get("stage")
+        title = " · ".join(v for v in (node.name, node.ident) if v) + (f" — {stage}" if stage else "")
+        self.put(y0, x0 + 2, views.fit(f" {title} ", w - 4), border)
+        row = y0 + 1
+        for segs in link_rows:
+            cx = x0 + 2
+            for seg in segs:
+                text = views.fit(seg[0], x1 - 2 - cx)
+                self.put(row, cx, text, attr.get(seg[1], 0))
+                if len(seg) > 2 and seg[2] and text:
+                    self.hits.append((row, row, cx, cx + len(text) - 1, "@url:" + seg[2]))
+                cx += len(text)
+            row += 1
+        view = y0 + h - 1 - row
+        if not rows:
+            self.put(row, x0 + 2, "no agents in this unit yet", attr["dim"])
+        elif view > 0:
+            chosen = self.agent_choice(unit)
+            i = next((n for n, r in enumerate(rows) if r[0].key == chosen), 0)
+            if i < self.list_scroll:
+                self.list_scroll = i
+            elif i >= self.list_scroll + view:
+                self.list_scroll = i - view + 1
+            self.list_scroll = max(0, min(self.list_scroll, max(0, len(rows) - view)))
+            name_w = min(22, max(len(a.name) for a, _, _ in rows))
+            for a, story, pr in rows[self.list_scroll:self.list_scroll + view]:
+                pick = a.key == chosen
+                self.put(row, x0 + 1, "▸" if pick else " ", attr["sel"] if pick else 0)
+                self.put(row, x0 + 2, views.glyph(a.status), attr.get("status:" + a.status, 0))
+                name_attr = attr["selname"] if pick and focused else attr["name"] | (attr["accent"] if pick else 0)
+                self.put(row, x0 + 4, views.fit(a.name, name_w).ljust(name_w), name_attr)
+                cx = x0 + 5 + name_w
+                cells = [(story or "", 10), (pr or "", 12)]
+                for text, cw in cells:
+                    self.put(row, cx, views.fit(text, cw - 1), attr["accent"])
+                    cx += cw
+                detail = ("! " + a.detail) if a.needs else (a.detail or "")
+                if cx < x1 - 2:
+                    self.put(row, cx, views.fit(detail, x1 - 2 - cx), attr["needs"] if a.needs else attr["dim"])
+                self.hits.append((row, row, x0 + 1, x1 - 2, "@agent:" + a.key))
+                row += 1
+            if len(rows) > view:
+                self.put(y0 + h - 1, x1 - 8, f" {self.list_scroll + view}/{len(rows)} ", border)
+        rest = (y0 + h, x0, y1, x1)
+        return rest if y1 - (y0 + h) >= 4 else None
 
     def preview_title(self, key):
         node = self.node(key)
@@ -506,7 +636,7 @@ class App:
             lines = [("proposal · waiting on the operator", "accent"), (raw.get("reason") or "", None),
                      (raw.get("event") or "", "dim"), (f"proposal.sh approve {pid} | decline {pid}", "accent")]
         elif key in self.tree.units:
-            lines = [("no PM in this unit yet", "dim"), (node.detail, None)]
+            lines = [("no agents in this unit yet", "dim"), (node.detail, None)]
         else:
             lines = [("nothing to preview", "dim")]
         row = y
@@ -582,6 +712,10 @@ class App:
         else:
             live = "live" if self.watcher.connected else "poll"
             back = "  esc back" if self.path else ""
+            if self.focus == "agents":
+                back = "  ↑↓ agent  ← epics"
+            elif self.seat_unit() and self.preview_on:
+                back = "  → agents"
             self.put(h - 1, 1, f"? keys  ⏎ drill{back}  i interact  o open  p preview  {live}", attr["dim"])
 
     # ---- navigation ---------------------------------------------------------
@@ -624,12 +758,14 @@ class App:
             return
         self.path.append(nxt)
         self.scroll_y = 0
+        self.focus = "map"
         self.rebuild()
 
     def up(self):
         if self.path:
             came_from = self.path.pop()
             self.scroll_y = 0
+            self.focus = "map"
             if came_from == model.CONTROL and self.tree.seat:
                 came_from = self.tree.seat
             self.selection[tuple(self.path)] = came_from
@@ -669,10 +805,18 @@ class App:
         self.last_key = time.monotonic()
         self.reader.poke.set()
 
+    def drill_agent(self):
+        """Enter in the seat's agent list: drill into the epic with that agent selected."""
+        unit = self.seat_unit()
+        agent = self.agent_choice(unit) if unit else None
+        self.drill(unit)
+        if agent and agent in [n.key for n in self.order()]:
+            self.select(agent)
+
     def open_pane(self):
         key = self.selected()
         raw = self.tree.raw.get(key) or {}
-        target = model.preview_target(self.tree, key)
+        target = self.target(key)
         try:
             if target:
                 try:
@@ -705,6 +849,19 @@ class App:
             return
         if key and key.startswith("@url:"):
             self.open_link(key[5:])
+            return
+        if key and key.startswith("@agent:"):
+            unit = self.seat_unit()
+            now = time.monotonic()
+            repeat = self.last_click[1] == key and now - self.last_click[0] < 0.4
+            self.flush_typed()
+            self.interact = None
+            if unit:
+                self.agent_sel[unit] = key[7:]
+                self.focus = "agents"
+            self.last_click = (now, key)
+            if repeat:
+                self.drill_agent()
             return
         if key == "@preview":
             if not self.interact:
@@ -746,6 +903,23 @@ class App:
         if self.show_help:
             self.show_help = False
             return True
+        if self.focus == "agents" and self.seat_unit():
+            if ch in (curses.KEY_UP, "k", "w"):
+                self.step_agent(-1)
+                return True
+            if ch in (curses.KEY_DOWN, "j", "s"):
+                self.step_agent(1)
+                return True
+            if ch in (curses.KEY_LEFT, "h", "a", "\x1b", curses.KEY_BACKSPACE, "\x7f", "\x08", "u"):
+                self.focus = "map"
+                return True
+            if ch in (curses.KEY_ENTER, "\n", "\r"):
+                self.drill_agent()
+                return True
+        elif ch in (curses.KEY_RIGHT, "l", "d") and self.seat_unit() and self.preview_on \
+                and self.tree.nodes[self.seat_unit()].rows:
+            self.focus = "agents"
+            return True
         if ch == "?":
             self.show_help = True
         elif ch == "q":
@@ -771,6 +945,7 @@ class App:
         elif ch == "p":
             self.preview_on = not self.preview_on
             self.interact = None
+            self.focus = "map"
         elif ch == "r":
             self.refresh()
         elif isinstance(ch, str) and ch in "123456789":
@@ -961,7 +1136,8 @@ def setup(screen_, unit=None, preview=True):
 
 def dump():
     tree = model.build(herdr.snapshot(), load_state(), own_pane=os.environ.get("HERDR_PANE_ID", ""),
-                       own_workspace=os.environ.get("HERDR_WORKSPACE_ID", ""), story_slug=story_slug())
+                       own_workspace=os.environ.get("HERDR_WORKSPACE_ID", ""), story_slug=story_slug(),
+                       operator=operator_login())
     print(model.to_text(tree))
     return 0
 

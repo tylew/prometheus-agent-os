@@ -1,7 +1,7 @@
 # ---
 # name: map.views
-# description: Pure layout for the prometheus map — one drill-down level drawn as a hub box over a fan of spoke boxes (wrapping into rows, never wider than the screen), with distinct seat (heavy), unit workspace (double: one line per agent, activity, numbered story / PR links) and agent (rounded) boxes, live working edges, agent logos and state marks from the radar icon font when enabled — drawn onto a Canvas of (char, style) cells so it tests as plain text.
-# usage: imported (from map import views); views.render_level(hub, spokes, width, spark={key: str})
+# description: Pure layout for the prometheus map — the seat level as the seat hub over one compact line per unit (epic name · id, PM state, story count, PRs by status mark, needs-you, held, age, activity); a drill-down level as a hub box over a fan of spoke boxes (wrapping into rows, never wider than the screen), with distinct seat (heavy), unit (double), story group (square: its PRs with status marks and the agents working it, each agent row selectable) and agent (rounded) boxes, live working edges, agent logos and state marks from the radar icon font when enabled — drawn onto a Canvas of (char, style) cells so it tests as plain text.
+# usage: imported (from map import views); views.render_seat(hub, units, width) · views.render_level(hub, spokes, width, spark={key: str})
 # ---
 # Canvas and edge animation ported from Horchestra's views.py (https://github.com/SimoneDaniotti/horchestra),
 # MIT License, Copyright (c) 2026 Simone Daniotti.
@@ -16,6 +16,7 @@ KINDS = {
     "seat": ("◉", "accent"),
     "unit": ("◼", "accent"),
     "proposal": ("?", "needs"),
+    "story": ("▣", "accent"),
 }
 DEFAULT_KIND = ("▪", "kind:other")
 
@@ -35,7 +36,13 @@ STATUS = {
 HEAVY_BOX = ("┏", "━", "┓", "┃", "┗", "┛", "┳", "┻")
 DOUBLE_BOX = ("╔", "═", "╗", "║", "╚", "╝", "╤", "╧")
 ROUND_BOX = ("╭", "─", "╮", "│", "╰", "╯", "┬", "┴")
-BORDERS = {"seat": HEAVY_BOX, "unit": DOUBLE_BOX}
+SQUARE_BOX = ("┌", "─", "┐", "│", "└", "┘", "┬", "┴")
+BORDERS = {"seat": HEAVY_BOX, "unit": DOUBLE_BOX, "story": SQUARE_BOX}
+
+# PR status marks, in the seat line's count order
+PR_MARKS = ("✓", "✗", "⟳", "◌", "●", "!")
+MARK_STYLE = {"✓": "status:done", "✗": "needs", "⟳": "status:working", "◌": "dim", "●": "accent", "!": "needs",
+              "·": "dim", "–": "dim"}
 
 FONT = {"on": False}  # set by the app once it knows the radar icon font is installed
 MAX_AGENT_LINES = 5
@@ -43,6 +50,7 @@ MAX_AGENT_LINES = 5
 GAP = 2
 GUTTER = 3  # wrapped rows start right of the trunk
 SPOKE_MIN, SPOKE_MAX = 18, 40
+GROUP_MIN, GROUP_MAX = 36, 56  # story group boxes
 HUB_MIN, HUB_MAX = 26, 56
 
 
@@ -50,7 +58,8 @@ class NodeView:
     """Display data for one node, independent of Herdr's JSON."""
 
     __slots__ = ("key", "name", "kind", "status", "detail", "needs", "here", "held", "flag",
-                 "selected", "sub", "counts", "age", "agents", "links")
+                 "selected", "sub", "counts", "age", "agents", "links", "prs", "rows", "ident", "unit_kind",
+                 "stories", "lead")
 
     def __init__(self, key, name, kind, status, detail="", needs=False, here=False, held=0):
         self.key = key
@@ -68,6 +77,12 @@ class NodeView:
         self.age = ""  # unit: since the dispatcher's last change
         self.agents = []  # unit: its PM then workers (NodeViews)
         self.links = []  # unit: [(label, url or None)] stories then PRs
+        self.prs = []  # unit / story group: [{ref, label, url, mark, author, stories}]
+        self.rows = []  # unit: [(agent NodeView, story or None, PR label or None)], PM first
+        self.ident = ""  # unit: Shortcut epic id
+        self.unit_kind = ""  # unit: epic · story · story-set · goal-set · review
+        self.stories = []  # unit: its stories, in group order
+        self.lead = None  # unit: its PM's NodeView
 
     @property
     def icon(self):
@@ -107,6 +122,7 @@ class Canvas:
         # [(child key, [(y, x), ...])]: each hub->spoke edge, hub end first.
         self.edges = []
         self.links = []  # [(y, x0, x1, url)] clickable link text
+        self.keyed = []  # [(key, y, x0, x1)] selectable rows inside a box (agents in a story group)
 
     def ensure(self, y):
         while len(self.rows) <= y:
@@ -175,6 +191,70 @@ class Wrap(list):
     """A line whose segments wrap onto further rows instead of being cut."""
 
 
+class Row(list):
+    """A line that is itself selectable: an agent inside a story group."""
+
+    def __init__(self, segments, key):
+        super().__init__(segments)
+        self.key = key
+
+
+def mark_counts(prs):
+    counts = {}
+    for p in prs:
+        counts[p["mark"]] = counts.get(p["mark"], 0) + 1
+    return counts
+
+
+def mark_line(prs):
+    """`✓a ✗b ⟳c ◌d ●e !f`, nonzero counts only."""
+    counts = mark_counts(prs)
+    return " ".join(f"{m}{counts[m]}" for m in PR_MARKS if counts.get(m))
+
+
+def seat_line(node, spark=None):
+    """Segments for a unit's compact seat line: `◼ <name> · <epic id>  <pm glyph> pm  <n> sc · <PR marks>
+    ⚑<needs>  ✉<held>  <age>  <spark>`. An older unit shows its kind where an epic shows its id."""
+    out = [(f"{node.icon[0]} ", "accent"), (node.name, "selname" if node.selected else "name")]
+    tag = node.ident if node.unit_kind == "epic" else node.unit_kind
+    if tag:
+        out.append((f" · {tag}", "dim"))
+    out.append(("  ", None))
+    if node.lead:
+        out += [(glyph(node.lead.status), "status:" + node.lead.status), (" pm", "dim")]
+    else:
+        out.append(("· no pm", "dim"))
+    out.append((f"  {len(node.stories)} sc", "dim"))
+    counts = mark_counts(node.prs)
+    shown = [m for m in PR_MARKS if counts.get(m)]
+    if shown:
+        out.append((" ·", "dim"))
+        for m in shown:
+            out += [(" ", None), (f"{m}{counts[m]}", MARK_STYLE[m])]
+    if node.flag:
+        out.append((f"  ⚑{node.flag}", "needs"))
+    if node.held:
+        out.append((f"  ✉{node.held}", "accent"))
+    if node.age:
+        out.append((f"  {node.age}", "dim"))
+    if spark and spark.strip():
+        out.append((f"  {spark}", "spark"))
+    return out
+
+
+def pr_segments(prs):
+    """A story group's PRs: `<mark> #<n> [@author]`, wrapping, each label a link."""
+    out = Wrap()
+    for p in prs:
+        if out:
+            out.append(("  ", None))
+        out += [(p["mark"] + " ", MARK_STYLE.get(p["mark"], "dim")), (p["label"], "link" if p["url"] else "name",
+                                                                       p["url"])]
+        if p["author"]:
+            out.append((" @" + p["author"], "dim"))
+    return out
+
+
 def link_line(links):
     out = Wrap()
     for i, (label, url) in enumerate(links[:9]):
@@ -184,11 +264,20 @@ def link_line(links):
     return out
 
 
-def content(node, spark=None, links=None):
+def content(node, spark=None, links=None, title=None):
     """Lines inside a node's box; each is [(text, style[, url])]."""
     glyph_, word = glyph(node.status), STATUS[node.status][1]
     name_style = "selname" if node.selected else "name"
     badge = marks(node)
+    if node.kind == "story":
+        lines = [[(f"{node.icon[0]} {node.name}", "name"), (f" {node.sub}" if node.sub else "", "accent"),
+                  (f"  {badge}" if badge else "", "needs" if node.flag else "accent")]]
+        lines.append(pr_segments(node.prs) if node.prs else [("no PRs", "dim")])
+        for a in node.agents:
+            lines.append(Row(agent_line(a, "selname" if a.selected else "name"), a.key))
+        if not node.agents:
+            lines.append([("(no agent)", "dim")])
+        return lines
     if node.kind == "unit":
         shown = node.agents[:MAX_AGENT_LINES]
         hidden = len(node.agents) > len(shown)
@@ -216,6 +305,8 @@ def content(node, spark=None, links=None):
         head.append((" " + badge, "needs" if node.flag else "accent"))
     detail = ("! " + node.detail) if node.needs else node.detail
     lines = [head, [(detail, "needs" if node.needs else "dim")]]
+    if title:
+        lines.insert(1, [(title, "accent")])
     if links:
         lines.append(link_line(links))
     return lines
@@ -228,27 +319,36 @@ def count_line(counts):
     return " ".join(f"{STATUS[s][0]}{counts[s]}" for s in COUNT_ORDER if counts.get(s))
 
 
-def draw_box(canvas, node, y, x, w, spark=None, tee_top=None, tee_bottom=None, links=None):
+def put_segments(canvas, row, cx, end, segments):
+    """Draw [(text, style[, url])] from column cx, cut at `end`; links are recorded. Returns the next column."""
+    for seg in segments:
+        text, seg_style = seg[0], seg[1]
+        if not text or cx >= end:
+            continue
+        shown = fit(text, end - cx)
+        canvas.put(row, cx, shown, seg_style)
+        if len(seg) > 2 and seg[2]:
+            canvas.links.append((row, cx, cx + len(shown) - 1, seg[2]))
+        cx += len(shown)
+    return cx
+
+
+def draw_box(canvas, node, y, x, w, spark=None, tee_top=None, tee_bottom=None, links=None, title=None):
     tl, h, tr, side, bl, br, tb, tt = BORDERS.get(node.kind, ROUND_BOX)
+    if node.kind == "story":
+        node.selected = any(a.selected for a in node.agents)
     style = _border_style(node)
     inner = w - 2
     lines = []
-    for line in content(node, spark, links):
+    for line in content(node, spark, links, title):
         lines += wrap_segments(line, inner - 2) if isinstance(line, Wrap) else [line]
     canvas.put(y, x, tl + h * inner + tr, style)
     for i, segments in enumerate(lines):
         row = y + 1 + i
         canvas.put(row, x, side + " " * inner + side, style)
-        cx, end = x + 2, x + w - 2
-        for seg in segments:
-            text, seg_style = seg[0], seg[1]
-            if not text or cx >= end:
-                continue
-            shown = fit(text, end - cx)
-            canvas.put(row, cx, shown, seg_style)
-            if len(seg) > 2 and seg[2]:
-                canvas.links.append((row, cx, cx + len(shown) - 1, seg[2]))
-            cx += len(shown)
+        put_segments(canvas, row, x + 2, x + w - 2, segments)
+        if isinstance(segments, Row):
+            canvas.keyed.append((segments.key, row, x + 1, x + w - 2))
     bottom = y + 1 + len(lines)
     canvas.put(bottom, x, bl + h * inner + br, style)
     if tee_top is not None:
@@ -286,6 +386,9 @@ def wrap_segments(segments, width):
 
 
 def spoke_width(spokes, width):
+    if any(s.kind == "story" for s in spokes):
+        longest = max([GROUP_MIN] + [len(a.name) + len(a.detail or "") + 10 for s in spokes for a in s.agents])
+        return max(10, min(GROUP_MAX, longest, width - GUTTER - 1))
     longest = max((len(s.name) + 9 if s.kind != "unit" else max(len(s.name) + 6, 36) for s in spokes),
                   default=SPOKE_MIN)
     return max(10, min(max(SPOKE_MIN, min(SPOKE_MAX, longest)), width - GUTTER - 1))
@@ -296,15 +399,41 @@ def per_row(spokes, width):
     return max(1, (width - GUTTER + GAP) // (bw + GAP))
 
 
-def render_level(hub, spokes, width, spark=None, hub_links=None):
+def render_seat(hub, units, width, spark=None):
+    """The seat level: the seat hub over one compact line per unit, fed by a trunk down the left.
+    Returns (canvas, boxes: key -> (y0, y1, x0, x1)); a unit's box is its line."""
+    spark = spark or {}
+    canvas, boxes = Canvas(width), {}
+    hub_w = min(width - 2, HUB_MAX, max(HUB_MIN, len(hub.name) + 8, len(hub.detail or "") + 6))
+    bottom = draw_box(canvas, hub, 0, 0, hub_w, spark.get(hub.key), tee_bottom=1 if units else None)
+    boxes[hub.key] = (0, bottom, 0, hub_w - 1)
+    path = [(bottom, 1)]
+    for i, unit in enumerate(units):
+        y = bottom + 1 + i
+        canvas.put(y, 1, ("└" if i == len(units) - 1 else "├") + "─", "rail")
+        if unit.selected:
+            canvas.put(y, 3, "▸", "sel")
+        line = seat_line(unit, spark.get(unit.key))
+        if sum(len(seg[0]) for seg in line) > width - 6:
+            line = seat_line(unit)  # the activity cells go first when the line does not fit
+        put_segments(canvas, y, 5, width - 1, line)
+        boxes[unit.key] = (y, y, 3, width - 1)
+        canvas.edges.append((unit.key, path + [(y, 1), (y, 2)]))
+        path = path + [(y, 1)]
+    return canvas, boxes
+
+
+def render_level(hub, spokes, width, spark=None, hub_links=None, hub_title=None):
     """Hub box over its spokes. One row of spokes fans out centered under the hub; more wrap into
-    left-aligned rows fed by a trunk down the left gutter. Returns (canvas, boxes: key -> (y0, y1, x0, x1))."""
+    left-aligned rows fed by a trunk down the left gutter. Story group spokes are not boxes of their own:
+    their agent rows are. Returns (canvas, boxes: key -> (y0, y1, x0, x1))."""
     spark = spark or {}
     canvas, boxes = Canvas(width), {}
     bw = spoke_width(spokes, width)
     n = per_row(spokes, width)
     rows = [spokes[i:i + n] for i in range(0, len(spokes), n)]
-    hub_w = min(width - 2, HUB_MAX, max(HUB_MIN, len(hub.name) + 8, len(hub.detail or "") + 6))
+    hub_w = min(width - 2, HUB_MAX, max(HUB_MIN, len(hub.name) + 8, len(hub.detail or "") + 6,
+                                        len(hub_title or "") + 6))
     single = len(rows) <= 1
     if single:
         row_w = len(spokes) * bw + GAP * max(0, len(spokes) - 1)
@@ -316,7 +445,7 @@ def render_level(hub, spokes, width, spark=None, hub_links=None):
     else:
         hub_x, trunk, first_x = 0, 1, GUTTER
     hub_bottom = draw_box(canvas, hub, 0, hub_x, hub_w, spark.get(hub.key),
-                          tee_bottom=trunk if spokes else None, links=hub_links)
+                          tee_bottom=trunk if spokes else None, links=hub_links, title=hub_title)
     boxes[hub.key] = (0, hub_bottom, hub_x, hub_x + hub_w - 1)
     if not spokes:
         return canvas, boxes
@@ -344,7 +473,8 @@ def render_level(hub, spokes, width, spark=None, hub_links=None):
         for node, c in zip(row, centers):
             x = c - bw // 2
             bottom = draw_box(canvas, node, y + 1, x, bw, spark.get(node.key), tee_top=c)
-            boxes[node.key] = (y + 1, bottom, x, x + bw - 1)
+            if node.kind != "story":
+                boxes[node.key] = (y + 1, bottom, x, x + bw - 1)
             height = max(height, bottom - y)
             step = 1 if c >= trunk else -1
             path = trunk_path + [(y, bx) for bx in range(trunk, c + step, step)] + [(y + 1, c)]
@@ -354,6 +484,8 @@ def render_level(hub, spokes, width, spark=None, hub_links=None):
                 canvas.put(ry, trunk, "│", "rail")
             trunk_path = trunk_path + [(ry, trunk) for ry in range(y, y + height + 1)]
         y += height + 1
+    for key, ry, x0, x1 in canvas.keyed:
+        boxes[key] = (ry, ry, x0, x1)
     return canvas, boxes
 
 

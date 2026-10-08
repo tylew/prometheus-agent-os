@@ -7,9 +7,13 @@
 # MIT License, Copyright (c) 2026 Simone Daniotti.
 from __future__ import annotations
 
+import re
 import time
 
-from .views import STATUS, NodeView, count_line
+from .views import STATUS, NodeView, count_line, mark_line, seat_line
+
+STORY_RE = re.compile(r"\bsc-(\d+)\b")
+PR_NUM_RE = re.compile(r"#(\d+)\b")
 
 TOP_ROLES = ("seat", "librarian")
 CHILD_ROLES = ("planner", "implementor", "reviewer")
@@ -32,6 +36,8 @@ class Tree:
         self.held = 0
         self.counts = {}  # agent status -> n, over every shown agent
         self.needs = 0
+        self.groups = {}  # epic unit key -> [story group NodeViews]
+        self.loose = {}  # epic unit key -> [agent NodeViews tied to no story]
 
 
 def tokens(item):
@@ -80,6 +86,22 @@ def agent_name(pane, tab_label):
     return role
 
 
+def default_repo(prs):
+    """The most common repo among PR refs `owner/repo#n`: its PRs show as `#n`."""
+    repos = [p.partition("#")[0] for p in prs]
+    return max(sorted(set(repos)), key=repos.count) if repos else None
+
+
+def pr_label(ref, default=None):
+    repo, _, num = ref.partition("#")
+    return f"#{num}" if repo == default else ref
+
+
+def pr_url(ref):
+    repo, _, num = ref.partition("#")
+    return f"https://github.com/{repo}/pull/{num}" if repo.count("/") == 1 and num.isdigit() else None
+
+
 def links(t, story_slug=None):
     """[(label, url or None)] for a unit's stories then PRs."""
     out = []
@@ -88,20 +110,84 @@ def links(t, story_slug=None):
         url = f"https://app.shortcut.com/{story_slug}/story/{num}" if story_slug and num.isdigit() else None
         out.append((story, url))
     prs = csv(t.get("prs"))
-    repos = {p.split("#", 1)[0] for p in prs}
+    default = default_repo(prs)
     for pr in prs:
-        repo, _, num = pr.partition("#")
-        label = f"#{num}" if len(repos) == 1 else f"{repo.rsplit('/', 1)[-1]}#{num}"
-        out.append((label, f"https://github.com/{repo}/pull/{num}" if repo.count("/") == 1 and num.isdigit() else None))
+        out.append((pr_label(pr, default), pr_url(pr)))
     return out
 
 
-def build(snap, state=None, own_pane="", here_tab="", now=None, own_workspace="", story_slug=None):
-    """Snapshot + dispatcher state → Tree."""
+def pr_mark(rec, needs=False, teammate=False):
+    """One PR's status mark: ● merged · – closed · ! needs you (an agent on it, or own CI failed) ·
+    ✗ changes requested · ◌ draft · ✓ approved · ⟳ in review / CI · · no record."""
+    if not isinstance(rec, dict) or not rec.get("state"):
+        return "!" if needs else "·"
+    if rec["state"] == "merged":
+        return "●"
+    if rec["state"] == "closed":
+        return "–"
+    if needs or (rec.get("ci") == "fail" and not teammate):
+        return "!"
+    if rec.get("decision") == "CHANGES_REQUESTED":
+        return "✗"
+    if rec.get("draft"):
+        return "◌"
+    if rec.get("decision") == "APPROVED":
+        return "✓"
+    return "⟳"
+
+
+def story_of(text):
+    m = STORY_RE.search(text or "")
+    return f"sc-{m.group(1)}" if m else None
+
+
+def stage_map(val):
+    out = {}
+    for pair in csv(val):
+        story, sep, stage = pair.partition("=")
+        if sep and story.strip():
+            out[story.strip()] = stage.strip()
+    return out
+
+
+def tie(pane, prs, pr_stories, recs):
+    """(story, pr ref) an agent works on now: item / pr tokens, a reviewer's PR → its stories, else its
+    status line; a story's PR is its first open one."""
+    t = tokens(pane)
+    text = t.get("status") or ""
+    story = story_of(t.get("item"))
+    pr = t.get("pr") or None
+    if pr and not story:
+        story = next(iter(pr_stories.get(pr) or []), None)
+    if not story:
+        story = story_of(text)
+    if not pr:
+        for m in PR_NUM_RE.finditer(text):
+            pr = next((r for r in prs if r.endswith("#" + m.group(1))), None)
+            if pr:
+                break
+    if not pr and story:
+        mine = [r for r in prs if story in pr_stories.get(r, [])]
+        live = [r for r in mine if (recs.get(r) or {}).get("state") not in ("merged", "closed")]
+        pr = next(iter(live or mine), None)
+    if pr and not story:
+        story = next(iter(pr_stories.get(pr) or []), None)
+    return story, pr
+
+
+def _dict(val):
+    return val if isinstance(val, dict) else {}
+
+
+def build(snap, state=None, own_pane="", here_tab="", now=None, own_workspace="", story_slug=None, operator=None):
+    """Snapshot + dispatcher state → Tree. `operator` is the operator's GitHub login: another author's PR
+    is a teammate's and shows `@author`."""
     now = time.time() if now is None else now
     state = state if isinstance(state, dict) else {}
-    outbox = state.get("outbox") if isinstance(state.get("outbox"), dict) else {}
-    last_change = state.get("last_change") if isinstance(state.get("last_change"), dict) else {}
+    outbox = _dict(state.get("outbox"))
+    last_change = _dict(state.get("last_change"))
+    cursors = _dict(state.get("cursors"))
+    story_epic = _dict(state.get("story_epic"))
     tree = Tree()
     tree.proposals = [p for p in state.get("proposals") or [] if isinstance(p, dict)]
 
@@ -186,6 +272,8 @@ def build(snap, state=None, own_pane="", here_tab="", now=None, own_workspace=""
         changed = last_change.get(t.get("unit"))
         if isinstance(changed, (int, float)):
             node.age = ago(now - changed)
+        node.lead = tree.nodes[pm["pane_id"]] if pm else None
+        epic_unit(tree, key, node, t, mine, pm, cursors, story_epic, operator)
         add(node, w)
         tree.units.append(key)
         tree.pm[key] = pm["pane_id"] if pm else None
@@ -215,6 +303,89 @@ def build(snap, state=None, own_pane="", here_tab="", now=None, own_workspace=""
     return tree
 
 
+def epic_unit(tree, key, node, t, mine, pm, cursors, story_epic, operator):
+    """A unit's stories, PRs with status marks, agent rows (story · PR now) and, for an epic, its story groups."""
+    prs = csv(t.get("prs"))
+    default = default_repo(prs)
+    recs = {r: _dict(cursors.get("pr:" + r)) for r in prs}
+    pr_stories = {r: [s for s in recs[r].get("stories") or [] if isinstance(s, str)] for r in prs}
+    stories = csv(t.get("stories"))
+    stages = stage_map(t.get("stages"))
+    node.unit_kind = t.get("kind") or ""
+    named = next((_dict(story_epic.get(s)) for s in stories if _dict(story_epic.get(s)).get("name")), {})
+    node.ident = str(t.get("epic") or named.get("id") or "")
+    if node.unit_kind == "epic":
+        node.name = named.get("name") or t.get("unit")
+
+    ties = {p["pane_id"]: tie(p, prs, pr_stories, recs) for p in mine}
+    order = list(stories) + [s for s in stages if s not in stories]
+    for p in mine:
+        s = ties[p["pane_id"]][0]
+        if s and s not in order and tokens(p).get("role") not in ("pm", "planner"):
+            order.append(s)
+    unplaced = []
+    for r in prs:
+        known = [s for s in pr_stories[r] if s in order]
+        if not known and pr_stories[r]:
+            order.append(pr_stories[r][0])
+        elif not pr_stories[r]:
+            unplaced.append(r)
+    node.stories = order
+
+    needs_on = {}
+    for p in mine:
+        pr = ties[p["pane_id"]][1]
+        if pr:
+            needs_on[pr] = needs_on.get(pr, False) or tree.nodes[p["pane_id"]].needs
+    records = {}
+    for r in prs:
+        author = recs[r].get("author") or ""
+        teammate = bool(author) and author != operator
+        records[r] = {"ref": r, "label": pr_label(r, default), "url": pr_url(r), "author": author if teammate else "",
+                      "mark": pr_mark(recs[r], needs_on.get(r, False), teammate), "stories": pr_stories[r]}
+    node.prs = [records[r] for r in prs]
+
+    rank = {s: i for i, s in enumerate(order)}
+    lead = [p for p in mine if p is pm]
+    rest = sorted((p for p in mine if p is not pm),
+                  key=lambda p: rank.get(ties[p["pane_id"]][0], len(rank)))
+    node.rows = [(tree.nodes[p["pane_id"]], ties[p["pane_id"]][0],
+                  pr_label(ties[p["pane_id"]][1], default) if ties[p["pane_id"]][1] else None)
+                 for p in lead + rest]
+
+    if node.unit_kind != "epic":
+        return
+    wid = key.split(":", 1)[1]
+    groups, loose = [], []
+    by_story = {}
+    for s in order:
+        g = NodeView(f"story:{wid}:{s}", s, "story", "idle")
+        g.sub = stages.get(s) or "stage ?"
+        g.prs = [records[r] for r in prs if s in pr_stories[r]]
+        if len(order) == 1:
+            g.prs += [records[r] for r in unplaced]
+        by_story[s] = g
+        groups.append(g)
+    if unplaced and len(order) != 1:
+        g = NodeView(f"story:{wid}:-", "no story", "story", "idle")
+        g.prs = [records[r] for r in unplaced]
+        groups.append(g)
+    for p in rest:
+        s = ties[p["pane_id"]][0]
+        agent = tree.nodes[p["pane_id"]]
+        if tokens(p).get("role") != "planner" and s in by_story:
+            by_story[s].agents.append(agent)
+        else:
+            loose.append(agent)
+    for g in groups:
+        sts = {a.status for a in g.agents}
+        g.status = next((st for st in ("working", "blocked", "idle", "done") if st in sts), "unknown")
+        g.flag = sum(a.needs for a in g.agents)
+        g.held = sum(a.held for a in g.agents)
+    tree.groups[key] = groups
+    tree.loose[key] = loose
+
+
 def seat_node(tree):
     """The system hub: the seat, or a stand-in when no seat is running."""
     if tree.seat:
@@ -238,6 +409,8 @@ def level(tree, path):
     if top in tree.units:
         pm = tree.pm.get(top)
         hub = tree.nodes[pm] if pm else tree.nodes[top]
+        if top in tree.groups:
+            return hub, [a for g in tree.groups[top] for a in g.agents] + tree.loose[top]
         return hub, [tree.nodes[k] for k in tree.workers[top]]
     return None, []
 
@@ -264,22 +437,27 @@ def unit_of(tree, key):
     return next((u for u in tree.units if key == tree.pm.get(u) or key in tree.workers[u]), None)
 
 
+def agent_text(a, lead):
+    return f"{lead}· {a.name} [{STATUS[a.status][1]}]" + (f" — {a.detail}" if a.detail else "")
+
+
+def row_text(a, story, pr):
+    """One agent row of a unit's agent list: name, status, the story and PR it works on now, status line."""
+    bits = [f"{STATUS[a.status][0]} {a.name}"]
+    bits += [v for v in (story, pr) if v]
+    text = "  ".join(bits)
+    return text + (f" — {a.detail}" if a.detail else "")
+
+
 def to_text(tree):
     """Every level as plain indented text (for --dump and tests)."""
     lines = [header_text(tree)]
 
     def row(node, lead):
         glyph, word = STATUS[node.status]
-        if node.kind == "unit":
-            bits = [f"{lead}◼ {node.name}"]
-            if node.sub:
-                bits.append(f"({node.sub})")
-            if node.counts:
-                bits.append(count_line(node.counts))
-        else:
-            bits = [f"{lead}{glyph} {node.name} [{word}]"]
-            if node.needs:
-                bits.append("! needs you")
+        bits = [f"{lead}{glyph} {node.name} [{word}]"]
+        if node.needs:
+            bits.append("! needs you")
         if node.flag and not node.needs:
             bits.append(f"!{node.flag}")
         if node.held:
@@ -289,27 +467,58 @@ def to_text(tree):
         if node.detail:
             bits.append("— " + node.detail)
         lines.append("  ".join(bits))
-        if node.kind == "unit":
-            pad = "   " if lead.startswith("├") else "   "
-            for a in node.agents:
-                lines.append(f"{pad}  · {a.name} [{STATUS[a.status][1]}]" + (f" — {a.detail}" if a.detail else ""))
-            if node.links:
-                lines.append(f"{pad}  ↗ " + "  ".join(label for label, _ in node.links))
 
-    def block(hub, spokes, title=None):
+    def unit_line(node, lead):
+        lines.append(lead + "".join(seg[0] for seg in seat_line(node)))
+        pad = "│    " if lead.startswith("├") else "     "
+        for a, story, pr in node.rows:
+            lines.append(f"{pad}{row_text(a, story, pr)}")
+        if node.links:
+            lines.append(f"{pad}↗ " + "  ".join(label for label, _ in node.links))
+
+    def group(g, lead):
+        lines.append(f"{lead}▣ {g.name} {g.sub}".rstrip())
+        pad = "│    " if lead.startswith("├") else "     "
+        if g.prs:
+            lines.append(pad + "  ".join(f"{p['mark']} {p['label']}" + (f" @{p['author']}" if p["author"] else "")
+                                         for p in g.prs))
+        for a in g.agents:
+            lines.append(agent_text(a, pad))
+        if not g.agents:
+            lines.append(f"{pad}(no agent)")
+
+    def block(hub, spokes, title=None, each=row):
         if title:
             lines.append("")
             lines.append(title)
         row(hub, "")
         for i, s in enumerate(spokes):
-            row(s, "└─ " if i == len(spokes) - 1 else "├─ ")
+            each(s, "└─ " if i == len(spokes) - 1 else "├─ ")
 
-    block(*level(tree, []))
+    block(*level(tree, []), each=unit_line)
     hub, spokes = level(tree, [CONTROL])
     if spokes:
         block(hub, spokes, "[control]")
     for u in tree.units:
-        block(*level(tree, [u]), f"[{tree.nodes[u].name}]")
+        node = tree.nodes[u]
+        if u not in tree.groups:
+            block(*level(tree, [u]), f"[{node.name}]")
+            continue
+        hub, _ = level(tree, [u])
+        lines.append("")
+        lines.append(f"[{node.name}]")
+        row(hub, "")
+        stage = tokens(tree.raw[u]).get("stage")
+        lines.append("   epic " + " · ".join(v for v in (node.name, node.ident) if v) + (f" — {stage}" if stage else ""))
+        if node.prs:
+            lines.append("   PRs " + mark_line(node.prs))
+        spokes = tree.groups[u] + tree.loose[u]
+        for i, s in enumerate(spokes):
+            lead = "└─ " if i == len(spokes) - 1 else "├─ "
+            if s.kind == "story":
+                group(s, lead)
+            else:
+                row(s, lead)
     return "\n".join(lines)
 
 
