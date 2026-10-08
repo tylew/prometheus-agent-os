@@ -53,9 +53,17 @@ class Base(unittest.TestCase):
         self.gh = FakeGitHub()
         self._gh, ev.gh_json = ev.gh_json, self.gh
         self.created = []
+        # epic lookups never reach Shortcut in tests: self.epics maps story → (epic id, name)
+        self.epics = {}
+        self._lookup = ev.lookup_epics
+        ev.lookup_epics = lambda st, ids, fn=None, now=None: [
+            ev.remember_epic(st, i, *self.epics.get(i, ("", ""))) for i in ids]
+        os.environ["PROMETHEUS_EPIC_UNITS"] = "0"  # the old per-unit model, until a test turns epics on
 
     def tearDown(self):
         ev.gh_json = self._gh
+        ev.lookup_epics = self._lookup
+        os.environ.pop("PROMETHEUS_EPIC_UNITS", None)
         os.environ.pop("WORKSPACE", None)
         self.tmp.cleanup()
 
@@ -71,9 +79,9 @@ class Base(unittest.TestCase):
         json.dump(w, open(self.world_path, "w"))
         return ws + ":p1"
 
-    def fake_create(self, st, name, kind, project, stories, prs, scope):
+    def fake_create(self, st, name, kind, project, stories, prs, scope, epic=None):
         import units
-        out = units.create(name, kind, project, stories, prs)
+        out = units.create(name, kind, project, stories, prs, epic=epic)
         self.created.append((name, kind, prs))
         return out["workspace"]
 
@@ -246,6 +254,79 @@ class HandleTest(Base):
         with dispatch.locked_state() as st:
             ev.handle(self.snap(), st, [story], settle_fn=lambda s, state: settled.append((s, state)) or "ok")
         self.assertEqual(settled, [("sc-7", "Completed")])
+
+
+class EpicTest(Base):
+    def setUp(self):
+        super().setUp()
+        os.environ.update(PROMETHEUS_EPIC_UNITS="1", PROMETHEUS_DEFAULT_PROJECT="besstie")
+        self.addCleanup(os.environ.pop, "PROMETHEUS_DEFAULT_PROJECT", None)
+        self.epics = {"sc-5005": ("77", "MISO / Ameren"), "sc-6006": ("77", "MISO / Ameren"), "sc-9009": ("88", "Bugfixes")}
+
+    def snap(self):
+        return dispatch.snapshot()
+
+    def story(self, sid, change="new", state="Backlog State"):
+        return {"kind": "story", "story": sid, "state": state, "change": change, "title": "t",
+                "line": "[prometheus] story %s %s" % (sid, change)}
+
+    def test_review_request_opens_its_epic_unit_with_the_whole_stack(self):
+        self.seat()
+        self.gh.review = ["o/r#2"]
+        self.gh.prs = {"o/r#1": pr(1, "a", "main"), "o/r#2": pr(2, "b", "a", body="sc-5005"), "o/r#3": pr(3, "c", "b")}
+        with dispatch.locked_state() as st:
+            events = ev.poll_github(self.snap(), st)
+            log = ev.handle(self.snap(), st, events, triage_fn=lambda e, s: self.fail("triaged"),
+                            create_fn=self.fake_create)
+        self.assertEqual(self.created, [("epic-77-miso-ameren", "epic", ["o/r#1", "o/r#2", "o/r#3"])])
+        unit = next(w for w in self.world()["workspaces"] if (w.get("tokens") or {}).get("unit") == "epic-77-miso-ameren")
+        self.assertEqual((unit["tokens"]["kind"], unit["tokens"]["epic"]), ("epic", "77"))
+        self.assertIn("opened epic unit", log[0])
+
+    def test_second_story_of_an_epic_routes_to_its_unit(self):
+        with dispatch.locked_state() as st:
+            ev.handle(self.snap(), st, [self.story("sc-5005")], create_fn=self.fake_create)
+            ev.handle(self.snap(), st, [self.story("sc-6006")], create_fn=self.fake_create)
+            ev.handle(self.snap(), st, [self.story("sc-9009")], create_fn=self.fake_create)
+        self.assertEqual([c[0] for c in self.created], ["epic-77-miso-ameren", "epic-88-bugfixes"])
+        unit = next(w for w in self.world()["workspaces"] if (w.get("tokens") or {}).get("epic") == "77")
+        self.assertEqual(unit["tokens"]["stories"], "sc-5005,sc-6006")
+
+    def test_a_story_without_an_epic_goes_to_the_seat_once_then_routes_when_homed(self):
+        seat = self.seat()
+        with dispatch.locked_state() as st:
+            ev.handle(self.snap(), st, [self.story("sc-4004")], create_fn=self.fake_create)
+            ev.handle(self.snap(), st, [self.story("sc-4004", change="Backlog → Ready")], create_fn=self.fake_create)
+            lines = [i["line"] for i in st["outbox"][seat]]
+            self.assertEqual(sum("needs a home" in l for l in lines), 1)
+            self.epics["sc-4004"] = ("77", "MISO / Ameren")
+            st["story_epic"]["sc-4004"]["at"] = 0  # past the recheck window
+            ev.handle(self.snap(), st, [self.story("sc-4004", change="Ready → In Development")], create_fn=self.fake_create)
+        self.assertEqual([c[0] for c in self.created], ["epic-77-miso-ameren"])
+
+    def test_teammate_pr_in_an_open_epic_joins_it(self):
+        with dispatch.locked_state() as st:
+            ev.handle(self.snap(), st, [self.story("sc-5005")], create_fn=self.fake_create)
+            pr_ev = {"kind": "pr", "pr": "o/r#7", "change": "new", "title": "x", "stories": ["sc-6006"],
+                     "source": "owned-paths", "line": "[prometheus] pr o/r#7 new — x"}
+            log = ev.handle(self.snap(), st, [pr_ev], create_fn=self.fake_create, stack_fn=lambda r, c: [r])
+        self.assertEqual(len(self.created), 1)
+        unit = next(w for w in self.world()["workspaces"] if (w.get("tokens") or {}).get("epic") == "77")
+        self.assertEqual((unit["tokens"]["prs"], unit["tokens"]["stories"]), ("o/r#7", "sc-5005,sc-6006"))
+        self.assertEqual(log, [])
+
+    def test_a_failed_epic_open_tells_the_seat_and_retries(self):
+        seat = self.seat()
+        def boom(*a, **k):
+            raise RuntimeError("could not start pm")
+        pr_ev = {"kind": "pr", "pr": "o/r#7", "change": "new", "title": "x", "stories": ["sc-5005"],
+                 "source": "review-requested", "line": "[prometheus] pr o/r#7 new — x"}
+        with dispatch.locked_state() as st:
+            st["cursors"]["pr:o/r#7"] = {"state": "open"}
+            log = ev.handle(self.snap(), st, [pr_ev], create_fn=boom, stack_fn=lambda r, c: [r])
+            self.assertNotIn("pr:o/r#7", st["cursors"])
+            self.assertIn("could not open epic unit", st["outbox"][seat][-1]["line"])
+        self.assertIn("epic open failed", log[0])
 
 
 class ShortcutTest(Base):

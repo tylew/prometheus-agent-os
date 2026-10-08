@@ -175,6 +175,10 @@
             "string",
             "null"
           ]
+        },
+        "default_project": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*$"
         }
       }
     },

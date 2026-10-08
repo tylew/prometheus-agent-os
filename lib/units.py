@@ -22,7 +22,7 @@ import env  # noqa: E402
 import herdr as hz  # noqa: E402
 import registry  # noqa: E402
 
-KINDS = ("story", "story-set", "goal-set", "review")
+KINDS = ("epic", "story", "story-set", "goal-set", "review")  # the four old kinds retire after the fold
 ROLES = ("pm", "planner", "implementor", "reviewer", "librarian", "runner", "configurator")
 READY_STATES = ("idle", "done")
 BUSY_STATES = ("working", "blocked")
@@ -124,9 +124,11 @@ def start(pane_id: str, role: str, name: str, label: str, extra_allow: list[str]
 # ------------------------------------------------------------------- units
 
 def create(name: str, kind: str, project: str, stories: list[str], prs: list[str],
-           brief: str | None = None, claude_args: list[str] | None = None) -> dict:
+           brief: str | None = None, claude_args: list[str] | None = None, epic: str | None = None) -> dict:
     if kind not in KINDS:
         raise ValueError("kind must be one of %s" % ", ".join(KINDS))
+    if (kind == "epic") != bool(epic):
+        raise ValueError("an epic unit needs --epic <id>, and only an epic unit takes one")
     stories, prs = [dispatch.canon_ref("stories", v) for v in stories], [dispatch.canon_ref("prs", v) for v in prs]
     if any(dispatch._tokens(u).get("unit") == name for u in dispatch.units(_snap())):
         raise ValueError("unit %s already exists" % name)
@@ -134,7 +136,7 @@ def create(name: str, kind: str, project: str, stories: list[str], prs: list[str
     ws = _h("workspace", "create", "--label", name, "--cwd", root, "--no-focus", *_env_flags("pm"))
     ws_id = (ws.get("workspace") or ws)["workspace_id"]
     lead = "pm"
-    tag_workspace(ws_id, unit=name, kind=kind, project=project,
+    tag_workspace(ws_id, unit=name, kind=kind, project=project, epic=epic,
                   stories=",".join(stories) or None, prs=",".join(prs) or None,
                   stage="triage")
     pane_id = _first_pane(ws_id)
@@ -171,7 +173,7 @@ def list_units() -> list[dict]:
 
 def set_tokens(workspace_id: str, stage: str | None = None, stories: str | None = None,
                prs: str | None = None, add_stories: list[str] | None = None,
-               add_prs: list[str] | None = None) -> dict:
+               add_prs: list[str] | None = None, story_stages: list[str] | None = None) -> dict:
     """The lead's writer for its unit's stage / stories / prs; never unit, kind or project."""
     unit = dispatch.unit_of_workspace(_snap(), workspace_id)
     if not unit:
@@ -185,8 +187,14 @@ def set_tokens(workspace_id: str, stage: str | None = None, stories: str | None 
         out[key] = ",".join(dict.fromkeys(dispatch.canon_ref(key, v) for v in base + (extra or [])))
     if stage:
         out["stage"] = stage
+    if story_stages:  # `stages` = sc-1=review,sc-2=implement — one stage per story, for the map
+        cur_st = dict(x.split("=", 1) for x in dispatch._csv(cur.get("stages")) if "=" in x)
+        for pair in story_stages:
+            sid, _, val = pair.partition("=")
+            cur_st[dispatch.canon_ref("stories", sid)] = val
+        out["stages"] = ",".join("%s=%s" % kv for kv in cur_st.items())
     if not out:
-        raise ValueError("nothing to set: give --stage, --stories, --prs, --add-story or --add-pr")
+        raise ValueError("nothing to set: give --stage, --story-stage, --stories, --prs, --add-story or --add-pr")
     tag_workspace(workspace_id, **out)
     return {**{k: cur.get(k) for k in ("unit", "stage", "stories", "prs")}, **out}
 
@@ -470,6 +478,7 @@ def main(argv: list[str]) -> int:
     c.add_argument("--stories", default="")
     c.add_argument("--prs", default="")
     c.add_argument("--brief")
+    c.add_argument("--epic", help="Shortcut epic id (kind epic)")
     sub.add_parser("list").add_argument("--json", action="store_true")
     cl = sub.add_parser("close")
     cl.add_argument("workspace")
@@ -515,6 +524,7 @@ def main(argv: list[str]) -> int:
     tk.add_argument("--prs", help="replace: csv")
     tk.add_argument("--add-story", action="append", default=[])
     tk.add_argument("--add-pr", action="append", default=[])
+    tk.add_argument("--story-stage", action="append", default=[], help="sc-N=<stage>; repeatable (the map reads it)")
     rs = sub.add_parser("restore")
     rs.add_argument("--unit", action="append", default=[])
     rs.add_argument("--forget", action="append", default=[], help="drop a unit's image instead; repeatable")
@@ -524,7 +534,7 @@ def main(argv: list[str]) -> int:
     try:
         if a.cmd == "create":
             print(json.dumps(create(a.name, a.kind, a.project, dispatch._csv(a.stories),
-                                    dispatch._csv(a.prs), a.brief)))
+                                    dispatch._csv(a.prs), a.brief, epic=a.epic)))
         elif a.cmd == "list":
             rows = list_units()
             if a.json:
@@ -558,7 +568,7 @@ def main(argv: list[str]) -> int:
             if not unit:
                 raise ValueError("tokens: run from a pane inside a unit workspace (HERDR_PANE_ID)")
             print(json.dumps(set_tokens(unit["workspace_id"], a.stage, a.stories, a.prs,
-                                        a.add_story, a.add_pr)))
+                                        a.add_story, a.add_pr, a.story_stage)))
         elif a.cmd == "control-tabs":
             print("opened: %s" % (", ".join(control_tabs(a.workspace)) or "nothing (both present)"))
         elif a.cmd == "dispatcher-pane":

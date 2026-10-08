@@ -22,7 +22,7 @@ import dispatch  # noqa: E402
 
 STORY_RE = re.compile(r"\bsc[-_ ]?(\d{4,})\b|shortcut\.com/[^/\s]+/story/(\d+)", re.I)
 PR_FIELDS = ("number,title,body,state,isDraft,mergedAt,closedAt,headRefName,baseRefName,"
-             "headRefOid,reviewDecision,latestReviews,comments,statusCheckRollup,url")
+             "headRefOid,reviewDecision,latestReviews,comments,statusCheckRollup,url,author")
 DONE_STATES = ("Completed",)
 DROP_STATES = ("Won't Fix",)
 HEALTH_COOLDOWN = 600
@@ -110,7 +110,10 @@ def fingerprint(pr: dict, ignore: list[str] | None = None) -> dict:
     return {"state": state, "draft": bool(pr.get("isDraft")), "head": pr.get("headRefOid"),
             "ci": ci_state(pr.get("statusCheckRollup")), "decision": pr.get("reviewDecision") or "",
             "review": "%s:%s" % (last.get("author", {}).get("login", ""), last.get("state", "")) if last else "",
-            "review_at": last.get("submittedAt", ""), "comments": len(comments)}
+            "review_at": last.get("submittedAt", ""), "comments": len(comments),
+            # not compared by pr_changes — the map and epic routing read them
+            "stories": stories_in(pr.get("title"), pr.get("body"), pr.get("headRefName")),
+            "author": (pr.get("author") or {}).get("login", "")}
 
 
 def pr_changes(ref: str, old: dict | None, new: dict) -> list[str]:
@@ -287,6 +290,7 @@ SHORTCUT_SCHEMA = {
         "type": "object", "required": ["id", "name", "state"],
         "properties": {"id": {"type": "string", "pattern": "^sc-[0-9]+$"}, "name": {"type": "string"},
                        "state": {"type": "string"}, "epic": {"type": "string"},
+                       "epic_id": {"type": "string", "pattern": "^[0-9]*$"},
                        "updated_at": {"type": "string"}}}}},
 }
 
@@ -339,7 +343,7 @@ def poll_shortcut(snap: dict, st: dict, now: float | None = None) -> list[dict]:
               "each story's name, workflow state and epic; do not fetch those one by one).\n"
               "2. stories-get-by-id for each of these ids the search did not return: %s.\n"
               "Return every story from steps 1–2 once: id as sc-<number>, name, workflow state name, epic name, "
-              "updated_at." % (since, ", ".join(s.split("-")[1] for s in fetch) or "none"))
+              "epic_id (the epic's numeric id; empty when the story has no epic), updated_at." % (since, ", ".join(s.split("-")[1] for s in fetch) or "none"))
     mcp = {"shortcut": {"type": "http", "url": os.environ.get("SHORTCUT_MCP_URL", "https://mcp.shortcut.com/mcp")}}
     result = claude_json(prompt, SHORTCUT_SCHEMA, mcp=mcp, allowed=SHORTCUT_READ_TOOLS,
                          budget=0.10 + 0.04 * len(fetch))  # ~$0.02 per turn measured; one turn per fetched id
@@ -347,6 +351,7 @@ def poll_shortcut(snap: dict, st: dict, now: float | None = None) -> list[dict]:
     st["cursors"]["shortcut:since"] = time.strftime("%Y-%m-%d", time.gmtime(now))
     events, fresh = [], 0
     for s in result.get("stories", []):
+        remember_epic(st, s["id"], s.get("epic_id", ""), s.get("epic", ""), now)
         key = "story:" + s["id"]
         old = st["cursors"].get(key)
         if old is None and s["id"] not in held:
@@ -364,6 +369,65 @@ def poll_shortcut(snap: dict, st: dict, now: float | None = None) -> list[dict]:
                        "title": s.get("name", ""), "epic": s.get("epic", ""),
                        "line": "[prometheus] story %s %s — %s" % (s["id"], change, s.get("name", ""))})
     return events
+
+
+# -------------------------------------------------------------------- epics
+
+EPIC_SCHEMA = {
+    "type": "object", "required": ["stories"],
+    "properties": {"stories": {"type": "array", "items": {
+        "type": "object", "required": ["id", "epic_id"],
+        "properties": {"id": {"type": "string", "pattern": "^sc-[0-9]+$"},
+                       "epic_id": {"type": "string", "pattern": "^[0-9]*$"}, "epic": {"type": "string"}}}}},
+}
+EPIC_LOOKUP_PER_TICK = int(os.environ.get("PROMETHEUS_EPIC_LOOKUPS", 6))
+NO_EPIC_RECHECK = 1800  # a story found without an epic is looked up again after this long (it may be homed)
+
+
+def remember_epic(st: dict, story: str, epic_id: str, epic_name: str, now: float | None = None) -> None:
+    st.setdefault("story_epic", {})[story] = {"id": epic_id or "", "name": epic_name or "", "at": int(now or time.time())}
+
+
+def lookup_epics(st: dict, stories: list[str], fn=None, now: float | None = None) -> None:
+    """One batched read-only Shortcut lookup for stories whose epic is not cached (or was empty a while ago)."""
+    now = now or time.time()
+    cache = st.setdefault("story_epic", {})
+    need = [s for s in dict.fromkeys(stories)
+            if s not in cache or (not cache[s]["id"] and now - cache[s].get("at", 0) > NO_EPIC_RECHECK)]
+    need = need[:EPIC_LOOKUP_PER_TICK]
+    if not need:
+        return
+    fn = fn or (lambda ids: claude_json(
+        "Read-only Shortcut lookup. Call stories-get-by-id once for each of these ids and nothing else: %s. "
+        "Return each as id sc-<number>, epic_id (the epic's numeric id; empty when none), epic (its name)."
+        % ", ".join(i.split("-")[1] for i in ids), EPIC_SCHEMA,
+        mcp={"shortcut": {"type": "http", "url": os.environ.get("SHORTCUT_MCP_URL", "https://mcp.shortcut.com/mcp")}},
+        allowed=["mcp__shortcut__stories-get-by-id"], budget=0.06 + 0.03 * len(ids)))
+    for row in fn(need).get("stories", []):
+        remember_epic(st, row["id"], row.get("epic_id", ""), row.get("epic", ""), now)
+
+
+def epic_of(st: dict, stories: list[str]) -> tuple[str, str] | None:
+    for s in stories:
+        e = st.get("story_epic", {}).get(s)
+        if e and e["id"]:
+            return e["id"], e["name"]
+    return None
+
+
+def epic_unit_name(epic_id: str, epic_name: str) -> str:
+    slug = re.sub(r"[^a-z0-9]+", "-", (epic_name or "").lower()).strip("-")
+    return ("epic-%s-%s" % (epic_id, "-".join(slug.split("-")[:4]))).strip("-")[:40].strip("-")
+
+
+def default_project() -> str | None:
+    if os.environ.get("PROMETHEUS_DEFAULT_PROJECT"):
+        return os.environ["PROMETHEUS_DEFAULT_PROJECT"]
+    try:
+        import registry
+        return ((registry.workspace_config() or {}).get("trackers", {}).get("shortcut") or {}).get("default_project")
+    except Exception:  # noqa: BLE001 — no registry: the seat is asked instead
+        return None
 
 
 # ------------------------------------------------------------------- triage
@@ -444,20 +508,23 @@ def _brief(unit: str, kind: str, project: str, stories: list[str], prs: list[str
     os.makedirs(d, exist_ok=True)
     path = os.path.join(d, "%s.md" % unit)
     with open(path, "w") as fh:
+        epic_file = ("\n## Your epic file\n%s — your working record (per story: stage, PRs, open threads, waits, "
+                     "decisions sent). Read it first; write it at every handoff.\n"
+                     % os.path.join(dispatch.state_dir(), "epics", "%s.md" % unit) if kind == "epic" else "")
         fh.write("---\nunit: %s\nkind: %s\nproject: %s\nstories: [%s]\nprs: [%s]\n---\n\n"
                  "# Unit: %s\n\n## Scope\n%s\n\n## Operator-defined behavior\n"
                  "Read each story's Scenarios on Shortcut; they are the behavior. None stated → ask the seat.\n\n"
                  "## Report to\nThe seat, at each gate crossing or blocker (`send.sh --role seat`). Keep this "
-                 "workspace's `stage`, `stories` and `prs` tokens current.\n"
-                 % (unit, kind, project, ", ".join(stories), ", ".join(prs), unit, scope))
+                 "workspace's `stage`, `stages`, `stories` and `prs` tokens current.\n%s"
+                 % (unit, kind, project, ", ".join(stories), ", ".join(prs), unit, scope, epic_file))
     return path
 
 
 def create_unit(st: dict, name: str, kind: str, project: str, stories: list[str], prs: list[str],
-                scope: str) -> str:
+                scope: str, epic: str | None = None) -> str:
     import units
     brief = _brief(name, kind, project, stories, prs, scope)
-    out = units.create(name, kind, project, stories, prs)
+    out = units.create(name, kind, project, stories, prs, epic=epic)
     dispatch.enqueue(st, out["pane"], "Read your brief at %s and begin." % brief, unit=name)
     return out["workspace"]
 
@@ -466,10 +533,12 @@ def _subject(ev: dict) -> str:
     return ev.get("pr") or ev.get("story") or ""
 
 
-def handle(snap: dict, st: dict, events: list[dict], triage_fn=triage, create_fn=create_unit,
-           settle_fn=None, stack_fn=pr_stack) -> list[str]:
+def handle(snap: dict, st: dict, events: list[dict], triage_fn=triage, create_fn=None,
+           settle_fn=None, stack_fn=pr_stack, lookup_fn=None) -> list[str]:
     """Route matched events, triage the rest, act on the verdict. Returns log lines."""
     log, cache = [], {}
+    create_fn = create_fn or create_unit
+    lookup_fn = lookup_fn or (lambda st_, ids: lookup_epics(st_, ids))
     pending = dispatch.pending_restore(snap, st)
     lost = _guard_tokens_lost(snap) + sorted(pending)
     only = os.environ.get("PROMETHEUS_FILTER")
@@ -497,7 +566,17 @@ def handle(snap: dict, st: dict, events: list[dict], triage_fn=triage, create_fn
             st.setdefault("restore_backlog", {}).setdefault(owner, []).append(ev["line"])
             log.append("held for restore of %s: %s" % (owner, subject))
             continue
+        ev_stories = list(dict.fromkeys(filter(None, [ev.get("story"), *ev.get("stories", [])])))
         hits = dispatch.match_units(snap, ev)
+        if not hits and ev_stories:
+            try:
+                lookup_fn(st, ev_stories)
+            except (RuntimeError, ValueError, OSError) as exc:
+                log.append("epic lookup failed: %s" % exc)
+            epic = epic_of(st, ev_stories)
+            if epic:
+                ev["epic"], ev["epic_name"] = epic
+                hits = [u for u in dispatch.units(snap) if dispatch._tokens(u).get("epic") == epic[0]]
         if len(hits) > 1:
             names = ",".join(dispatch._tokens(u)["unit"] for u in hits)
             _to_seat(snap, st, "[prometheus] conflict: %s is claimed by %s — routing paused; which unit owns it?"
@@ -507,14 +586,28 @@ def handle(snap: dict, st: dict, events: list[dict], triage_fn=triage, create_fn
         if hits:
             unit = hits[0]
             label = dispatch._tokens(unit)["unit"]
-            if ev["kind"] == "pr" and ev["pr"] not in dispatch._csv(dispatch._tokens(unit).get("prs")):
-                _append_token(unit, "prs", ev["pr"])
+            if ev["kind"] == "pr":
+                for ref in ev.get("stack") or [ev["pr"]]:
+                    if ref not in dispatch._csv(dispatch._tokens(unit).get("prs")):
+                        _append_token(unit, "prs", ref)
+            for sid in ev_stories:
+                if sid not in dispatch.token_list(dispatch._tokens(unit), "stories"):
+                    _append_token(unit, "stories", sid)
             target = dispatch.route(snap, {"unit": label, "role": "pm"})
             dispatch.enqueue(st, target, ev["line"], details=ev, unit=label)
             continue
-        if ev.get("change") != "new" or any(p["id"] == subject for p in st["proposals"]):
+        homing = subject in st.get("homing", [])
+        if (ev.get("change") != "new" and not homing) or any(p["id"] == subject for p in st["proposals"]):
             continue  # seen before and not in a unit: already triaged (ignored, proposed or declined)
         if ev["kind"] == "story" and ev["state"] in DONE_STATES + DROP_STATES:
+            continue
+        if ev.get("epic"):
+            if homing:
+                st["homing"].remove(subject)
+            log.append(open_epic(snap, st, ev, ev_stories, lost, create_fn))
+            continue
+        if epic_units_on():
+            log.append(home_once(snap, st, ev, ev_stories))
             continue
         verdict = review_verdict(ev)
         if verdict is None:
@@ -531,6 +624,53 @@ def handle(snap: dict, st: dict, events: list[dict], triage_fn=triage, create_fn
             continue
         log.append(act(snap, st, ev, verdict, lost, create_fn))
     return log
+
+
+def epic_units_on() -> bool:
+    return os.environ.get("PROMETHEUS_EPIC_UNITS", "1") == "1"
+
+
+def open_epic(snap: dict, st: dict, ev: dict, stories: list[str], lost: list[str], create_fn) -> str:
+    """The first event in an epic with no unit opens one — no proposal (operator decision 2026-10-08)."""
+    epic_id, epic_name = ev["epic"], ev.get("epic_name", "")
+    name = epic_unit_name(epic_id, epic_name)
+    project = repo_projects().get(split_ref(ev["pr"])[0]) if ev["kind"] == "pr" else default_project()
+    if not project:
+        return home_once(snap, st, ev, stories, why="no project for epic %s (set trackers.shortcut.default_project)"
+                         % epic_id)
+    if lost:
+        _to_seat(snap, st, "[prometheus] epic %s (%s) has new work (%s) but units await restore or carry no "
+                 "tokens (%s) — opening held" % (epic_name or epic_id, name, _subject(ev), ",".join(lost)))
+        return "epic open held %s" % name
+    prs = list(ev.get("stack") or ([ev["pr"]] if ev.get("pr") else []))
+    review = ev["kind"] == "pr" and ev.get("source") in REVIEW_SOURCES
+    scope = ("Epic %s (%s): every story and PR in it is yours — the operator's stories through the full lifecycle, "
+             "teammates' PRs through the review loop. Opened by: %s%s."
+             % (epic_name or "?", epic_id, ev["line"].replace("[prometheus] ", ""),
+                "" if not review else (" (review requested from the operator)" if ev.get("source") == "review-requested"
+                                       else " (review not requested: it touches the operator's owned paths — say so "
+                                            "in each review body and post COMMENT unless Critical/High stand)")))
+    try:
+        ws = create_fn(st, name, "epic", project, stories, prs, scope, epic=epic_id)
+    except (RuntimeError, ValueError) as exc:
+        if ev["kind"] == "pr":
+            st["cursors"].pop("pr:" + ev["pr"], None)  # seen again next tick
+        _to_seat(snap, st, "[prometheus] could not open epic unit %s: %s — retrying next tick" % (name, str(exc)[:200]))
+        return "epic open failed %s: %s" % (name, exc)
+    return "opened epic unit %s (%s) for %s" % (name, ws, _subject(ev))
+
+
+def home_once(snap: dict, st: dict, ev: dict, stories: list[str], why: str | None = None) -> str:
+    """No epic (or no story) → the seat, once per subject, to home it; it routes once it has one."""
+    subject = _subject(ev)
+    asked = st.setdefault("homing", [])
+    if subject in asked:
+        return "homing pending %s" % subject
+    asked.append(subject)
+    why = why or ("story %s has no epic" % ", ".join(stories) if stories else "PR has no story")
+    _to_seat(snap, st, "[prometheus] needs a home — %s: %s. Home it in an epic (planner or a PM sets it); it "
+             "routes to that epic's unit on its next change." % (why, ev["line"].replace("[prometheus] ", "")))
+    return "homing %s: %s" % (subject, why)
 
 
 def _imaged_owner(pending: dict, ev: dict) -> str | None:
