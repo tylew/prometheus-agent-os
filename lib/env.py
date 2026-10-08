@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # ---
 # name: env
-# description: Resolve the workspace root once for every prometheus script — $WORKSPACE if set, else the git toplevel holding this plugin's directory (the plugin is its own repository inside the workspace checkout), else the git toplevel of the cwd — never the plugin repo itself. Exit 1 with empty stdout when unresolvable.
+# description: Resolve the workspace root once for every prometheus script — $WORKSPACE if set, else the git toplevel holding this plugin's directory (the plugin is its own repository inside the workspace checkout), else the git toplevel of the cwd — never the plugin repo itself; and the state dir, realpath of $PROMETHEUS_STATE_DIR or ~/.local/state/prometheus (state_dir()). Exit 1 with empty stdout when unresolvable.
 # usage: env.py [workspace]
 # ---
 from __future__ import annotations
@@ -37,6 +37,11 @@ def workspace_root(cwd: str | None = None) -> str | None:
     if top and os.path.realpath(top) == os.path.realpath(PLUGIN_ROOT):
         return None  # never mistake the plugin repo for the workspace
     return top
+
+
+def state_dir() -> str:
+    """The prometheus state dir, resolved: Claude Code never matches a path rule spelled through a symlink."""
+    return os.path.realpath(os.environ.get("PROMETHEUS_STATE_DIR") or os.path.expanduser("~/.local/state/prometheus"))
 
 
 def main(argv: list[str]) -> int:

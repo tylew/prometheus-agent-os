@@ -20,6 +20,7 @@ import time
 LIB = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if LIB not in sys.path:
     sys.path.insert(0, LIB)
+import env  # noqa: E402
 import herdr  # noqa: E402
 
 from . import activity, model, screen, views  # noqa: E402
@@ -48,7 +49,7 @@ CONTROL_CHARS = {"\n": "enter", "\r": "enter", "\t": "tab", "\x1b": "esc", "\x7f
 
 
 def state_dir():
-    return os.environ.get("PROMETHEUS_STATE_DIR") or os.path.expanduser("~/.local/state/prometheus")
+    return env.state_dir()
 
 
 def load_state():

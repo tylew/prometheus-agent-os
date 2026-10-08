@@ -17,6 +17,7 @@ import sys
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import env  # noqa: E402
 import herdr as hz  # noqa: E402
 
 SAFE_STATES = ("idle", "done", "working")
@@ -31,7 +32,7 @@ INLINE_LIMIT = 400
 # ------------------------------------------------------------------------ state
 
 def state_dir() -> str:
-    d = os.environ.get("PROMETHEUS_STATE_DIR") or os.path.expanduser("~/.local/state/prometheus")
+    d = env.state_dir()
     os.makedirs(d, exist_ok=True)
     return d
 

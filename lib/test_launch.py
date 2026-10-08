@@ -112,7 +112,13 @@ class StateDirTest(unittest.TestCase):
             old = os.environ.get("PROMETHEUS_STATE_DIR")
             os.environ["PROMETHEUS_STATE_DIR"] = alias
             try:
-                self.assertEqual(os.path.realpath(dispatch.state_dir()), resolved)
+                import kb
+                import registry
+                for mod in (env, dispatch, kb, registry):
+                    self.assertEqual(mod.state_dir(), resolved, mod.__name__)
+                out = subprocess.run([sys.executable, os.path.join(LIB, "kb.py"), "proposal-path", "x"],
+                                     capture_output=True, text=True, env=dict(os.environ))
+                self.assertEqual(out.stdout.strip(), os.path.join(resolved, "kb-proposals", "x.json"), out.stderr)
             finally:
                 if old is None:
                     del os.environ["PROMETHEUS_STATE_DIR"]

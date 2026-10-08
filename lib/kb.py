@@ -38,7 +38,7 @@ def today() -> str:
 
 
 def state_dir() -> str:
-    d = os.environ.get("PROMETHEUS_STATE_DIR") or os.path.expanduser("~/.local/state/prometheus")
+    d = env.state_dir()
     os.makedirs(d, exist_ok=True)
     return d
 
