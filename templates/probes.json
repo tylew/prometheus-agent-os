@@ -100,6 +100,10 @@
           "cmd": "gt submit --draft --no-interactive",
           "live": false
         },
+        {
+          "cmd": "gt submit --draft --no-edit --update-only",
+          "live": false
+        },
         "Write({wt}/voltuspy/brightfield-besstie/x.py)",
         "Edit({wt}/voltuspy/brightfield-besstie/x.py)",
         "Read({workspace}/CLAUDE.md)",
@@ -120,6 +124,11 @@
         },
         "gt merge",
         "gt submit --publish",
+        "gt submit --draft --no-edit --publish",
+        "gt submit --draft --no-edit -p",
+        "gt submit --draft -np",
+        "gt submit --draft -up",
+        "gt submit --no-edit --update-only",
         "gh pr merge 1",
         "gh pr ready 1",
         "git push --force origin HEAD",
