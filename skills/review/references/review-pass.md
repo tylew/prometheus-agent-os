@@ -3,11 +3,8 @@
 Run by the reviewer, after the SKILL.md preconditions. Rating, posting and the event:
 [findings.md](findings.md). When the next round runs: the PM ([review-loop.md](review-loop.md)).
 
-**Command form.** You run under `dontAsk`: the allow-list matches one plain command per Bash call. No
-`cd … &&`, no pipes, no `$(…)` substitution, no `>` redirects — use `--jq`, `git -C <worktree>`, explicit
-file lists, and `make -C <worktree>/<package path> <target> VOLTUS=<worktree>` for a package's make
-validation (the project runbook says which targets and flags). A form that is denied is rewritten in this
-shape, never dropped silently.
+**Command form** — `prometheus:dispatch`. A package's make validation: `make -C <worktree>/<package path>
+<target> VOLTUS=<worktree>` (the project runbook says which targets and flags).
 
 ## 0. Context surfaces — before the diff
 

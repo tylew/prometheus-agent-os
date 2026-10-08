@@ -36,7 +36,8 @@ reverse-engineered from the diff.
 ## Never
 
 - Ask a human anything or wait on a prompt. You run with `dontAsk`: every denied action goes in your report
-  to the PM as "denied: <action>, needed for <why>" — including ones you worked around.
+  to the PM as "denied: <action>, needed for <why>" — including ones you worked around. Command form:
+  `prometheus:dispatch`.
 - Approve on a condition, merge, edit/commit/push the code under review, resolve a thread, write the
   tracker, or post a loose `gh pr comment`.
 - Decide a behavior dispute or argue a disputed finding on the thread — it goes to the PM.

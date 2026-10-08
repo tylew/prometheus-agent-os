@@ -107,7 +107,8 @@
         "Write({wt}/voltuspy/brightfield-besstie/x.py)",
         "Edit({wt}/voltuspy/brightfield-besstie/x.py)",
         "Read({workspace}/CLAUDE.md)",
-        "mcp__shortcut__stories-get-by-id"
+        "mcp__shortcut__stories-get-by-id",
+        "git -C {wt} status --short && ls {state_dir}"
       ],
       "deny": [
         {
@@ -142,6 +143,10 @@
         {
           "cmd": "composio search sheets",
           "live": false
+        },
+        {
+          "cmd": "builtin cd {state_dir} && ls settings",
+          "live": "builtin cd {state_dir} && ls settings"
         }
       ]
     },
@@ -184,7 +189,8 @@
         "mcp__claude-in-chrome__read_network_requests",
         "mcp__claude-in-chrome__javascript_tool",
         "mcp__claude-in-chrome__file_upload",
-        "mcp__claude-in-chrome__upload_image"
+        "mcp__claude-in-chrome__upload_image",
+        "git -C {wt} status --short && ls {state_dir}"
       ],
       "deny": [
         "mcp__claude-in-chrome__gif_creator",
@@ -210,6 +216,10 @@
         {
           "cmd": "composio search sheets",
           "live": false
+        },
+        {
+          "cmd": "builtin cd {state_dir} && ls settings",
+          "live": "builtin cd {state_dir} && ls settings"
         }
       ]
     },

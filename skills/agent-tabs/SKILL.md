@@ -15,7 +15,7 @@ close-tab.sh <workspace-id> <label>
 
 - **Worktree first** — create the item's worktree completely (branch, `gt track`, the project's worktree
   setup such as the `js/node_modules` link — `branching`) before `open-tab.sh --worktree <abs>`. The tab
-  starts in that worktree, so the implementor's plain `git` / `gt` act on it; it cannot `cd` or `git -C`.
+  starts in that worktree, so the implementor's plain `git` / `gt` act on it.
 - **Labels** — `impl-<item-slug>`, `review-<pr#>`, `validate-<pr#>` (a reviewer on `templates/validate-brief.md`), `planner` (one per unit, opened when it needs stories). Labels may repeat across units; routing uses pane ids.
 - **Launch** — `herdr agent start` with `lib/launch.sh <role> --args`: merged settings (other workflow plugins off
   for the session), `--name <label>`, and for implementor / reviewer `--permission-mode dontAsk` with

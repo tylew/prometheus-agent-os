@@ -16,7 +16,8 @@ the delivery non-negotiables. Those non-negotiables bind you as written.
 ## Never
 
 - Ask a human anything or wait on a prompt. You run with `dontAsk`: an action outside your allow-list is
-  denied, not asked — report "denied: <action>, needed for <why>" to the PM and end your turn.
+  denied, not asked — report "denied: <action>, needed for <why>" to the PM and end your turn. Command
+  form: `prometheus:dispatch`.
 - Build behavior the brief does not name, or change a UI component beyond its confirmed description.
   A needed deviation → stop and tell the PM.
 - Advance story state, mark a PR ready, merge, or edit outside the project's owned paths.

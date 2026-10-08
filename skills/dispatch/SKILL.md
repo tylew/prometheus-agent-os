@@ -61,6 +61,12 @@ outbox. **The librarian** gets one batch per turn: held while it works, `/clear`
 `send.sh` and `report.sh` are on every agent's PATH. Call them bare, one command per Bash call — never
 `cd … &&`, chained or by relative path; the depth-3 allow-lists match only `send.sh …` / `report.sh …`.
 
+**Command form (dontAsk roles).** Never `cd` — after `builtin cd` every relative path or `git` is denied,
+a relative `cd` too, and the tab already starts in its worktree. Elsewhere: `git -C <abs>` and absolute paths. `&&` / `;` and
+pipes into `grep` / `head` / `wc` pass when every part is allowed. Files outside the worktree (plugin
+skills, briefs) → the Read tool, not `cat`. No `$(…)`, no `awk`. A denied form is rewritten in this shape,
+never dropped silently.
+
 ```
 send.sh --role pm "<one line>"                  to your own unit's lead
 send.sh --role planner --unit <label> "<line>"  to another unit's role
