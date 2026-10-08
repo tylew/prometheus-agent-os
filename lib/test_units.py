@@ -37,7 +37,7 @@ class UnitsTest(unittest.TestCase):
         self.assertEqual(pane["tokens"], {"role": "pm"})
         self.assertIn("--agent prometheus:project-manager", pane["ran"])
         self.assertIn("--name pm", pane["ran"])
-        self.assertEqual(pane["agent_name"], "sc-1-a-%s" % pane["pane_id"].replace(":", "-").lower())
+        self.assertEqual(pane["agent_name"], "pm-%s" % pane["pane_id"].replace(":", "-").lower())
         long = units.herdr_name("review-43649-let-users-enter-plc-and", "w1F:p1")
         self.assertEqual((long, len(long) <= 32), ("review-43649-let-users-en-w1f-p1", True))
         self.assertTrue(units.herdr_name("9-x", "w1:p2")[0].isalpha())

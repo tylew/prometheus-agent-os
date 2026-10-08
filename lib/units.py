@@ -103,11 +103,11 @@ def herdr_name(name: str, pane_id: str) -> str:
     return out if out[0].isalpha() else "p" + out[:31]
 
 
-def start(pane_id: str, role: str, name: str, label: str, extra_allow: list[str] | None = None,
+def start(pane_id: str, role: str, label: str, extra_allow: list[str] | None = None,
           claude_args: list[str] | None = None) -> None:
     """Start the role's Claude in a shell pane; returns when Herdr sees it ready for input."""
     args = launch_args(role, extra_allow, ["--name", label, *(claude_args or [])])
-    agent_name = herdr_name(name, pane_id)
+    agent_name = herdr_name(label, pane_id)  # Herdr's sidebar shows this name: the tab's label, not the unit's
     for attempt in range(6):
         try:
             hz.start_agent(agent_name, pane_id, args)
@@ -147,7 +147,7 @@ def create(name: str, kind: str, project: str, stories: list[str], prs: list[str
     _h("tab", "rename", tab_id, lead)
     tag_pane(pane_id, role=lead)
     try:
-        start(pane_id, lead, name, lead, claude_args=claude_args)
+        start(pane_id, lead, lead, claude_args=claude_args)
     except RuntimeError:
         _h("workspace", "close", ws_id)  # no half-made unit: the caller reports and the next tick retries
         raise
@@ -235,7 +235,7 @@ def open_tab(workspace_id: str, label: str, role: str, item: str | None = None,
     unit = dispatch.unit_of_workspace(_snap(), workspace_id)
     if worktree and unit:
         link_worktree(worktree, dispatch._tokens(unit).get("project", ""))
-    start(pane_id, role, unit_name(unit) if unit else "prometheus", label, extra_allow, claude_args)
+    start(pane_id, role, label, extra_allow, claude_args)
     return pane_id
 
 
@@ -380,7 +380,7 @@ def restore_unit(name: str, record: dict) -> dict:
                           if p["pane_id"] == pane_id)
             _h("tab", "rename", tab_id, label)
             tag_pane(pane_id, role=role, **extra)
-            start(pane_id, role, name, label, claude_args=["--resume", session])
+            start(pane_id, role, label, claude_args=["--resume", session])
             first = False
         else:
             open_tab(ws_id, label, role, claude_args=["--resume", session], **extra)
@@ -444,7 +444,7 @@ def respawn(pane_id: str, force: bool = False, timeout: float = 30) -> str:
             hz.call("agent", "send-keys", pane_id, "ctrl+c", "ctrl+c")
             keys_at = time.time() + 5
         time.sleep(1)
-    start(pane_id, role, unit_name(unit) if unit else "prometheus", label,
+    start(pane_id, role, label,
           claude_args=["--resume", session, "--system-prompt-snapshot", "off"])
     return "respawned %s (%s) on session %s" % (label, pane_id, session)
 

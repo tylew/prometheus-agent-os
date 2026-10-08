@@ -817,7 +817,7 @@ def health(snap: dict, st: dict, now: float | None = None) -> list[str]:
             continue
         st["restarts"][label] = int(now)
         if panes:
-            units.start(panes[0]["pane_id"], lead, label, lead, claude_args=["--resume", sid])
+            units.start(panes[0]["pane_id"], lead, lead, claude_args=["--resume", sid])
             log.append("resumed %s in %s (session %s)" % (lead, panes[0]["pane_id"], sid))
         else:
             pane = units.open_tab(u["workspace_id"], lead, lead, claude_args=["--resume", sid])
@@ -828,7 +828,7 @@ def health(snap: dict, st: dict, now: float | None = None) -> list[str]:
         if p.get("agent") or now - last < HEALTH_COOLDOWN:
             continue
         st["restarts"]["librarian"] = int(now)
-        units.start(p["pane_id"], "librarian", "prometheus", "librarian")  # stateless: always fresh
+        units.start(p["pane_id"], "librarian", "librarian")  # stateless: always fresh
         log.append("restarted librarian in %s" % p["pane_id"])
     return log
 
