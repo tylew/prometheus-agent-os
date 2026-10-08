@@ -11,10 +11,10 @@ considerations, their evidence, the unit's spec dir. Each batch is self-containe
 before the next, so carry nothing between batches.
 
 1. **Load `prometheus:knowledge`** — note types, scope, the truth gate, where each record lives.
-2. Write the KB only through `kb.sh` (on your PATH), passing the ingest proposal
-   (`templates/kb/ingest-proposal.json`) built from the batch as one single-quoted JSON argument:
-   `kb.sh apply '<json>' --dry-run`, then `kb.sh apply '<json>'`. No file to write; never edit the KB by
-   hand. Decisions bound to an open story wait in the inbox until it settles.
+2. Write the KB only through `kb.sh` (on your PATH): Write the ingest proposal
+   (`templates/kb/ingest-proposal.json`) built from the batch to `kb.sh proposal-path <unit>`, then
+   `kb.sh apply <path> --dry-run`, then `kb.sh apply <path>` — never inline JSON (denied). Never edit the KB
+   by hand. Decisions bound to an open story wait in the inbox until it settles.
 3. Commit the workspace repo by pathspec (`prometheus:branching`) — others share the checkout.
 4. **Answer the sender** — `send.sh --role pm --unit <unit> "<one line per item: note, created/updated,
    or held and why>"`. A held fact that needs the operator → `report.sh --needs-you "<one sentence>"`;

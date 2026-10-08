@@ -38,7 +38,7 @@ spec's `grounded_by` points at the decisions it rests on.
 ```
 kb.sh resolve "<mention>" [--type T]         one slug, or the candidates (exit 1)
 kb.sh search  [--type] [--scope] [--text] [--edge] [--links-to <slug>] [--orphans]
-kb.sh apply '<proposal json>' --dry-run      always first; then without --dry-run (a file path works too)
+kb.sh apply <proposal-path file> --dry-run   always first; then without --dry-run (never inline JSON: denied)
 kb.sh inbox [list | confirm <id> [--as <slug>] | drop <id>]
 kb.py check                                  schema, dangling edges, name collisions, facts without refs
 ```

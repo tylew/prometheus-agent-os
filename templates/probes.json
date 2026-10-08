@@ -256,6 +256,12 @@
     "librarian": {
       "allow": [
         "{workspace}/.claude/prometheus/projects/besstie/scratch-test.sh {wt}",
+        "Write({state_dir}/kb-proposals/x.json)",
+        {
+          "cmd": "kb.sh apply {state_dir}/kb-proposals/x.json --dry-run",
+          "live": "kb.sh apply {state_dir}/kb-proposals/none.json --dry-run",
+          "why": "a long inline JSON argument is denied by Claude Code's own command check whatever the allow rule (review-43740, review-43743) — proposals go through a file"
+        },
         {
           "cmd": "kb.sh search transmission",
           "live": "kb.sh --help"
@@ -279,6 +285,7 @@
           "live": "cd {wt} && git status"
         },
         "Edit({workspace}/docs/x.md)",
+        "Write({workspace}/docs/kb/x.md)",
         "git add docs",
         "git push",
         "gt sync",
