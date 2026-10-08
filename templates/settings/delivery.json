@@ -1,0 +1,51 @@
+{
+  "$comment": "Shared base for the delivery roles (pm, implementor, reviewer): a role file opts in with \"extends\": [\"delivery\"] and lib/launch.sh merges launch.json → this → the role (lists add up). Holds the reads all three need, the review artifact write under {state_dir}/reviews/, and the PR conversation read (gh api …/issues/*/comments) — read-only: every write form on an issues path is denied. A rule lives here or in a role file, never both.",
+  "permissions": {
+    "allow": [
+      "Read",
+      "Glob",
+      "Grep",
+      "Bash(git diff *)",
+      "Bash(git log *)",
+      "Bash(git show *)",
+      "Bash(git fetch *)",
+      "Bash(git rev-parse *)",
+      "Bash(gh pr view *)",
+      "Bash(gh pr diff *)",
+      "Bash(gh pr checks *)",
+      "Bash(ls *)",
+      "Bash(cat *)",
+      "Bash(head *)",
+      "Bash(wc *)",
+      "Bash(find *)",
+      "Bash(*/skills/dispatch/scripts/send.sh *)",
+      "Bash(*/skills/dispatch/scripts/report.sh *)",
+      "Bash(git -C * show *)",
+      "Bash(git -C * diff *)",
+      "Bash(git -C * log *)",
+      "Bash(git -C * ls-tree *)",
+      "Bash(git -C * rev-parse *)",
+      "Bash(git -C * fetch *)",
+      "Bash(git -C * status *)",
+      "Bash(git -C * cat-file *)",
+      "Bash(git ls-tree *)",
+      "Bash(git cat-file *)",
+      "Bash(git grep *)",
+      "Bash(git -C * grep *)",
+      "Bash(make -C * lint *)",
+      "Bash(make -C * run_test *)",
+      "Edit(/{state_dir}/reviews/**)",
+      "Bash(gh api repos/*/issues/*/comments)",
+      "Bash(gh api repos/*/issues/*/comments *)"
+    ],
+    "deny": [
+      "Bash(gh api repos/*/issues/* -f *)",
+      "Bash(gh api repos/*/issues/* -F *)",
+      "Bash(gh api repos/*/issues/* --field *)",
+      "Bash(gh api repos/*/issues/* --raw-field *)",
+      "Bash(gh api repos/*/issues/* -X *)",
+      "Bash(gh api repos/*/issues/* --method *)",
+      "Bash(gh api repos/*/issues/* --input *)"
+    ]
+  }
+}

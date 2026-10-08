@@ -58,7 +58,7 @@ class LaunchTest(unittest.TestCase):
         rev = run_launch("reviewer", state_dir=self.state.name)
         self.assertEqual(rev.returncode, 0, rev.stderr)
         merged = json.load(open(os.path.join(self.state.name, "settings", "reviewer.json")))
-        self.assertIn("Edit(/%s/reviews/**)" % self.state.name, merged["permissions"]["allow"])
+        self.assertIn("Edit(/%s/reviews/**)" % os.path.realpath(self.state.name), merged["permissions"]["allow"])
         self.assertIn("Bash(git -C * show *)", merged["permissions"]["allow"])
 
     def test_extra_args_pass_through(self):
@@ -86,6 +86,63 @@ class OperatorPromptTest(unittest.TestCase):
         for r in text:
             self.assertIn("⚡ Prometheus by instruction of", text[r])
             self.assertNotIn("{", text[r].split("## Signing", 1)[1])
+
+
+class StateDirTest(unittest.TestCase):
+    """Claude Code never matches a path rule spelled through a symlink: launch.sh writes the realpath,
+    the same dir the dispatcher reads, and names it in every role's prompt."""
+    def test_symlinked_state_dir_resolves_everywhere(self):
+        import json
+        import dispatch
+        with tempfile.TemporaryDirectory() as base:
+            real = os.path.join(base, "real")
+            os.mkdir(real)
+            alias = os.path.join(base, "alias")
+            os.symlink(real, alias)
+            resolved = os.path.realpath(real)
+            for role in ("reviewer", "runner"):
+                out = run_launch(role, state_dir=alias)
+                self.assertEqual(out.returncode, 0, out.stderr)
+            perms = json.load(open(os.path.join(real, "settings", "reviewer.json")))["permissions"]
+            self.assertIn("Edit(/%s/reviews/**)" % resolved, perms["allow"])
+            self.assertEqual(perms["additionalDirectories"], [resolved])
+            for role in ("reviewer", "runner"):
+                prompt = open(os.path.join(real, "settings", role + ".prompt.md")).read()
+                self.assertIn("Prometheus state dir: `%s`" % resolved, prompt)
+            old = os.environ.get("PROMETHEUS_STATE_DIR")
+            os.environ["PROMETHEUS_STATE_DIR"] = alias
+            try:
+                self.assertEqual(os.path.realpath(dispatch.state_dir()), resolved)
+            finally:
+                if old is None:
+                    del os.environ["PROMETHEUS_STATE_DIR"]
+                else:
+                    os.environ["PROMETHEUS_STATE_DIR"] = old
+
+
+class DeliveryBaseTest(unittest.TestCase):
+    def test_delivery_roles_share_one_base(self):
+        import json
+        tpl = os.path.join(os.path.dirname(LIB), "templates", "settings")
+        base = json.load(open(os.path.join(tpl, "delivery.json")))["permissions"]
+        with tempfile.TemporaryDirectory() as st:
+            s = {}
+            for role in ("pm", "implementor", "reviewer", "seat", "runner", "planner", "librarian", "configurator"):
+                self.assertEqual(run_launch(role, state_dir=st).returncode, 0)
+                s[role] = json.load(open(os.path.join(st, "settings", role + ".json")))
+        read = "Bash(gh api repos/*/issues/*/comments *)"
+        for role in ("pm", "implementor", "reviewer"):
+            self.assertIn(read, s[role]["permissions"]["allow"])
+            self.assertIn("Bash(gh api repos/*/issues/* -f *)", s[role]["permissions"]["deny"])
+            self.assertNotIn("extends", s[role])
+        for role in ("seat", "runner", "planner", "librarian", "configurator"):
+            self.assertNotIn(read, s[role].get("permissions", {}).get("allow", []))
+        self.assertIn("AskUserQuestion", s["reviewer"]["permissions"]["deny"])
+        self.assertNotIn("AskUserQuestion", s["pm"]["permissions"].get("deny", []))
+        for role in ("pm", "implementor", "reviewer"):  # one home: no rule restated in a role file
+            own = json.load(open(os.path.join(tpl, role + ".json")))["permissions"]
+            for k in ("allow", "deny"):
+                self.assertFalse(set(own.get(k, [])) & set(base.get(k, [])), (role, k))
 
 
 class PluginRepoTest(unittest.TestCase):

@@ -111,6 +111,18 @@ class DecideTest(unittest.TestCase):
         self.assertTrue(pm("src/**", "/c/src/a.py", "/s", "/c"))
         self.assertTrue(pm("~/n/**", os.path.expanduser("~/n/a"), "/s", "/c"))
 
+    def test_symlink_spelled_rule_matches_nothing(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as base:
+            real = os.path.realpath(base)
+            os.mkdir(os.path.join(real, "r"))
+            os.symlink(os.path.join(real, "r"), os.path.join(real, "a"))
+            pm = probes.path_matches
+            for rule in ("a", "r"):  # live: only real rule + real path is allowed
+                for target in ("a", "r"):
+                    self.assertEqual(pm("/%s/%s/**" % (real, rule), "%s/%s/x.md" % (real, target), "/", "/c"),
+                                     rule == target == "r", (rule, target))
+
     def test_bare_tool_and_judge(self):
         self.assertEqual(self.d(tool("Read", "/any")), "allow")
         self.assertEqual(self.d(tool("AskUserQuestion")), "deny")

@@ -1,7 +1,7 @@
 #!/bin/zsh
 # ---
 # name: launch
-# description: The one launch recipe for every prometheus role. Merges templates/settings/launch.json with the role's allow-list (plus PROMETHEUS_EXTRA_ALLOW, one rule per line) into one settings file, adds --permission-mode dontAsk for depth-3 roles and the librarian, and execs claude with the role's agent (WORKSPACE, PROMETHEUS_ROLE set). --args prints the claude arguments as a JSON array instead, for `herdr agent start`; PROMETHEUS_DRY_RUN=1 prints the command.
+# description: The one launch recipe for every prometheus role. Merges templates/settings/launch.json with the role's allow-list (after any base it "extends", e.g. delivery.json; {state_dir} = the realpath, named in the role prompt) (plus PROMETHEUS_EXTRA_ALLOW, one rule per line) into one settings file, adds --permission-mode dontAsk for depth-3 roles and the librarian, and execs claude with the role's agent (WORKSPACE, PROMETHEUS_ROLE set). --args prints the claude arguments as a JSON array instead, for `herdr agent start`; PROMETHEUS_DRY_RUN=1 prints the command.
 # usage: launch.sh <seat|librarian|runner|configurator|planner|pm|implementor|reviewer> [--args] [extra claude args...]
 # ---
 set -euo pipefail
@@ -31,10 +31,15 @@ WORKSPACE=$workspace python3 - "$plugin_root/templates/settings/launch.json" "$p
 import json, os, sys
 base_path, role_path, out = sys.argv[1:4]
 merged = json.load(open(base_path))
+layers = []
 if os.path.exists(role_path):
     role = json.load(open(role_path))
-    for key, val in role.items():
-        if key == "$comment":
+    # a role file may extend shared bases in templates/settings (e.g. delivery.json), merged before it
+    layers = [json.load(open(os.path.join(os.path.dirname(role_path), b + ".json"))) for b in role.get("extends", [])]
+    layers.append(role)
+for layer in layers:
+    for key, val in layer.items():
+        if key in ("$comment", "extends"):
             continue
         if isinstance(val, dict) and isinstance(merged.get(key), dict):
             base = merged[key]
@@ -45,7 +50,8 @@ if os.path.exists(role_path):
         else:
             merged[key] = val
 merged.pop("$comment", None)
-state = os.environ.get("PROMETHEUS_STATE_DIR") or os.path.expanduser("~/.local/state/prometheus")
+# realpath: Claude Code never matches a path rule spelled through a symlink
+state = os.path.realpath(os.environ.get("PROMETHEUS_STATE_DIR") or os.path.expanduser("~/.local/state/prometheus"))
 perms = merged.get("permissions") or {}
 workspace = os.environ.get("WORKSPACE") or ""
 role_name = os.path.basename(out)[:-5]
@@ -111,6 +117,7 @@ for chunk in tmpl.split("<!-- ")[1:]:
 keep = ["operator" if role_name in ("seat", "pm") else "hierarchy", "signature"]
 with open(os.path.join(state, "settings", role_name + ".prompt.md"), "w") as fh:
     fh.write("\n\n".join(sections[k].format(**vals) for k in keep) + "\n")
+    fh.write("\nPrometheus state dir: `%s` — `<state_dir>` in skills and briefs means this path.\n" % state)
 for key in ("allow", "deny", "additionalDirectories"):
     if key in perms:
         perms[key] = [r.replace("{state_dir}", state).replace("{workspace}", workspace) for r in perms[key]]

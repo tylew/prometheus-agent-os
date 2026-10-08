@@ -102,7 +102,7 @@ review id in the findings file.
 ### Findings file + report
 
 Write with the Write tool to the brief's `artifact`, else
-`${PROMETHEUS_STATE_DIR:-$HOME/.local/state/prometheus}/reviews/<owner>-<repo>-<pr>-r<round>.md`:
+`<state_dir>/reviews/<owner>-<repo>-<pr>-r<round>.md`:
 
 - head sha reviewed; status (`posting` → `posted` / `not posted: <why>`); review id + `html_url`; the
   inline comment ids it opened (these define "ours" next round);

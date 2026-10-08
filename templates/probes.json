@@ -42,7 +42,9 @@
         {
           "cmd": "composio search sheets",
           "live": false
-        }
+        },
+        "gh api repos/o/r/issues/1/comments --paginate --jq .",
+        "Write({state_dir}/reviews/x.md)"
       ],
       "ask": [
         "mcp__launchdarkly__update-feature-flag",
@@ -55,7 +57,10 @@
         {
           "cmd": "composio link googlesheets",
           "live": false
-        }
+        },
+        "gh api repos/o/r/issues/1/comments -f body=x",
+        "gh api repos/o/r/issues/1/comments -X POST",
+        "gh api repos/o/r/issues/1/comments --input body.json"
       ]
     },
     "planner": {
@@ -108,7 +113,9 @@
         "Edit({wt}/voltuspy/brightfield-besstie/x.py)",
         "Read({workspace}/CLAUDE.md)",
         "mcp__shortcut__stories-get-by-id",
-        "git -C {wt} status --short && ls {state_dir}"
+        "git -C {wt} status --short && ls {state_dir}",
+        "gh api repos/o/r/issues/1/comments --paginate --jq .",
+        "Write({state_dir}/reviews/x.md)"
       ],
       "deny": [
         {
@@ -147,7 +154,10 @@
         {
           "cmd": "builtin cd {state_dir} && ls settings",
           "live": "builtin cd {state_dir} && ls settings"
-        }
+        },
+        "gh api repos/o/r/issues/1/comments -f body=x",
+        "gh api repos/o/r/issues/1/comments -X POST",
+        "gh api repos/o/r/issues/1/comments --input body.json"
       ]
     },
     "reviewer": {
@@ -190,7 +200,8 @@
         "mcp__claude-in-chrome__javascript_tool",
         "mcp__claude-in-chrome__file_upload",
         "mcp__claude-in-chrome__upload_image",
-        "git -C {wt} status --short && ls {state_dir}"
+        "git -C {wt} status --short && ls {state_dir}",
+        "gh api repos/o/r/issues/1/comments --paginate --jq ."
       ],
       "deny": [
         "mcp__claude-in-chrome__gif_creator",
@@ -220,7 +231,10 @@
         {
           "cmd": "builtin cd {state_dir} && ls settings",
           "live": "builtin cd {state_dir} && ls settings"
-        }
+        },
+        "gh api repos/o/r/issues/1/comments -f body=x",
+        "gh api repos/o/r/issues/1/comments -X POST",
+        "gh api repos/o/r/issues/1/comments --input body.json"
       ]
     },
     "librarian": {

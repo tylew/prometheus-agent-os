@@ -20,6 +20,7 @@ sys.path.insert(0, LIB)
 import dispatch  # noqa: E402
 import env  # noqa: E402
 import herdr as hz  # noqa: E402
+import registry  # noqa: E402
 
 KINDS = ("story", "story-set", "goal-set", "review")
 ROLES = ("pm", "planner", "implementor", "reviewer", "librarian", "runner", "configurator")
@@ -223,8 +224,26 @@ def open_tab(workspace_id: str, label: str, role: str, item: str | None = None,
     pane_id = _first_pane(workspace_id, tab_id)
     tag_pane(pane_id, role=role, item=item, pr=pr, worktree=worktree)
     unit = dispatch.unit_of_workspace(_snap(), workspace_id)
+    if worktree and unit:
+        link_worktree(worktree, dispatch._tokens(unit).get("project", ""))
     start(pane_id, role, unit_name(unit) if unit else "prometheus", label, extra_allow, claude_args)
     return pane_id
+
+
+def link_worktree(worktree: str, project: str) -> list[str]:
+    """Symlink the project's registry worktree_links (<repo.root>/<path>) into the worktree: deps never reinstalled.
+    A path whose source is missing or that already exists in the worktree is left alone."""
+    ent = registry.entry(project) if project else None
+    if not ent or not os.path.isdir(worktree):
+        return []
+    root = os.path.join(env.workspace_root() or "", ent["repo"]["root"])
+    made = []
+    for rel in ent.get("worktree_links", []):
+        src, dst = os.path.join(root, rel), os.path.join(worktree, rel)
+        if os.path.exists(src) and not os.path.lexists(dst) and os.path.isdir(os.path.dirname(dst)):
+            os.symlink(src, dst)
+            made.append(dst)
+    return made
 
 
 def send_brief(pane_id: str, brief_path: str) -> str:

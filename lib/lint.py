@@ -356,7 +356,20 @@ def check_settings(ctx: Ctx) -> list[dict]:
     def role_ok(role: str) -> bool:
         return ROLE_AGENTS.get(role, role) in agents
 
-    for path in sorted(glob.glob(os.path.join(ctx.plugin, "templates", "settings", "*.json"))):
+    paths = sorted(glob.glob(os.path.join(ctx.plugin, "templates", "settings", "*.json")))
+    stems = {os.path.splitext(os.path.basename(p))[0] for p in paths}
+    bases = set()  # shared bases a role file extends (merged by lib/launch.sh)
+    for path in paths:
+        try:
+            ext = json.loads(read(path)).get("extends", [])
+        except ValueError:
+            continue
+        for b in ext:
+            bases.add(b)
+            if b not in stems:
+                out.append(finding("settings", "error", ctx.rel(path), json_line(read(path), b),
+                                   "extends %r, which is no file in templates/settings" % b))
+    for path in paths:
         rel = ctx.rel(path)
         text = read(path)
         try:
@@ -365,7 +378,7 @@ def check_settings(ctx: Ctx) -> list[dict]:
             out.append(finding("settings", "error", rel, getattr(exc, "lineno", 0), "invalid JSON: %s" % exc))
             continue
         stem = os.path.splitext(os.path.basename(path))[0]
-        if stem != "launch" and not role_ok(stem):
+        if stem != "launch" and stem not in bases and not role_ok(stem):
             out.append(finding("settings", "error", rel, 0, "settings for role %r, which maps to no agent" % stem))
         perms = data.get("permissions") or {}
         for key in ("allow", "deny", "ask"):

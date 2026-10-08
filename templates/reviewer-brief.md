@@ -10,7 +10,7 @@ stack: [<#bottom>, …, <#top> | standalone]
 stack_position: <n of m | standalone>
 below: <#n approved | none>
 worktree: <absolute path, read-only, detached at the head>
-artifact: ~/.local/state/prometheus/reviews/<owner>-<repo>-<pr>-r<round>.md
+artifact: <state_dir>/reviews/<owner>-<repo>-<pr>-r<round>.md
 ---
 
 # Review: PR #<number>, round <n>

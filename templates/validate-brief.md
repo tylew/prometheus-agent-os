@@ -7,7 +7,7 @@ round: <n>
 branch: <branch> @ <sha>
 proof: adds `<symbol>` ✓ · removes `<symbol>` ✓
 base_url: <local base URL, from the project runbook>
-artifact: ~/.local/state/prometheus/reviews/<owner>-<repo>-<pr>-validate-r<round>.md
+artifact: <state_dir>/reviews/<owner>-<repo>-<pr>-validate-r<round>.md
 ---
 
 # Validate: PR #<number>, round <n>

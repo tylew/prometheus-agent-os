@@ -78,7 +78,8 @@ git -C $WORKSPACE/.worktrees/<slug> rev-parse --show-toplevel     # must equal t
   `.worktrees/`.
 - Brief the implementor with the worktree's absolute path only — never `root` + `owned_paths`, which
   resolve to the base checkout and the edit lands there silently.
-- Dependencies: JS `node_modules` symlinked from the base checkout, never reinstalled; Python gets its own
+- Dependencies: JS `node_modules` symlinked from the base checkout (`open-tab.sh` does it from the registry's
+  `worktree_links`), never reinstalled; Python gets its own
   venv (`uv sync` in the worktree's package dir) — never point `UV_PROJECT_ENVIRONMENT` at the base's
   `.venv`. Build/test variables a worktree needs (e.g. a monorepo-root override for `make`): the
   project's runbooks.

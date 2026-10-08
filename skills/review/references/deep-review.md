@@ -36,7 +36,7 @@ Every agent is read-only; the Workflow posts nothing and returns data.
 ## Running it
 
 1. Write the script with the Write tool to
-   `${PROMETHEUS_STATE_DIR:-$HOME/.local/state/prometheus}/reviews/deep-<owner>-<repo>-<pr>.mjs` per the
+   `<state_dir>/reviews/deep-<owner>-<repo>-<pr>.mjs` per the
    `workflow-authoring` skill (load it first): `meta` with the three phases, `args` = `{repo, prs (bottom-up),
    worktree, ownedPaths, lenses: [{path, applies_to}], dimensions?}`, the pipeline above. A `dimensions`
    subset logs which ran and names any unknown key — a narrowed review otherwise reads like a clean one.

@@ -53,7 +53,7 @@ evidence, not opinion. An unresolved thread is not a defect — fixing to clear 
 
 **Calibration memo.** A received finding that did not help or was over-rated — restates a documented,
 chosen tradeoff with no failing input, proposes net-new UI as the remedy, lands a tier above the scale —
-gets one short entry in `${PROMETHEUS_STATE_DIR:-$HOME/.local/state/prometheus}/reviews/calibration.md`: PR,
+gets one short entry in `<state_dir>/reviews/calibration.md`: PR,
 the finding's title and tier, why it missed. Written at triage by the PM; every reviewer reads it before
 rating ([review-pass.md](review-pass.md) step 0).
 

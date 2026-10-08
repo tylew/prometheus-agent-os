@@ -82,6 +82,26 @@ class UnitsTest(unittest.TestCase):
         settings = json.load(open(os.path.join(self.tmp.name, "settings", "implementor.json")))
         self.assertIn("Bash(make lint *)", settings["permissions"]["allow"])
 
+    def test_open_tab_links_worktree_deps_from_the_registry(self):
+        ws_root = os.path.join(self.tmp.name, "ws")
+        os.makedirs(os.path.join(ws_root, ".claude", "prometheus", "projects"))
+        os.makedirs(os.path.join(ws_root, "repos", "r", "js", "node_modules"))
+        json.dump({"key": "besstie", "repo": {"root": "repos/r"}, "worktree_links": ["js/node_modules", "py/.venv"]},
+                  open(os.path.join(ws_root, ".claude", "prometheus", "projects", "besstie.json"), "w"))
+        wt = os.path.join(self.tmp.name, "wt")
+        os.makedirs(os.path.join(wt, "js"))
+        os.makedirs(os.path.join(wt, "py"))
+        with unittest.mock.patch.dict(os.environ, {"WORKSPACE": ws_root}):
+            ws = units.create("sc-1-a", "story", "besstie", ["sc-1"], [])["workspace"]
+            units.open_tab(ws, "review-10", "reviewer", pr="o/r#10", worktree=wt)
+            self.assertEqual(os.readlink(os.path.join(wt, "js", "node_modules")),
+                             os.path.join(ws_root, "repos", "r", "js", "node_modules"))
+            self.assertFalse(os.path.lexists(os.path.join(wt, "py", ".venv")))  # no source: untouched
+            os.unlink(os.path.join(wt, "js", "node_modules"))
+            os.makedirs(os.path.join(wt, "js", "node_modules"))
+            units.open_tab(ws, "review-11", "reviewer", pr="o/r#11", worktree=wt)
+            self.assertFalse(os.path.islink(os.path.join(wt, "js", "node_modules")))  # existing: untouched
+
     def test_send_brief_lands_with_prompt_wait(self):
         ws = units.create("sc-1-a", "story", "besstie", ["sc-1"], [])["workspace"]
         pane = units.open_tab(ws, "review-10", "reviewer", pr="o/r#10")

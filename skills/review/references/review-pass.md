@@ -14,7 +14,7 @@ Intent comes from these, never reverse-engineered from the diff:
 - the PR body and every thread (`gh pr view`, the comments + reviews APIs); on a stack, every rung's body;
 - the spec dir for the area (`registry.py field docs.specs --key <k>`) and `docs/kb/` — read for intent,
   never cited outward;
-- calibration memos, if present: `${PROMETHEUS_STATE_DIR:-$HOME/.local/state/prometheus}/reviews/calibration.md`
+- calibration memos, if present: `<state_dir>/reviews/calibration.md`
   — findings an earlier round over-rated; read before rating;
 - threads already open: the brief's `open_threads` + any comment newer than the brief. A finding that
   duplicates one is dropped before it posts.

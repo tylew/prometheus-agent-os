@@ -24,7 +24,7 @@ Scope is frontmatter, never a folder. Widening scope edits the list; the note do
 ## The truth gate
 
 A fact lands only with a final basis — `decided` · `merged` · `stated` (with a `quote`) · `confirmed`. Everything
-else is held in `~/.local/state/prometheus/kb-inbox/`: tentative facts, unquoted `stated`, ambiguous mentions, a new
+else is held in `<state_dir>/kb-inbox/`: tentative facts, unquoted `stated`, ambiguous mentions, a new
 person or org, a field whose existing value differs, every decision. Held is not lost: `kb.py inbox` lists it,
 the operator confirms (`confirm <id> [--as <slug>]`) or drops it, and a later final source releases a held fact.
 

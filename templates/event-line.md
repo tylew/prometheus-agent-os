@@ -6,4 +6,4 @@ description: Dispatcher → PM (or seat). The one line delivered per tick; detai
 
 <!-- kinds: ci (pass|fail on <pr>) · review (<state> on <pr>) · comment (<pr|story>) · pr (merged|closed <pr>) ·
      story (<old> → <new> <sc-id>) · agent (<label> <old> → <new>) · heartbeat (no movement on <subject> for <n> min)
-     details file: ~/.local/state/prometheus/events/<unit>/<tick>.json — one object per event with its source payload -->
+     details file: <state_dir>/events/<unit>/<tick>.json — one object per event with its source payload -->

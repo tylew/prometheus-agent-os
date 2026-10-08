@@ -13,7 +13,8 @@
 #   is not in the role's --mcp-config is "unavailable" (counts as refused) — except a built-in server
 #   (BUILTIN_SERVERS), present in every session. Edit rules cover Write/MultiEdit/
 #   NotebookEdit, Read rules cover Grep/Glob; path rules are gitignore-style (`//abs`, `~/`, `/` = settings
-#   dir, else cwd; `**` crosses `/`, `*` does not).
+#   dir, else cwd; `**` crosses `/`, `*` does not); the probed path must match both as written and resolved
+#   (realpath), so a symlink in the rule or the path never matches (live-verified; deny rules modeled alike).
 # Limits (live mode is the ground truth):
 #   - only the role's merged --settings file; user/project/local settings, managed policy and hooks are ignored.
 #   - Claude Code's built-in read-only auto-approvals (ls, cat, pwd, cd inside the working dirs …) and its
@@ -190,8 +191,10 @@ def path_matches(spec: str, path: str, settings_dir: str, cwd: str) -> bool:
     full = resolve_rule_path(spec, settings_dir, cwd)
     if full.endswith("/"):
         full += "**"
-    p = os.path.normpath(path)
-    return re.fullmatch(glob_to_regex(full), p) is not None or re.fullmatch(glob_to_regex(full), p + "/") is not None
+    rx = glob_to_regex(full)
+    # Claude Code checks the path as written and resolved: both must match (a symlink in either spelling fails)
+    return all(re.fullmatch(rx, p) is not None or re.fullmatch(rx, p + "/") is not None
+               for p in {os.path.normpath(path), os.path.realpath(path)})
 
 
 def tool_rule_matches(rule: str, tool: str, arg: str | None, settings_dir: str = "/", cwd: str = "/") -> bool:
@@ -289,6 +292,7 @@ def generate(role: str, state_dir: str) -> dict:
 
 
 def context(state_dir: str) -> dict:
+    state_dir = os.path.realpath(state_dir)  # agents use the resolved dir their prompt names (launch.sh)
     return {"workspace": env.workspace_root(), "state_dir": state_dir, "plugin_root": PLUGIN,
             "wt": os.path.join(state_dir, "probe-wt-missing")}
 

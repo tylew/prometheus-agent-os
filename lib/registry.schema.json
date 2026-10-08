@@ -232,6 +232,14 @@
             "type": "string"
           }
         },
+        "worktree_links": {
+          "description": "Paths under repo.root symlinked into every agent worktree open-tab.sh starts in (dependencies never reinstalled, e.g. js/node_modules).",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[^/.][^ ]*$"
+          }
+        },
         "vcs": {
           "type": "object",
           "additionalProperties": false,

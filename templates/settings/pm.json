@@ -1,5 +1,8 @@
 {
   "$comment": "Project manager additions to launch.json. Not dontAsk: the operator may approve in the tab. unit-tokens.sh is the PM's writer for its own unit's stage / stories / prs tokens; other roles do not get it.",
+  "extends": [
+    "delivery"
+  ],
   "permissions": {
     "allow": [
       "Bash(unit-tokens.sh *)",
