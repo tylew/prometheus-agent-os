@@ -263,6 +263,14 @@ class MergeTest(Base):
         self.assertEqual((st["ignored"], st["proposals"], st["cursors"]),
                          (["x", "y"], [{"pid": "p2"}], {"gh": 2, "sc": 5}))
 
+    def test_a_queued_slash_command_is_sent_alone_after_the_messages(self):
+        sent = []
+        with d.locked_state() as st:
+            d.enqueue(st, "wA:p1", "/compact keep: epic 77")
+            d.enqueue(st, "wA:p1", "[prometheus] ci pass")
+            d.deliver(snap(), st, prompt=lambda p, t: sent.append(t))
+        self.assertEqual(sent, ["[prometheus] ci pass", "/compact keep: epic 77"])
+
     def test_a_failed_send_is_requeued(self):
         def boom(p, t):
             raise RuntimeError("herdr down")

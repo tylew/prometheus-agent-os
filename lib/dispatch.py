@@ -315,7 +315,13 @@ def send_all(sends: list[dict], prompt=None) -> list[dict]:
         try:
             if d["clear"]:
                 clear(d["pane"]) if prompt is None else prompt(d["pane"], "/clear")
-            (prompt or submit)(d["pane"], _compose(d["pane"], d["items"]))
+            # a queued slash command (/compact …) goes alone and unwrapped, after the messages
+            slash = [i for i in d["items"] if i["line"].startswith("/")]
+            rest = [i for i in d["items"] if not i["line"].startswith("/")]
+            if rest:
+                (prompt or submit)(d["pane"], _compose(d["pane"], rest))
+            for item in slash:
+                herdr("agent", "prompt", d["pane"], item["line"]) if prompt is None else prompt(d["pane"], item["line"])
         except Exception:  # noqa: BLE001 — a failed send is requeued, never lost
             failed.append(d)
     return failed

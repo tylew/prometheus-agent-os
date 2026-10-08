@@ -451,11 +451,19 @@ def respawn(pane_id: str, force: bool = False, timeout: float = 30) -> str:
 
 # --------------------------------------------------------- context hygiene
 
-def compact(pane_id: str, focus: str) -> None:
+def compact(pane_id: str, focus: str, queue: bool = False) -> str:
+    """/compact at the agent's prompt; `queue` hands it to the dispatcher instead, delivered once the agent is
+    idle — how an agent compacts itself (it ends its turn right after)."""
+    if queue:
+        with dispatch.locked_state() as st:
+            dispatch.enqueue(st, pane_id, "/compact %s" % focus)
+        dispatch.poke()
+        return "compact queued for %s (delivered when it is idle)" % pane_id
     st = _status(pane_id)
     if st not in READY_STATES:
         raise ValueError("agent %s is %s; /compact only at its prompt" % (pane_id, st))
     _h("agent", "prompt", pane_id, "/compact %s" % focus)
+    return "compact sent to %s" % pane_id
 
 
 def refresh(workspace_id: str, label: str, role: str, brief: str, **tab_tokens) -> str:
@@ -498,6 +506,7 @@ def main(argv: list[str]) -> int:
     ct.add_argument("workspace")
     ct.add_argument("label")
     cp = sub.add_parser("compact")
+    cp.add_argument("--queue", action="store_true", help="deliver when the agent is idle (an agent compacting itself)")
     cp.add_argument("pane")
     cp.add_argument("focus", nargs="+")
     r = sub.add_parser("refresh")
@@ -553,8 +562,7 @@ def main(argv: list[str]) -> int:
             close_tab(a.workspace, a.label)
             print("closed %s" % a.label)
         elif a.cmd == "compact":
-            compact(a.pane, " ".join(a.focus))
-            print("compact sent to %s" % a.pane)
+            print(compact(a.pane, " ".join(a.focus), a.queue))
         elif a.cmd == "refresh":
             print(refresh(a.workspace, a.label, a.role, a.brief))
         elif a.cmd == "configure":
