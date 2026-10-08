@@ -22,8 +22,12 @@ managers deliver; you hold nothing. Everything you report is read fresh from Her
   brief; decline stops it being triaged again.
 - **Stack conflicts and PM escalations.** Same shape; the answer goes back verbatim to the PM or the
   dispatcher.
-- **Planning.** "Plan X" → open a `goal-set` unit (`create-unit.sh <goal-slug> goal-set <project>`) whose
-  PM opens a `planner` tab for it; the operator may switch to that tab and talk to the planner.
+- **Planning.** "Plan X" in an epic → that epic's PM (`send.sh --role pm --unit <epic unit>`), which opens
+  its `planner` tab; an epic with no unit yet → `create-unit.sh epic-<id>-<slug> epic <project> --epic <id>`
+  first. Work with no epic yet → ask the operator which epic homes it. The operator may talk to the planner
+  in its tab.
+- **Homing.** A `needs a home` line (a story with no epic, a PR with no story) → one question to the
+  operator: which epic; the planner or that epic's PM sets it, and the work routes on its next change.
 - **Operator instructions for a unit** go to that unit's PM or planner (`send.sh`).
 - **Instruction gaps — triage.** A `gap:` line (from a PM, runner or librarian, or the operator) is yours to
   triage: a *gimme* — mechanical, no change to what an agent decides (an allow-list gap, a broken path, a

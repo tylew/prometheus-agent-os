@@ -32,15 +32,15 @@ every `INTERVAL`. No socket → full ticks only.
    read-only tools). Agent panes: one `herdr api snapshot`, `agent_status` diffed.
 2. **Filter** — only next-move changes: CI terminal, review, new comment, merged / closed, new commits,
    draft ↔ ready, story state, agent state.
-3. **Route** — by tokens: story id → `stories`, PR (or any PR in its stack) → `prs`, then the unit's
-   `pm` (or `planner`) pane. Two units claiming one stack → conflict to the seat; never split.
-4. **Review units without triage** — an unmatched PR with the operator's review requested, or a teammate's
-   PR touching an editable project's `owned_paths` (polled every `OWNED_INTERVAL`, 600 s; the first poll
-   is a baseline sent to the seat as one line), becomes a `review` unit for its whole stack at once.
-   **Triage** the other unmatched new — `prometheus:triage`, fresh per event; verdict validated in code.
-   `ignore` remembered · `attach` appends the token · `new` review request → review unit created for the
-   whole stack · any other `new` → proposal to the seat · invalid → `untriaged` to the seat.
-   Auto-create is held while any `pm`/`planner` tab sits in a workspace without unit tokens.
+3. **Route** — by tokens: story id → `stories`, PR (or any PR in its stack) → `prs`; else by **epic**: the
+   event's stories → their epic (`story_epic` cache: the Shortcut poll returns epic ids; uncached stories get
+   one batched read-only lookup per tick) → the unit whose `epic` token matches. The story and stack join
+   that unit's tokens. Two units claiming one stack → conflict to the seat; never split.
+4. **Epic units open themselves** — an unmatched event whose story has an epic opens `epic-<id>-<slug>` at
+   once (a review request, an owned-paths PR — polled every `OWNED_INTERVAL`, 600 s, first poll a baseline
+   line to the seat — or a story of the operator's). A story with **no epic**, or a PR with **no story**,
+   goes to the seat once to be homed and routes on its next change. Opening is held while units await
+   restore or carry no tokens. (`PROMETHEUS_EPIC_UNITS=0` restores the older triage → proposal path.)
 5. **Settle** — story Completed / Won't Fix → `kb.py inbox settle`.
 6. **Heartbeat** · **Health** (a lead whose agent exited → `claude --resume <session>`) · **Deliver**.
 7. **Restore image** — per live unit: tokens, and per agent tab its label, pane tokens and Claude session.
