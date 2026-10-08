@@ -192,10 +192,51 @@ class ViewsTest(unittest.TestCase):
         self.assertIn("┏", text)  # seat box
         self.assertIn("╔", text)  # unit boxes
         self.assertIn("◼ sc-1-a", text)
-        self.assertIn("●2 ○1 !1 ✉2 5m", text)
+        self.assertIn("story · implement  !1 ✉2 5m", text)
+        self.assertIn("✻ ● pm ✉2  waiting on CI", text)
+        self.assertIn("✻ ○ impl sc-1  ! needs you", text)
         self.assertIn("▁▃█", text)
+        self.assertIn("1 sc-1  2 #10  3 #11", text)
         self.assertLess(boxes["wC:p1"][1], boxes["unit:wA"][0])
         self.assertEqual(boxes["unit:wA"][0], boxes["unit:wB"][0])
+
+    def test_links_are_recorded_for_clicks(self):
+        t = model.build(snap(), STATE, now=1300, story_slug="acme")
+        self.assertEqual(t.nodes["unit:wA"].links, [
+            ("sc-1", "https://app.shortcut.com/acme/story/1"),
+            ("#10", "https://github.com/o/r/pull/10"), ("#11", "https://github.com/o/r/pull/11")])
+        hub, spokes = model.level(t, [])
+        canvas, _ = views.render_level(hub, spokes, 100)
+        urls = [u for _, _, _, u in canvas.links]
+        self.assertIn("https://github.com/o/r/pull/11", urls)
+        y, x0, x1, _ = canvas.links[urls.index("https://app.shortcut.com/acme/story/1")]
+        self.assertEqual(canvas.text().splitlines()[y][x0:x1 + 1], "sc-1")
+
+    def test_long_link_lists_wrap(self):
+        t = model.build(snap(), STATE, now=1300, story_slug="acme")
+        t.nodes["unit:wA"].links = [(f"sc-10000{i}", f"https://x/{i}") for i in range(6)]
+        canvas, _ = views.render_level(*model.level(t, []), 90)
+        text = canvas.text()
+        for i in range(6):
+            self.assertIn(f"{i + 1} sc-10000{i}", text)
+        self.assertEqual(len(canvas.links), 7)  # six here plus rev-b's PR
+        self.assertNotIn("no agents", text)
+
+    def test_hidden_agents_fold_to_counts(self):
+        t = model.build(snap(), STATE, now=1300)
+        unit = t.nodes["unit:wA"]
+        unit.agents = unit.agents * 2
+        canvas, _ = views.render_level(*model.level(t, []), 100)
+        self.assertIn("+1 more", canvas.text())
+        self.assertIn("●2 ○1", canvas.text())
+
+    def test_font_icons(self):
+        views.use_font(True)
+        try:
+            canvas, _ = views.render_level(*model.level(model.build(snap(), STATE), ["unit:wA"]), 80)
+            self.assertIn("\ue1a0 \ue1c2 reviewer-sc-1", canvas.text())
+        finally:
+            views.use_font(False)
 
     def test_wraps_into_rows(self):
         t = model.build(snap(), STATE)
@@ -217,6 +258,35 @@ class ViewsTest(unittest.TestCase):
         (canvas, _), _, _ = self.render(["unit:wA"], 80)
         self.assertTrue(views.animate_edges(canvas, {"wA:p3"}, 0))
         self.assertFalse(views.animate_edges(canvas, set(), 0))
+
+
+class IconsTest(unittest.TestCase):
+    def test_missing_font_installs_and_stays_on_text(self):
+        import tempfile
+        from unittest import mock
+        from map import icons
+        with tempfile.TemporaryDirectory() as home, mock.patch.dict(os.environ, {"PROMETHEUS_MAP_ICONS": ""}), \
+                mock.patch.object(icons, "FONT_DIRS", (home,)), \
+                mock.patch.object(icons, "user_font_dir", lambda: home):
+            self.assertFalse(icons.font_wanted())
+            self.assertTrue(os.path.isfile(os.path.join(home, "HerdrAgentIconsMax-Regular.ttf")))
+            self.assertTrue(icons.font_wanted())
+
+    def test_override(self):
+        from unittest import mock
+        from map import icons
+        with mock.patch.dict(os.environ, {"PROMETHEUS_MAP_ICONS": "text"}):
+            self.assertFalse(icons.font_wanted())
+
+
+class MouseTest(unittest.TestCase):
+    def test_sgr_reports(self):
+        from map.app import parse_mouse
+        self.assertEqual(parse_mouse("[<64;10;5M"), (64, 9, 4, True))  # wheel up
+        self.assertEqual(parse_mouse("[<65;1;1M"), (65, 0, 0, True))  # wheel down
+        self.assertEqual(parse_mouse("[<0;3;4m"), (0, 2, 3, False))  # release
+        self.assertIsNone(parse_mouse("[A"))
+        self.assertIsNone(parse_mouse("[<x;1;1M"))
 
 
 if __name__ == "__main__":

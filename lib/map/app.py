@@ -1,6 +1,6 @@
 # ---
 # name: map.app
-# description: The prometheus map's curses front end — the primary view and navigation: header stats top-right (dispatcher, agents, status counts, needs-you, proposals, held), one drill-down level at a time (seat → units · unit PM → its agents · seat → control), a live preview of the selected agent (a unit previews its PM) mirrored from `herdr pane read --ansi`, and an interact mode that forwards keystrokes to the previewed pane. Redraws on Herdr events (herdr.Watcher) with a poll fallback. Also --dump (every level as text, no curses) and --split (map only, ~32 columns right of the caller).
+# description: The prometheus map's curses front end — the primary view and navigation: header stats top-right (dispatcher, agents, status counts, needs-you, proposals, held), one drill-down level at a time (seat → units, each listing its agents and numbered story / PR links that 1-9 or a click open · unit PM → its agents · seat → control), radar icon-font logos when installed, a live preview of the selected agent (a unit previews its PM) mirrored from `herdr pane read --ansi`, and an interact mode that forwards keystrokes to the previewed pane. Redraws on Herdr events (herdr.Watcher) with a poll fallback. Also --dump (every level as text, no curses) and --split (map only, ~32 columns right of the caller).
 # usage: python3 lib/map [--unit <workspace_id>] [--dump | --split]
 # ---
 # Ported from Horchestra's agentmap.py (https://github.com/SimoneDaniotti/horchestra),
@@ -13,6 +13,7 @@ import json
 import locale
 import os
 import shlex
+import subprocess
 import sys
 import threading
 import time
@@ -22,14 +23,16 @@ if LIB not in sys.path:
     sys.path.insert(0, LIB)
 import env  # noqa: E402
 import herdr  # noqa: E402
+import registry  # noqa: E402
 
-from . import activity, model, screen, views  # noqa: E402
+from . import activity, icons, model, screen, views  # noqa: E402
 
 POLL_SECONDS = 2.0
 DEBOUNCE_SECONDS = 0.15
 FRAME_SECONDS = 0.12  # edge animation step and input timeout
 PREVIEW_SECONDS = 0.25
 INTERACT_SECONDS = 0.1
+INTERACT_IDLE_SECONDS = 120  # interact ends on its own so stray keys later go to the map, not an agent
 HEADER_ROWS = 2
 FOOTER_ROWS = 1
 SIDE_BY_SIDE = 110  # columns from which the preview sits right of the map
@@ -74,8 +77,10 @@ def help_lines():
         ("Enter, 2×click", "drill into a unit / the seat"),
         ("Esc  Bksp  u", "back up a level"),
         ("i, click preview", "interact with the previewed agent"),
+        ("wheel on preview", "scroll the agent's own view"),
         ("ctrl-]", "leave interact"),
         ("o", "open the agent's own tab"),
+        ("1-9, click link", "open a story / PR of this unit"),
         ("p", "preview on / off"),
         ("r", "refresh"),
         ("q", "quit"),
@@ -86,6 +91,42 @@ def help_lines():
         ("?N", "proposals waiting"),
         ("╔═╗ ┏━┓ ╭─╮", "unit · seat · agent"),
     ]
+
+
+def story_slug():
+    try:
+        trackers = (registry.workspace_config() or {}).get("trackers") or {}
+    except Exception:  # noqa: BLE001 — links degrade to labels
+        return None
+    return next((t.get("org_slug") for t in trackers.values() if isinstance(t, dict) and t.get("org_slug")), None)
+
+
+def open_url(url):
+    opener = "open" if sys.platform == "darwin" else "xdg-open"
+    subprocess.Popen([opener, url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+
+
+def parse_mouse(seq):
+    """(button, x, y, pressed) from an SGR mouse report `[<b;x;yM` (ESC stripped), 0-based; else None."""
+    if not seq.startswith("[<") or seq[-1:] not in ("M", "m"):
+        return None
+    try:
+        b, x, y = (int(v) for v in seq[2:-1].split(";"))
+    except ValueError:
+        return None
+    return b, x - 1, y - 1, seq[-1] == "M"
+
+
+MOUSE_ON = "\x1b[?1000h\x1b[?1006h"
+MOUSE_OFF = "\x1b[?1006l\x1b[?1000l"
+
+
+def mouse(on):
+    """SGR mouse reports, parsed here: the system ncurses decodes neither SGR nor wheel-down."""
+    try:
+        os.write(sys.__stdout__.fileno(), (MOUSE_ON if on else MOUSE_OFF).encode())
+    except OSError:
+        pass
 
 
 def mark_view(pane_id, on):
@@ -199,6 +240,8 @@ class App:
         self.animating = False
         self.last_draw = 0.0
         self.notice = (0.0, "")
+        self.slug = story_slug()
+        self.last_key = 0.0
 
     # ---- data ---------------------------------------------------------------
 
@@ -215,7 +258,8 @@ class App:
             self.tab_id = me.get("tab_id") or self.tab_id
         self.tabs = {t.get("tab_id"): t.get("label") or "" for t in snap.get("tabs") or []}
         self.tree = model.build(snap, load_state(), own_pane=self.own_pane,
-                                own_workspace=os.environ.get("HERDR_WORKSPACE_ID", ""), here_tab=self.tab_id)
+                                own_workspace=os.environ.get("HERDR_WORKSPACE_ID", ""), here_tab=self.tab_id,
+                                story_slug=self.slug)
         now = time.monotonic()
         for pane in self.tree.panes:
             key, status = pane.get("pane_id"), pane.get("agent_status")
@@ -377,7 +421,10 @@ class App:
     def draw_map(self, rect):
         y0, x0, y1, x1 = rect
         width, view_h = x1 - x0 - 1, y1 - y0
-        canvas, boxes = views.render_level(self.hub, self.spokes, width, spark=self.sparks(width))
+        unit = self.path[-1] if self.path and self.path[-1] in self.tree.units else None
+        hub_links = self.tree.nodes[unit].links if unit and self.hub.key != unit else None
+        canvas, boxes = views.render_level(self.hub, self.spokes, width, spark=self.sparks(width),
+                                           hub_links=hub_links)
         self.boxes = boxes
         if self.animate:
             frame = int(time.monotonic() / FRAME_SECONDS)
@@ -393,6 +440,8 @@ class App:
         for row in range(view_h):
             for x, text, style in canvas.runs(self.scroll_y + row):
                 self.put(y0 + row, x0 + x, text, self.styles.get(style, 0))
+        for ly, lx0, lx1, url in canvas.links:
+            self.hits.append((y0 + ly - self.scroll_y, y0 + ly - self.scroll_y, x0 + lx0, x0 + lx1, "@url:" + url))
         for key, (by0, by1, bx0, bx1) in boxes.items():
             self.hits.append((y0 + by0 - self.scroll_y, y0 + by1 - self.scroll_y, x0 + bx0, x0 + bx1, key))
         if not self.spokes:
@@ -586,12 +635,38 @@ class App:
             self.selection[tuple(self.path)] = came_from
             self.rebuild()
 
+    def focus_links(self):
+        """The links the number keys open: the selected unit's, or the unit this level belongs to."""
+        sel = self.selected()
+        unit = sel if sel in self.tree.units else next((p for p in reversed(self.path) if p in self.tree.units),
+                                                       model.unit_of(self.tree, sel))
+        return self.tree.nodes[unit].links if unit else []
+
+    def open_link(self, url, label=None):
+        try:
+            open_url(url)
+            self.flash(f"opened {label or url}")
+        except OSError as exc:
+            self.flash(f"could not open: {exc}"[:80])
+
+    def open_numbered(self, n):
+        links = self.focus_links()
+        if n > len(links):
+            self.flash(f"no link {n} here" if links else "no stories or PRs here")
+            return
+        label, url = links[n - 1]
+        if url:
+            self.open_link(url, label)
+        else:
+            self.flash(f"{label}: no URL (tracker slug missing)")
+
     def start_interact(self):
         key = self.preview_key()
         if not key or not self.preview_on:
             self.flash("nothing to interact with here")
             return
         self.interact = key
+        self.last_key = time.monotonic()
         self.reader.poke.set()
 
     def open_pane(self):
@@ -615,38 +690,55 @@ class App:
 
     # ---- input --------------------------------------------------------------
 
-    def on_mouse(self):
-        try:
-            _, mx, my, _, bstate = curses.getmouse()
-        except curses.error:
-            return
-        if bstate & getattr(curses, "BUTTON4_PRESSED", 0):
-            self.scroll_y = max(0, self.scroll_y - 2)
-            return
-        if bstate & getattr(curses, "BUTTON5_PRESSED", 0):
-            self.scroll_y += 2
-            return
-        if not bstate & (curses.BUTTON1_PRESSED | curses.BUTTON1_CLICKED | curses.BUTTON1_DOUBLE_CLICKED):
-            return
+    def on_mouse(self, event):
+        button, mx, my, press = event
+        if button & 32:
+            return  # motion
         key = next((k for y0, y1, x0, x1, k in self.hits if y0 <= my <= y1 and x0 <= mx <= x1), None)
+        if button in (64, 65):
+            if key == "@preview" or (self.interact and key is None):
+                self.scroll_preview(button, mx, my)
+            else:
+                self.scroll_y = max(0, self.scroll_y + (-2 if button == 64 else 2))
+            return
+        if button != 0 or not press:
+            return
+        if key and key.startswith("@url:"):
+            self.open_link(key[5:])
+            return
         if key == "@preview":
             if not self.interact:
                 self.start_interact()
             return
         if key is None:
             return
+        self.flush_typed()
         self.interact = None
         now = time.monotonic()
         repeat = self.last_click[1] == key and now - self.last_click[0] < 0.4
         self.select(key)
         self.last_click = (now, key)
-        if bstate & curses.BUTTON1_DOUBLE_CLICKED or repeat:
+        if repeat:
             self.drill(key)
+
+    def scroll_preview(self, button, mx, my):
+        """Pass a wheel step to the previewed agent, which scrolls its own view (Herdr keeps no scrollback
+        for full-screen TUIs)."""
+        key = self.preview_key()
+        if not key or not self.preview_rect:
+            return
+        y0, x0, _, _ = self.preview_rect
+        col, row = max(1, mx - x0 - 1), max(1, my - y0)
+        try:
+            herdr.call("pane", "send-text", key, f"\x1b[<{button};{col};{row}M", timeout=5)
+        except herdr.HerdrError as exc:
+            self.flash(f"scroll failed: {exc}"[:80])
+        self.reader.poke.set()
 
     def handle(self, ch):
         """One key from get_wch (str or int) in map mode; False quits."""
-        if ch == curses.KEY_MOUSE:
-            self.on_mouse()
+        if isinstance(ch, tuple):
+            self.on_mouse(ch)
             return True
         if ch == curses.KEY_RESIZE:
             self.sync_size()
@@ -681,13 +773,14 @@ class App:
             self.interact = None
         elif ch == "r":
             self.refresh()
+        elif isinstance(ch, str) and ch in "123456789":
+            self.open_numbered(int(ch))
         return True
 
     def forward(self, ch):
         """One key in interact mode: printable text is buffered, everything else flushes and is sent."""
-        if ch == curses.KEY_MOUSE:
-            self.flush_typed()
-            self.on_mouse()
+        if isinstance(ch, tuple):
+            self.on_mouse(ch)
             return
         if ch == curses.KEY_RESIZE:
             self.sync_size()
@@ -698,6 +791,10 @@ class App:
             return
         if isinstance(ch, str) and ch >= " " and ch != "\x7f":
             self.typed.append(ch)
+            return
+        if isinstance(ch, str) and len(ch) > 1:  # an escape sequence the map does not use: alt+key etc.
+            self.flush_typed()
+            self.send("send-text", ch)
             return
         name = SPECIAL_KEYS.get(ch) if isinstance(ch, int) else CONTROL_CHARS.get(ch)
         if name is None and isinstance(ch, str) and "\x01" <= ch <= "\x1a":
@@ -733,10 +830,34 @@ class App:
         return True
 
     def getkey(self):
+        """A key (str / int), a mouse event (button, x, y, pressed) or None. ESC starts a read of whatever
+        follows it right away: an SGR mouse report, another sequence, or nothing (a lone Esc)."""
         try:
-            return self.screen.get_wch()
+            ch = self.screen.get_wch()
         except curses.error:
             return None
+        if ch != "\x1b":
+            return ch
+        seq = ""
+        self.screen.nodelay(True)
+        try:
+            while len(seq) < 32:
+                try:
+                    c = self.screen.get_wch()
+                except curses.error:
+                    break
+                if not isinstance(c, str):
+                    break
+                seq += c
+                if not seq.startswith("[") or (len(seq) > 1 and (c.isalpha() or c == "~")):
+                    break
+        finally:
+            self.screen.nodelay(False)
+            self.screen.timeout(int(FRAME_SECONDS * 1000))
+        if not seq:
+            return "\x1b"
+        event = parse_mouse(seq)
+        return event if event else "\x1b" + seq
 
     def run(self):
         self.watcher.start()
@@ -746,6 +867,7 @@ class App:
         while True:
             ch = self.getkey()
             if ch is not None:
+                self.last_key = time.monotonic()
                 if self.interact:
                     self.forward(ch)
                 elif not self.handle(ch):
@@ -755,6 +877,10 @@ class App:
                 continue
             self.flush_typed()
             redraw = self.sync_size() or self.preview_due()
+            if self.interact and time.monotonic() - self.last_key > INTERACT_IDLE_SECONDS:
+                self.interact = None
+                self.flash("interact ended after 2m without keys")
+                redraw = True
             if self.animating and time.monotonic() - self.last_draw >= FRAME_SECONDS:
                 redraw = True
             if self.watcher.changed.is_set():
@@ -796,6 +922,7 @@ def make_styles():
         "sel_here": cp(5) | bold,
         "accent": cp(5),
         "spark": cp(5),
+        "link": cp(5) | curses.A_UNDERLINE,
         "interact": cp(7) | bold,
         "needs": cp(2) | bold,
         "status:working": cp(1) | bold,
@@ -816,13 +943,17 @@ def make_styles():
 def setup(screen_, unit=None, preview=True):
     curses.curs_set(0)
     curses.use_default_colors()
-    curses.mousemask(curses.ALL_MOUSE_EVENTS)
-    curses.mouseinterval(0)
+    curses.mousemask(0)
+    mouse(True)
     screen_.timeout(int(FRAME_SECONDS * 1000))
     screen_.keypad(True)
+    views.use_font(icons.font_wanted())
     app = App(screen_, unit=unit, preview=preview)
     app.styles = make_styles()
-    app.run()
+    try:
+        app.run()
+    finally:
+        mouse(False)
 
 
 # ---- entry points ----------------------------------------------------------
@@ -830,7 +961,7 @@ def setup(screen_, unit=None, preview=True):
 
 def dump():
     tree = model.build(herdr.snapshot(), load_state(), own_pane=os.environ.get("HERDR_PANE_ID", ""),
-                       own_workspace=os.environ.get("HERDR_WORKSPACE_ID", ""))
+                       own_workspace=os.environ.get("HERDR_WORKSPACE_ID", ""), story_slug=story_slug())
     print(model.to_text(tree))
     return 0
 

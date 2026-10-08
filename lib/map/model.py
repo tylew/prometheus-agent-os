@@ -73,14 +73,30 @@ def ago(seconds):
 def agent_name(pane, tab_label):
     t = tokens(pane)
     role = t.get("role") or pane.get("agent") or "shell"
-    if role in CHILD_ROLES or role == "runner":
+    if role in CHILD_ROLES or role in ("runner", "configurator"):
         if tab_label and not tab_label.isdigit():
             return tab_label
         return f"{role}-{t['item']}" if t.get("item") else role
     return role
 
 
-def build(snap, state=None, own_pane="", here_tab="", now=None, own_workspace=""):
+def links(t, story_slug=None):
+    """[(label, url or None)] for a unit's stories then PRs."""
+    out = []
+    for story in csv(t.get("stories")):
+        num = story.split("-", 1)[-1]
+        url = f"https://app.shortcut.com/{story_slug}/story/{num}" if story_slug and num.isdigit() else None
+        out.append((story, url))
+    prs = csv(t.get("prs"))
+    repos = {p.split("#", 1)[0] for p in prs}
+    for pr in prs:
+        repo, _, num = pr.partition("#")
+        label = f"#{num}" if len(repos) == 1 else f"{repo.rsplit('/', 1)[-1]}#{num}"
+        out.append((label, f"https://github.com/{repo}/pull/{num}" if repo.count("/") == 1 and num.isdigit() else None))
+    return out
+
+
+def build(snap, state=None, own_pane="", here_tab="", now=None, own_workspace="", story_slug=None):
     """Snapshot + dispatcher state → Tree."""
     now = time.time() if now is None else now
     state = state if isinstance(state, dict) else {}
@@ -122,7 +138,7 @@ def build(snap, state=None, own_pane="", here_tab="", now=None, own_workspace=""
         control = ws_by_id.get(seat.get("workspace_id")) if seat else None
     if control is not None:
         cid = control.get("workspace_id")
-        panes = [p for p in panes if role_of(p) not in TOP_ROLES + ("runner",) or p.get("workspace_id") == cid]
+        panes = [p for p in panes if role_of(p) not in TOP_ROLES + ("runner", "configurator") or p.get("workspace_id") == cid]
     tree.panes = panes
     tree.dispatcher = "running" if tokens(control).get("dispatcher") == "running" else "stopped"
 
@@ -163,6 +179,8 @@ def build(snap, state=None, own_pane="", here_tab="", now=None, own_workspace=""
                                    if v))
         node.sub = " · ".join(v for v in (t.get("kind"), t.get("stage")) if v)
         node.counts = counts
+        node.agents = agents
+        node.links = links(t, story_slug)
         node.flag = sum(a.needs for a in agents)
         node.held = sum(a.held for a in agents)
         changed = last_change.get(t.get("unit"))
@@ -177,7 +195,7 @@ def build(snap, state=None, own_pane="", here_tab="", now=None, own_workspace=""
         role = role_of(p)
         if p is seat:
             continue
-        if role in TOP_ROLES + ("runner",) or p.get("workspace_id") not in units:
+        if role in TOP_ROLES + ("runner", "configurator") or p.get("workspace_id") not in units:
             tree.control.append(p["pane_id"])
     for prop in tree.proposals:
         pid = prop.get("pid") or prop.get("id") or "?"
@@ -271,6 +289,12 @@ def to_text(tree):
         if node.detail:
             bits.append("— " + node.detail)
         lines.append("  ".join(bits))
+        if node.kind == "unit":
+            pad = "   " if lead.startswith("├") else "   "
+            for a in node.agents:
+                lines.append(f"{pad}  · {a.name} [{STATUS[a.status][1]}]" + (f" — {a.detail}" if a.detail else ""))
+            if node.links:
+                lines.append(f"{pad}  ↗ " + "  ".join(label for label, _ in node.links))
 
     def block(hub, spokes, title=None):
         if title:
