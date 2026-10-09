@@ -16,7 +16,8 @@ close-unit.sh <workspace-id> [--force]
 ```
 
 - **Names** — `epic-<id>-<slug>`. Units of the older kinds (`story` · `story-set` · `goal-set` · `review`)
-  run until folded (`fold.sh`), and are never created new.
+  run until folded (`fold.sh`), and are never created new. A busy one left open by a fold carries
+  `folded=<epic unit>`: it matches no story or PR, and events addressed to it reach the epic's PM.
 - **Tokens** (source `prometheus`) — workspace: `unit`, `kind`, `epic`, `project` (a registry key),
   `stories`, `prs`, `stage`, `stages` (`sc-1=review,sc-2=implement`); panes: `role`, `item`, `pr`, `worktree`. One writer each: `create-unit.sh` sets the
   workspace tokens; the lead keeps `stage`, `stories`, `prs` current with `dispatch/scripts/unit-tokens.sh`; the session-role hook sets `role`.

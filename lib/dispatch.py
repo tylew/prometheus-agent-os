@@ -163,14 +163,19 @@ class RouteError(Exception):
 
 
 def match_units(snap: dict, event: dict) -> list[dict]:
-    """Units an event belongs to: by unit label, story id, or any PR in its stack."""
+    """Units an event belongs to: by unit label, story id, or any PR in its stack. A unit tagged
+    `folded=<epic unit>` never matches by story / PR; by label it resolves to its epic unit."""
     if event.get("unit"):
-        return [u for u in units(snap) if _tokens(u).get("unit") == event["unit"]]
+        hits = [u for u in units(snap) if _tokens(u).get("unit") == event["unit"]]
+        into = _tokens(hits[0]).get("folded") if hits else None
+        return [u for u in units(snap) if _tokens(u).get("unit") == into] if into else hits
     stories = set(filter(None, [event.get("story"), *event.get("stories", [])]))
     prs = set(filter(None, [event.get("pr"), *event.get("stack", [])]))
     hits = []
     for u in units(snap):
         t = _tokens(u)
+        if t.get("folded"):
+            continue
         if stories & set(token_list(t, "stories")) or prs & set(_csv(t.get("prs"))):
             hits.append(u)
     return hits

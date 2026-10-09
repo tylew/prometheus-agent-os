@@ -85,6 +85,17 @@ class RouteTest(Base):
             d.route(snap(), {"story": "sc-404"})
 
 
+    def test_a_folded_unit_resolves_to_its_epic(self):
+        s = snap()
+        s["workspaces"][1]["tokens"]["folded"] = "epic-7-e"
+        s["workspaces"].append({"workspace_id": "wE", "label": "epic-7-e", "tokens": {
+            "unit": "epic-7-e", "kind": "epic", "epic": "7", "stories": "sc-1,sc-2", "prs": "o/r#10,o/r#11"}})
+        s["panes"].append({"pane_id": "wE:p1", "workspace_id": "wE", "agent_status": "idle", "tokens": {"role": "pm"}})
+        self.assertEqual(d.route(s, {"story": "sc-1"}), "wE:p1")
+        self.assertEqual(d.route(s, {"pr": "o/r#10"}), "wE:p1")
+        self.assertEqual(d.route(s, {"unit": "sc-1-a", "role": "pm"}), "wE:p1")
+
+
 class SendDeliverTest(Base):
     def test_send_defaults_to_own_unit_and_tags_sender(self):
         os.environ.update(PROMETHEUS_ROLE="implementor", HERDR_WORKSPACE_ID="wA")

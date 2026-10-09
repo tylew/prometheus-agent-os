@@ -61,6 +61,21 @@ class FoldTest(unittest.TestCase):
             lines = [i["line"] for items in st["outbox"].values() for i in items]
         self.assertTrue(any("write your handoff" in l for l in lines))
 
+    def test_a_busy_old_unit_stays_open_tagged_folded(self):
+        w = json.load(open(self.world_path))
+        w["panes"].append({"pane_id": "%s:p9" % self.a, "tab_id": "t9", "workspace_id": self.a,
+                           "agent_status": "working", "tokens": {"role": "implementor"}})
+        json.dump(w, open(self.world_path, "w"))
+        path = fold.epic_file("epic-77-miso-ameren")
+        with open(path, "a") as fh:
+            fh.write("## from review-11-b\n## from sc-1001-a\n")
+        out = fold.run("77", wait=5, lookup=lookup, sleep=lambda _: None)
+        self.assertEqual(out["folded"], ["review-11-b"])
+        snap = dispatch.snapshot()
+        self.assertEqual(dispatch._tokens(dispatch.unit_of_workspace(snap, self.a)).get("folded"), "epic-77-miso-ameren")
+        epic = next(u for u in dispatch.units(snap) if dispatch._tokens(u)["unit"] == "epic-77-miso-ameren")
+        self.assertEqual(dispatch.match_units(snap, {"story": "sc-1001"}), [epic])
+
     def test_run_opens_nothing_until_every_handoff_is_written(self):
         out = fold.run("77", wait=0.01, lookup=lookup, sleep=lambda _: None)
         self.assertEqual(out["folded"], [])

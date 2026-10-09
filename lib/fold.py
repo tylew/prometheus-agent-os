@@ -108,6 +108,9 @@ def run(epic_id: str, wait: float = 900, lookup=None, sleep=time.sleep) -> dict:
                 "Epic %s (%s), opened by folding %s. Every story and PR below is yours: read each `## from <unit>` "
                 "section of your epic file first and resume every story and PR exactly where it stands — nothing is "
                 "restarted." % (p["name"], epic_id, ", ".join(p["units"])), epic=epic_id)
+    into = dispatch._tokens(existing)["unit"] if existing else p["unit"]
+    for ws in p["workspaces"]:  # a busy old unit left open routes to the epic from here on
+        units.tag_workspace(ws, folded=into)
     closed, left = [], []
     for old, ws in zip(p["units"], p["workspaces"]):
         try:
