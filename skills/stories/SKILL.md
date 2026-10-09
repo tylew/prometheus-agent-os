@@ -102,7 +102,7 @@ The planner checks every item before moving the story:
       no how anywhere (no engineering section, no file named).
 - [ ] **Flag decision** — the flag sentence in *What's decided* (key, context kind, default = old
       behavior), or why no flag; an epic's release flag named instead when the epic has one.
-- [ ] **Dependencies** — *blocked by* relations on the tracker, each with its reason in words.
+- [ ] **Dependencies** — no open *blocked by*; a story that gains one returns to Backlog until it resolves.
 - [ ] **Planning links** — as Shortcut doc or story URLs, never a vault note.
 - [ ] **Estimate** — Fibonacci, ≤ 5 targeted, 8 splits.
 

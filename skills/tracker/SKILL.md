@@ -54,7 +54,7 @@ Move: `mcp__shortcut__stories-update` with `storyPublicId` + `workflow_state_id`
 |---|---|
 | created (intake) | `backlog_state` (planner, at create) |
 | design posted; the type's readiness bar met ([board.md](references/board.md) → Readiness) | `ready_for_development` |
-| queued to work next — ready stories only, none with an unresolved *blocked by* | `on_deck` |
+| queued to work next — ready stories only | `on_deck` |
 | worktree created after plan confirmation, or draft PR up | `in_development` |
 | PR un-drafted | `ready_for_review` |
 | PR merged to `main` | `completed` |

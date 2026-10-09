@@ -92,7 +92,7 @@ for an intake-level gap, labelled from config `labels` (`needs-scoping`, `needs-
 
 | Type | Bar |
 |---|---|
-| all | scenarios + AC confirmed; no unresolved *blocked by*; no blocking *Still open*; recorded decisions read and followed or explicitly superseded; estimate re-checked ≤ 5 |
+| all | scenarios + AC confirmed; no blocking *Still open*; recorded decisions read and followed or explicitly superseded; estimate re-checked ≤ 5 |
 | feature | expected behavior; out of scope; target paths (outside `owned_paths` = cross-cutting → operator go-ahead now); work-item breakdown; test expectations + suite; rollout (any schema change called out); observability |
 | bug | observed vs expected; reproduction or evidence; affected area; impact; validation environment; origin (*relates to* the shipped change, or "unknown" + why); duplicates folded |
 | chore | current state + its cost; target state; scope; why now; behavior change (a "none" the test plan proves); risk + reversal |
