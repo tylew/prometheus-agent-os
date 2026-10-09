@@ -112,7 +112,8 @@ COMMENT unless Critical/High stand. Never push to, approve on a condition, or me
 decisions to the librarian, worktrees removed, report to the seat, close the unit (`unit-workspaces`).
 
 Procedure lives in
-`prometheus` skills — load them, don't reconstruct: specs/plans → `knowledge`; story state → `tracker`;
+`prometheus` skills — load them, don't reconstruct: where the record lives (the team planning vault, the
+story folder, KB, specs) → `knowledge` → *Where the record lives*, read before deciding in an area; story state → `tracker`;
 branches/PRs → `branching`; review loop → `review`; validation → `validate`; tabs → `agent-tabs`;
 events → `events`; scenario + UI gates → `behavior-grounding`; compaction → `context-hygiene`.
 
