@@ -95,6 +95,8 @@ by new content is superseded by this round's `REQUEST_CHANGES`; the body says wh
 6. On a stack, the rung below approved; body carries **Stack order**.
 7. No `HUMAN_NEEDED` label, no hold.
 8. The review was requested of the operator (brief `requested: yes`).
+9. A teammate's PR that delivers a story: every acceptance criterion on the story is checked (Shortcut
+   `stories-get-by-id`). Ticking them is the author's; unchecked ⇒ open, and the round says which.
 
 Scenario acceptance as a whole is not in the gate: it is `validate`'s, and the merge is the operator's.
 

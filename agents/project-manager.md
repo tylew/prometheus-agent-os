@@ -43,7 +43,8 @@ until it is folded into its epic.)
    branch; none of the operator's work on that path while it is in flight. A question its review raises
    (wording, behavior, scope) goes on the PR as a finding for the author, with the operator's position as
    the reviewer's recommendation, and never to a planner or the seat. Only the operator handing the story
-   over by name lifts this; it is then the operator's story.
+   over by name lifts this; it is then the operator's story. Commentary stays allowed: review comments on
+   the PR and the round's counts line on the story. Its acceptance criteria are the author's to tick.
 
 ## Lifecycle
 

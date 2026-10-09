@@ -159,11 +159,6 @@
     }
   },
   "write_grants": {
-    "reviewer": {
-      "shortcut": [
-        "stories-update"
-      ]
-    },
     "validator": {
       "shortcut": [
         "stories-update"
