@@ -141,3 +141,55 @@ class MergeAndHeartbeatTest(Base):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ReviewShadowTest(Base):
+    def line(self, counts="0 critical · 1 high · 2 medium"):
+        return ("[prometheus] from reviewer@epic-1-x: review #o/r#10 r2 @abc1234: %s (held: 1 low) — COMMENT — "
+                "https://github.com/o/r/pull/10#pullrequestreview-1 — /s/reviews/o-r-10-r2.md" % counts)
+
+    def test_own_pr_round_predicts_the_next_round_and_matches_when_the_pm_opens_it(self):
+        st = {"loops": {"o/r#10": {"round": 2}}, "cursors": {"pr:o/r#10": {"author": "me"}}}
+        with unittest.mock.patch.object(eng, "_operator", return_value="me"):
+            eng.observe(snap(), {"unit": "epic-1-x", "line": self.line()}, st, now=1)
+        self.assertIn("review|next:o/r#10:3", st["engine"]["expect"])
+        self.assertTrue(any("would (review): post the r2 counts line, then open round 3 on o/r#10" in l
+                            for l in self.feed()))
+        self.assertEqual(eng.settle_expectations(st, now=2), [])
+        st["loops"]["o/r#10"]["round"] = 3
+        self.assertEqual(eng.settle_expectations(st, now=3), ["engine: review match 1"])
+        self.assertEqual(st["engine"]["matches"], {"review": 1})
+        self.assertEqual(st["engine"]["expect"], {})
+
+    def test_a_teammates_pr_predicts_nothing_and_a_clean_round_predicts_approval(self):
+        st = {"loops": {"o/r#10": {"round": 2}}, "cursors": {"pr:o/r#10": {"author": "mate"}}}
+        with unittest.mock.patch.object(eng, "_operator", return_value="me"):
+            eng.observe(snap(), {"unit": "epic-1-x", "line": self.line()}, st, now=1)
+            self.assertEqual(st.get("engine", {}).get("expect", {}), {})
+            st["cursors"]["pr:o/r#10"]["author"] = "me"
+            eng.observe(snap(), {"unit": "epic-1-x", "line": self.line("0 critical · 0 high · 0 medium")}, st, now=1)
+        self.assertIn("review|clean:o/r#10:2", st["engine"]["expect"])
+
+    def test_old_expectations_expire(self):
+        st = {"engine": {"expect": {"review|next:o/r#10:3": {"unit": "epic-1-x", "what": "x", "at": 0}}}}
+        eng.settle_expectations(st, now=4 * 86400)
+        self.assertEqual(st["engine"]["expect"], {})
+        self.assertTrue(any("no match (review)" in l for l in self.feed()))
+
+
+class StopShadowTest(Base):
+    def test_a_stop_predicts_the_relay_and_the_pms_message_to_the_planner_matches_it(self):
+        st = {}
+        eng.tick(snap(stages=""), st, now=1)
+        self.inbox("stopped", "sc-3")
+        eng.tick(snap(stages=""), st, now=2)
+        self.assertIn("stops|relay:/tmp/stopped.md", st["engine"]["expect"])
+        eng.observe(snap(), {"unit": "epic-1-x", "line": "[prometheus] from pm@epic-1-x: stop on sc-3 — /tmp/stopped.md"},
+                    st, now=3)
+        self.assertEqual(st["engine"]["matches"], {"stops": 1})
+
+    def test_adoption_reads_the_tracker_state_when_the_stages_token_is_silent(self):
+        st = {"cursors": {"story:sc-3": "In Development"}}
+        eng.tick(snap(stages=""), st, now=1)
+        self.assertEqual((st["engine"]["stories"]["sc-3"]["stage"], st["engine"]["stories"]["sc-3"]["legacy"]),
+                         ("implement", True))

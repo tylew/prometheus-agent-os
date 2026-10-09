@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sys
 import time
 
@@ -96,9 +97,15 @@ def intend(rec: dict, kind: str, key: str) -> bool:
 
 # ------------------------------------------------------------------- adoption
 
+TRACKER_STAGE = {"Backlog": "backlog", "Backlog State": "backlog", "Ready for Development": "ready",
+                 "On Deck": "ready", "In Development": "implement", "Ready for Review": "review",
+                 "Completed": "done", "Won't Fix": "done"}
+
+
 def adopt(snap: dict, st: dict, unit: dict, now: float | None = None) -> list[str]:
     """Stories in an engine unit's `stories` token get a record; one past ready when first seen is legacy
-    (started under the PM: no IDR or scenario-test gate). Stage starts from the PM-kept `stages` token."""
+    (started under the PM: no IDR or scenario-test gate). Stage starts from the PM-kept `stages` token,
+    else the story's tracker state from the dispatcher's Shortcut poll (`story:<id>` cursor)."""
     t = dispatch._tokens(unit)
     label = t.get("unit")
     stages = dict(kv.split("=", 1) for kv in dispatch._csv(t.get("stages")) if "=" in kv)
@@ -109,7 +116,8 @@ def adopt(snap: dict, st: dict, unit: dict, now: float | None = None) -> list[st
             continue
         rec = story_state(st, sid, label)
         token_stage = stages.get(sid)
-        stage = token_stage if token_stage in STAGES else "backlog"
+        tracked = TRACKER_STAGE.get((st.get("cursors") or {}).get("story:" + sid, ""))
+        stage = token_stage if token_stage in STAGES else tracked or "backlog"
         rec["legacy"] = stage not in ("backlog", "ready")
         set_stage(st, rec, stage, None, "adopted%s" % (" (legacy)" if rec["legacy"] else ""), now)
         log.append("engine: adopted %s in %s at %s" % (sid, label, stage))
@@ -142,6 +150,10 @@ def consume_inbox(snap: dict, st: dict, now: float | None = None) -> list[str]:
             s.setdefault("files", {})[rec["kind"]] = rec["file"]
             set_stage(st, s, stage, waiting, "%s reported by %s (%s): %s" % (rec["kind"], rec.get("role"),
                                                                               rec.get("pane"), rec["file"]), now)
+            if rec["kind"] == "stopped":
+                expect(st, unit, "stops", "relay:%s" % rec["file"],
+                       "post %s's stop as one story comment, add `blocked`, relay %s to its planner"
+                       % (story, os.path.basename(rec["file"])), now)
             log.append("engine: %s %s → %s" % (story, rec["kind"], stage))
         elif unit:
             feed(unit, "inbox %s from %s (%s) on %s: %s" % (rec["kind"], rec.get("role"), rec.get("pane"),
@@ -150,11 +162,99 @@ def consume_inbox(snap: dict, st: dict, now: float | None = None) -> list[str]:
     return log
 
 
-def observe(snap: dict, ev: dict, now: float | None = None) -> None:
-    """A lead-routed event line for an engine unit goes to its feed too (shadow: the PM still acts on it)."""
+def observe(snap: dict, ev: dict, st: dict | None = None, now: float | None = None) -> None:
+    """A lead-routed line for an engine unit goes to its feed too, and each duty predicts from it what it
+    would do (shadow: the PM still acts on it)."""
     unit = ev.get("unit")
-    if unit and any(dispatch._tokens(u).get("unit") == unit for u in engine_units(snap)):
-        feed(unit, "event: %s" % ev.get("line", ""), now)
+    if not unit or not any(dispatch._tokens(u).get("unit") == unit for u in engine_units(snap)):
+        return
+    line = ev.get("line", "")
+    feed(unit, "event: %s" % line, now)
+    if st is not None:
+        for predict in PREDICTORS:
+            predict(st, unit, line, now)
+        _match_lines(st, unit, line, now)
+
+
+# ----------------------------------------------------- duties: shadow predictions
+
+REVIEW_LINE = re.compile(r"review #?(?P<ref>[\w.-]+/[\w.-]+#\d+|\d+) r(?P<n>\d+) @(?P<sha>\w+): "
+                         r"(?P<c>\d+) critical · (?P<h>\d+) high · (?P<m>\d+) medium.*? — (?P<event>[A-Za-z_ ]+?) — ")
+
+
+def expect(st: dict, unit: str, duty: str, key: str, what: str, now: float | None = None) -> None:
+    """Shadow: record what this duty would do; `settle_expectations` matches it against what happened."""
+    exp = st.setdefault("engine", {}).setdefault("expect", {})
+    k = "%s|%s" % (duty, key)
+    if k not in exp:
+        exp[k] = {"unit": unit, "what": what, "at": int(now or time.time())}
+        feed(unit, "would (%s): %s" % (duty, what), now)
+
+
+def predict_review(st: dict, unit: str, line: str, now: float | None = None) -> None:
+    m = REVIEW_LINE.search(line)
+    if not m:
+        return
+    ref, n = m.group("ref"), int(m.group("n"))
+    loop = st.get("loops", {}).get(ref)
+    counts = (int(m.group("c")), int(m.group("h")), int(m.group("m")))
+    author = (st.get("cursors", {}).get("pr:" + ref) or {}).get("author", "")
+    if author and author != _operator():
+        return  # a teammate's rounds open themselves on new commits: nothing for the duty to predict
+    if loop and sum(counts):
+        expect(st, unit, "review", "next:%s:%d" % (ref, n + 1),
+               "post the r%d counts line, then open round %d on %s" % (n, n + 1, ref), now)
+    elif not sum(counts):
+        expect(st, unit, "review", "clean:%s:%d" % (ref, n),
+               "r%d clean on %s — request a teammate's approval" % (n, ref), now)
+
+
+def _operator() -> str:
+    try:
+        import events
+        return events.own_posts()[0]
+    except Exception:  # noqa: BLE001
+        return ""
+
+
+PREDICTORS = [predict_review]
+
+
+def _hit(st: dict, k: str, now: float | None = None) -> None:
+    exp = st["engine"]["expect"]
+    duty = k.split("|", 1)[0]
+    matches = st["engine"].setdefault("matches", {})
+    matches[duty] = matches.get(duty, 0) + 1
+    e = exp.pop(k)
+    feed(e["unit"], "match (%s #%d): the PM did what the engine would — %s" % (duty, matches[duty], e["what"]), now)
+
+
+def _match_lines(st: dict, unit: str, line: str, now: float | None = None) -> None:
+    """Expectations a message settles: the PM relaying a stop file to the story's planner."""
+    if not line.startswith("[prometheus] from pm@"):
+        return
+    for k in [k for k in st.get("engine", {}).get("expect", {}) if k.startswith("stops|relay:")]:
+        if k.split("relay:", 1)[1] in line:
+            _hit(st, k, now)
+
+
+def settle_expectations(st: dict, now: float | None = None) -> list[str]:
+    """Match each expectation against the state the PM's actions left; a match counts toward the duty."""
+    exp = st.get("engine", {}).get("expect", {})
+    log = []
+    for k, e in list(exp.items()):
+        duty, key = k.split("|", 1)
+        hit = False
+        if key.startswith("next:"):
+            ref, n = key[len("next:"):].rsplit(":", 1)
+            hit = (st.get("loops", {}).get(ref) or {}).get("round", 0) >= int(n)
+        if hit:
+            _hit(st, k, now)
+            log.append("engine: %s match %d" % (duty, st["engine"]["matches"][duty]))
+        elif (now or time.time()) - e["at"] > 3 * 86400:
+            feed(e["unit"], "no match (%s) in 3 days: %s" % (duty, e["what"]), now)
+            del exp[k]
+    return log
 
 
 # ----------------------------------------------------------------------- tick
@@ -185,6 +285,7 @@ def tick(snap: dict, st: dict, now: float | None = None) -> list[str]:
     log += consume_inbox(snap, st, now)
     for u in engine_units(snap):
         log += reconcile(snap, st, u, now)
+    log += settle_expectations(st, now)
     return log
 
 
@@ -216,6 +317,10 @@ def main(argv: list[str]) -> int:
     if a.cmd == "status":
         with dispatch.locked_state() as st:
             rows = [r for r in _stories(st).values() if not a.unit or r.get("unit") == a.unit]
+            matches = dict(st.get("engine", {}).get("matches", {}))
+            pending = len(st.get("engine", {}).get("expect", {}))
+        print("shadow matches: %s · predictions pending: %d" % (
+            ", ".join("%s %d" % kv for kv in sorted(matches.items())) or "none yet", pending))
         for r in sorted(rows, key=lambda r: (r.get("unit") or "", r["story"])):
             print("%-10s %-24s %-10s %s%s" % (r["story"], r.get("unit") or "-", r["stage"],
                                               "waiting: %s" % r["waiting"] if r.get("waiting") else "",

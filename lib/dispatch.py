@@ -236,8 +236,11 @@ def send(snap: dict, st: dict, message: str, *, pane_id: str | None = None,
     if event["role"] in CONTROL:
         event["unit"] = None
     target = route(snap, event)
-    enqueue(st, target, "[prometheus] from %s@%s: %s" % (me_role, my_label, message),
-            unit=event.get("unit"))
+    line = "[prometheus] from %s@%s: %s" % (me_role, my_label, message)
+    enqueue(st, target, line, unit=event.get("unit"))
+    if event.get("unit"):
+        import unit_engine
+        unit_engine.observe(snap, {"unit": event["unit"], "line": line}, st)
     return target
 
 
@@ -569,7 +572,7 @@ def tick(heartbeat_min: int = 30, prompt=None, external: bool | None = None) -> 
             enqueue(st, target, ev["line"], unit=ev.get("unit"))
             if ev.get("unit"):
                 import unit_engine
-                unit_engine.observe(snap, ev)
+                unit_engine.observe(snap, ev, st)
         report, sends = take_deliveries(snap, st, real=prompt is None)
     failed = send_all(sends, prompt)
     if failed:
