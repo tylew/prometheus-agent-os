@@ -105,7 +105,8 @@ class StateDirTest(unittest.TestCase):
                 self.assertEqual(out.returncode, 0, out.stderr)
             perms = json.load(open(os.path.join(real, "settings", "reviewer.json")))["permissions"]
             self.assertIn("Edit(/%s/reviews/**)" % resolved, perms["allow"])
-            self.assertEqual(perms["additionalDirectories"], [resolved])
+            self.assertIn(resolved, perms["additionalDirectories"])
+            self.assertFalse([d for d in perms["additionalDirectories"] if alias in d])
             for role in ("reviewer", "runner"):
                 prompt = open(os.path.join(real, "settings", role + ".prompt.md")).read()
                 self.assertIn("Prometheus state dir: `%s`" % resolved, prompt)

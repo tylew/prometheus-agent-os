@@ -3,8 +3,7 @@
 Run by the reviewer, after the SKILL.md preconditions. Rating, posting and the event:
 [findings.md](findings.md). When the next round runs: the PM ([review-loop.md](review-loop.md)).
 
-**Command form** — `prometheus:dispatch`. A package's make validation: `make -C <worktree>/<package path>
-<target> VOLTUS=<worktree>` (the project runbook says which targets and flags).
+**Command form** — `prometheus:dispatch` (the project runbook says which make targets and flags).
 
 ## 0. Context surfaces — before the diff
 

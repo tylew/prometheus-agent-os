@@ -69,7 +69,14 @@
         {
           "cmd": "rounds.sh next o/r#1",
           "live": "rounds.sh list"
-        }
+        },
+        "cat {plugin_root}/skills/review/references/findings.md",
+        "ls {workspace}/docs/specs",
+        "git -C {plugin_root} range-diff HEAD~3..HEAD~2 HEAD~2..HEAD~1",
+        "git -C {plugin_root} ls-files lib",
+        "git -C {workspace} worktree list",
+        "gh api repos/voltusdev/voltus/pulls/comments/4221467356 --jq .id",
+        "CI=true timeout 5 npm --prefix {wt}/js run test x -- --forceExit"
       ],
       "ask": [
         "mcp__launchdarkly__update-feature-flag",
@@ -87,7 +94,11 @@
         "gh api repos/o/r/issues/1/comments -X POST",
         "gh api repos/o/r/issues/1/comments --input body.json",
         "CI=true npm --prefix {wt}/js run test brightfield-besstie -- -u",
-        "CI=true npm --prefix {wt}/js run test brightfield-besstie -- --updateSnapshot"
+        "CI=true npm --prefix {wt}/js run test brightfield-besstie -- --updateSnapshot",
+        {
+          "cmd": "gh api repos/o/r/pulls/comments/1 -X DELETE",
+          "live": "gh api repos/o/r/pulls/comments/1 -X DELETE --hostname probe.invalid"
+        }
       ]
     },
     "planner": {
@@ -150,7 +161,17 @@
           "cmd": "report.sh --holds o/r#1",
           "live": "report.sh --help"
         },
-        "Write({state_dir}/reviews/o-r-1-r2-dispositions.md)"
+        "Write({state_dir}/reviews/o-r-1-r2-dispositions.md)",
+        "cat {plugin_root}/skills/review/references/findings.md",
+        "ls {workspace}/docs/specs",
+        "git -C {plugin_root} range-diff HEAD~3..HEAD~2 HEAD~2..HEAD~1",
+        "git -C {plugin_root} ls-files lib",
+        "git -C {workspace} worktree list",
+        "gh api repos/voltusdev/voltus/pulls/comments/4221467356 --jq .id",
+        "CI=true timeout 5 npm --prefix {wt}/js run test x -- --forceExit",
+        "gt continue",
+        "gt add --help",
+        "git -C {wt} add x.py && git -C {wt} status --short"
       ],
       "deny": [
         {
@@ -194,7 +215,23 @@
         "gh api repos/o/r/issues/1/comments -X POST",
         "gh api repos/o/r/issues/1/comments --input body.json",
         "CI=true npm --prefix {wt}/js run test brightfield-besstie -- -u",
-        "CI=true npm --prefix {wt}/js run test brightfield-besstie -- --updateSnapshot"
+        "CI=true npm --prefix {wt}/js run test brightfield-besstie -- --updateSnapshot",
+        {
+          "cmd": "gh api repos/o/r/pulls/comments/1 -X DELETE",
+          "live": "gh api repos/o/r/pulls/comments/1 -X DELETE --hostname probe.invalid"
+        },
+        {
+          "cmd": "touch {workspace}/probe-missing-dir/x",
+          "live": "touch {workspace}/probe-missing-dir/x"
+        },
+        {
+          "cmd": "gt add -A",
+          "live": "gt add -A"
+        },
+        {
+          "cmd": "git -C {wt} add -A",
+          "live": "git -C {wt} add -A"
+        }
       ]
     },
     "reviewer": {
@@ -246,7 +283,14 @@
         {
           "cmd": "send.sh --role implementor --pr o/r#1 \"r2 findings\"",
           "live": "send.sh --help"
-        }
+        },
+        "cat {plugin_root}/skills/review/references/findings.md",
+        "ls {workspace}/docs/specs",
+        "git -C {plugin_root} range-diff HEAD~3..HEAD~2 HEAD~2..HEAD~1",
+        "git -C {plugin_root} ls-files lib",
+        "git -C {workspace} worktree list",
+        "gh api repos/voltusdev/voltus/pulls/comments/4221467356 --jq .id",
+        "CI=true timeout 5 npm --prefix {wt}/js run test x -- --forceExit"
       ],
       "deny": [
         "mcp__claude-in-chrome__gif_creator",
@@ -281,7 +325,15 @@
         "gh api repos/o/r/issues/1/comments -X POST",
         "gh api repos/o/r/issues/1/comments --input body.json",
         "CI=true npm --prefix {wt}/js run test brightfield-besstie -- -u",
-        "CI=true npm --prefix {wt}/js run test brightfield-besstie -- --updateSnapshot"
+        "CI=true npm --prefix {wt}/js run test brightfield-besstie -- --updateSnapshot",
+        {
+          "cmd": "gh api repos/o/r/pulls/comments/1 -X DELETE",
+          "live": "gh api repos/o/r/pulls/comments/1 -X DELETE --hostname probe.invalid"
+        },
+        {
+          "cmd": "touch {workspace}/probe-missing-dir/x",
+          "live": "touch {workspace}/probe-missing-dir/x"
+        }
       ]
     },
     "librarian": {

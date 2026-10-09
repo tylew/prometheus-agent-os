@@ -6,7 +6,7 @@ description: "The dispatcher — the only watcher; no agent polls, Monitors or l
 # dispatch
 
 The dispatcher is the only watcher. No agent polls, arms a `Monitor`, runs `/loop` or background-waits.
-Scripts: `$CLAUDE_PLUGIN_ROOT/skills/dispatch/scripts/` (thin wrappers over `lib/dispatch.py` and `lib/events.py`).
+Scripts: `$CLAUDE_PLUGIN_ROOT/skills/dispatch/scripts/`, on PATH — call by bare name (thin wrappers over `lib/dispatch.py` and `lib/events.py`).
 
 ## Start, stop, status (the seat)
 
@@ -73,9 +73,11 @@ outbox.
 
 **Command form (dontAsk roles).** Never `cd` — after `builtin cd` every relative path or `git` is denied,
 a relative `cd` too, and the tab already starts in its worktree. Elsewhere: `git -C <abs>` and absolute paths. `&&` / `;` and
-pipes into `grep` / `head` / `wc` pass when every part is allowed. Files outside the worktree (plugin
-skills, briefs, `docs/kb/`) → the Read / Grep tools, not `cat` / `grep`. No `$(…)`, no `awk`. A denied form is rewritten in this shape,
-never dropped silently.
+pipes into `grep` / `head` / `wc` pass when every part is allowed. Scripts (`send.sh`, `report.sh` …) by bare
+name, never a path. No shell variables (`X=…; $X`, `$PWD`, `$CLAUDE_PLUGIN_ROOT`) — spell absolute paths; the
+only env prefix is `CI=true`. No `$(…)`, `awk`, `python3 -c`, heredoc or `for` loop — one call per item. Make
+validation: `make -C <worktree>/<package path> <target> VOLTUS=<worktree>`. A denied form is rewritten in this
+shape, never dropped silently.
 
 ```
 send.sh --role pm "<one line>"                  to your own unit's lead

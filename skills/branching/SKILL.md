@@ -36,7 +36,7 @@ Facts come from the registry, never memory. `<default>` below = `repo.default_br
 ## Roles
 
 - **Implementor** — one work item in one worktree, `dontAsk` + allow-list
-  (`templates/settings/implementor.json`). May: `git add <path>`, `gt create/modify/restack/sync`,
+  (`templates/settings/implementor.json`). May: `git add <path>` / `gt add <path>`, `gt create/modify/restack/sync`, `gt continue` (finishing a conflicted restack),
   `gt submit --draft …`, `gh pr view/diff/checks`, the entry's validation commands. May not:
   `gt submit --publish`, merge, `gh pr ready`, force-push, `git stash`, story state. A denied action is
   reported, never retried around: `send.sh --role pm "denied: <action>, needed for <why>"`
