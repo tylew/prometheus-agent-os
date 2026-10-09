@@ -365,6 +365,13 @@
                   "jest-json"
                 ],
                 "description": "How <report> is parsed into passed / failed / error per test."
+              },
+              "proof_links": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Paths symlinked from the story's worktree into the proof's throwaway worktrees (an environment a fresh checkout cannot build, e.g. a package .venv)."
               }
             }
           }

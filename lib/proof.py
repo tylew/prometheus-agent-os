@@ -131,6 +131,10 @@ def run_tests(wt: str, sha: str, files: list[str], pkg: dict, project: str) -> d
             units.link_worktree(tmp, project)
         except Exception:
             pass
+        for rel in pkg.get("proof_links", []):
+            src, dst = os.path.join(wt, rel), os.path.join(tmp, rel)
+            if os.path.exists(src) and not os.path.lexists(dst) and os.path.isdir(os.path.dirname(dst)):
+                os.symlink(src, dst)
         report = tmp + ".report"
         present = [f for f in files if os.path.exists(os.path.join(tmp, f))]
         if not present:
