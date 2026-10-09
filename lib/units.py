@@ -192,6 +192,8 @@ def set_tokens(workspace_id: str, stage: str | None = None, stories: str | None 
         base = dispatch._csv(whole) if whole is not None else dispatch._csv(cur.get(key))
         out[key] = ",".join(dict.fromkeys(dispatch.canon_ref(key, v) for v in base + (extra or [])))
     if stage:
+        if len(stage) > members.TOKEN_MAX:
+            raise ValueError("stage is ≤%d chars; per-story stages go in --story-stage" % members.TOKEN_MAX)
         out["stage"] = stage
     if story_stages:  # `stages` = sc-1=review,sc-2=implement — one stage per story, for the map
         cur_st = dict(x.split("=", 1) for x in dispatch._csv(cur.get("stages")) if "=" in x)

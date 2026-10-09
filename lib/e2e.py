@@ -45,6 +45,15 @@ def main(argv: list[str]) -> int:
         units.set_tokens(out["workspace"], stage="design", add_prs=["o/r#1"])
         row = next((r for r in units.list_units() if r["unit"] == name), {})
         step("unit tokens set (stage, prs)", (row.get("stage"), row.get("prs")) == ("design", "o/r#1"), str(row))
+        many = ["o/r#%d" % n for n in range(1000, 1010)]
+        units.set_tokens(out["workspace"], prs=",".join(many))
+        raw = units.hz.call("api", "snapshot").get("snapshot", {})
+        token = next((w.get("tokens") or {} for w in raw.get("workspaces", [])
+                      if w.get("workspace_id") == out["workspace"]), {}).get("prs", "")
+        row = next((r for r in units.list_units() if r["unit"] == name), {})
+        step("10 PRs: token ≤80 whole entries, unit row holds all",
+             len(token) <= 80 and set(token.split(",")) <= set(many) and row.get("prs") == ",".join(many),
+             "token=%r row=%r" % (token, row.get("prs")))
         brief = os.path.join(state, "brief.md")
         with open(brief, "w") as fh:
             fh.write("Plumbing e2e. Reply with the single word OK and do nothing else.\n")

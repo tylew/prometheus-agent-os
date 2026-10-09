@@ -32,6 +32,14 @@ class UnitsTest(unittest.TestCase):
         import members
         self.assertNotIn("sc-1-a", members.load())
 
+    def test_stage_longer_than_herdrs_token_cap_is_refused(self):
+        out = units.create("sc-1-a", "story", "besstie", ["sc-1"], [])
+        with self.assertRaises(ValueError):
+            units.set_tokens(out["workspace"], stage="x" * 81)
+        self.assertEqual(self.world()["workspaces"][0]["tokens"]["stage"], "triage")
+        units.set_tokens(out["workspace"], stage="y" * 80)
+        self.assertEqual(self.world()["workspaces"][0]["tokens"]["stage"], "y" * 80)
+
     def tearDown(self):
         self.tmp.cleanup()
         for k in ("HERDR_BIN", "FAKE_HERDR_WORLD", "PROMETHEUS_STATE_DIR"):
