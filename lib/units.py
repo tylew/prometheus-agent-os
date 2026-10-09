@@ -2,7 +2,7 @@
 # ---
 # name: units
 # description: Unit workspaces and agent tabs over Herdr — create a unit (workspace, tokens, lead tab), list and close units, open / brief / close agent tabs (role tokens, `herdr agent start` with launch.sh's args, allow-list extras), the control tabs beside the seat (librarian, map), restoring units from the dispatcher's image after a Herdr restart, and context hygiene (compact an idle agent, refresh a session in a new tab). The unit-workspaces, agent-tabs and context-hygiene scripts are thin wrappers over its subcommands.
-# usage: units.py {create|list|tokens|close|open-tab|send-brief|close-tab|compact|refresh|control-tabs|dispatcher-pane|restore} [args]
+# usage: units.py {create|list|tokens|close|open-tab|send-brief|close-tab|compact|refresh|control-tabs|dispatcher-pane|restore|story-dir} [args]
 # ---
 from __future__ import annotations
 
@@ -562,6 +562,7 @@ def main(argv: list[str]) -> int:
     tk.add_argument("--add-story", action="append", default=[])
     tk.add_argument("--add-pr", action="append", default=[])
     tk.add_argument("--story-stage", action="append", default=[], help="sc-N=<stage>; repeatable (the map reads it)")
+    sub.add_parser("story-dir", help="a story's folder (research findings, IDR), created if missing").add_argument("story")
     rs = sub.add_parser("restore")
     rs.add_argument("--unit", action="append", default=[])
     rs.add_argument("--forget", action="append", default=[], help="drop a unit's image instead; repeatable")
@@ -605,6 +606,8 @@ def main(argv: list[str]) -> int:
                 raise ValueError("tokens: run from a pane inside a unit workspace (HERDR_PANE_ID)")
             print(json.dumps(set_tokens(unit["workspace_id"], a.stage, a.stories, a.prs,
                                         a.add_story, a.add_pr, a.story_stage)))
+        elif a.cmd == "story-dir":
+            print(story_dir(a.story))
         elif a.cmd == "control-tabs":
             print("opened: %s" % (", ".join(control_tabs(a.workspace)) or "nothing (both present)"))
         elif a.cmd == "dispatcher-pane":

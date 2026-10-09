@@ -56,8 +56,24 @@ losing your place (`context-hygiene`), and what a replacement PM reads.
 **Stages on the map** — keep each story's stage current: `units.py tokens --story-stage sc-<id>=<stage>`
 (and `--stage "<one line for the epic>"`).
 
-**Your stories** (the operator's): triage → design → plan → implement → review → merge-ready, no stage
-skipped, each story on its own track; several may run at once, one implementor per work item.
+**Your stories** (the operator's): backlog → ready (the story's planner) → design (the implementor's IDR)
+→ implement → review → merge-ready, each story on its own track; several may run at once, one implementor
+per story. No `design.md` / `plan.md`: the Ready story is the what, its IDR the how (stories started before
+2026-10-08 keep theirs).
+
+- **Start** a Ready story: create its worktree (`prometheus:branching`), `units.py story-dir sc-<id>`, open
+  `impl-sc-<id>` (`open-tab.sh … --item sc-<id> --worktree <abs>`) and brief it from
+  `templates/implementor-brief.md`.
+- **`IDR ready … <file>`** — read it against the story's Scenarios and *What's decided*: every scenario
+  placed in *Approach* with a seam, nothing contradicting a decision. Sound → `send.sh --pane <impl>
+  "IDR checked, start"`; not → the gaps, one line each, to the implementor; a behavior gap → the story's
+  planner.
+- **`STOPPED … <file>`** — post the stop file's block as the one story comment and add the `blocked`
+  label (`prometheus:tracker`); then route by its *needs*: the operator or the product owner → the story's
+  planner (`planner-sc-<id>`, opened and briefed if none) with the file; a spike → the planner offers to
+  file it; the owning team → `report.sh --needs-you` naming the team and the story. When the planner
+  reports it settled, tell the implementor what changed (story diff, IDR delta).
+- **`done … <file>`** — the PR flow as before (body, publish, story state; `prometheus:branching`).
 
 **Teammates' PRs in your epic** (a review request, or a PR touching the operator's owned paths) skip design,
 plan and build: the review loop on every PR of the stack, bottom rung first, until each merges, closes or the

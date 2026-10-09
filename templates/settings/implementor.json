@@ -1,5 +1,5 @@
 {
-  "$comment": "Depth-3 implementor: never prompts a human. Launched with --permission-mode dontAsk --settings <this file>; anything not allowed is denied and reported to the PM. open-tab.sh appends the project's registry validation commands to allow.",
+  "$comment": "Depth-3 implementor: never prompts a human — it stops instead (report.sh --stopped). Agent runs its analysis subagents (read-only by their brief); idr.py checks its IDR and renders the PR body block. Launched with --permission-mode dontAsk --settings <this file>; anything not allowed is denied and reported to the PM. open-tab.sh appends the project's registry validation commands to allow.",
   "extends": [
     "delivery"
   ],
@@ -23,6 +23,9 @@
       "Bash(gt sync *)",
       "Bash(gt log *)",
       "Bash(gt submit --draft *)",
+      "Agent",
+      "Bash(python3 */lib/idr.py *)",
+      "Bash(python3 \"*/lib/idr.py\" *)",
       "Bash(python3 */lib/registry.py *)",
       "Bash(send.sh *)",
       "Bash(report.sh *)",

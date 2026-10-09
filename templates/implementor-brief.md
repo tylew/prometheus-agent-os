@@ -1,30 +1,32 @@
 ---
-description: Project manager → implementor. One work item, the scenario it serves, and the boundaries it builds within.
+description: Lead (PM, later the engine) → implementor. One Ready story, its worktree and story folder, and the boundaries it builds within. The rule set itself is in agents/implementor.md.
 unit: <workspace-label>
-item: <item-slug>
 story: sc-#####
 worktree: <absolute path>
-ref: <branch or sha>
+story_dir: <absolute path — units.story_dir(sc-#####)>
+ref: <branch, off a fresh origin/<default>>
 ---
 
-# Work item: <item-slug>
+# Story: sc-##### — <title>
 
-## Serves scenario
-<The operator scenario this item satisfies, verbatim.>
+## The story
+<Link, and the Scenarios block verbatim. *What's decided* verbatim — UI changes are described there in
+the user's words; change nothing visible beyond them.>
 
-## Build
-<Scope and boundary of the item. Nothing beyond it.>
+## Research
+`<story_dir>/research/` — the planner's code, UI and knowledge findings. Start from them; verify what you
+rely on.
 
-## Confirmed UI changes
-<Each confirmed `ui-change` card, or "none". Change nothing visible beyond these.>
+## Stack
+<Fresh stack off `<default>`, or "stacked on #<n> by operator choice" — then the bottom PR body carries
+that line.>
 
 ## Non-negotiables (verbatim from `branching` + the registry entry)
-<Pasted, not paraphrased.>
+<Pasted, not paraphrased: branch, worktree, title prefix, no sc-##### in the title, gt, draft PRs, never
+sign, never a Claude author or co-author, minimal comments, explicit staging, owned paths, samples/
+read-only, the validation set with VOLTUS=<worktree>.>
 
-- Write only under `<worktree>`; never the project's main checkout; `samples/` is read-only.
-- Stacked on another item: when the PM says "restack", commit what you have, run `gt restack`, re-run
-  validation, and report.
-
-## Done when
-<Tests that prove the scenario pass; commits on the branch; draft PR open.> Report: paths changed,
-validation run and result, PR link, open questions.
+## Order
+Analyse (four background subagents) → IDR (`report.sh --idr`) → wait for "IDR checked, start" → failing
+scenario tests → code → validation → draft PRs with the scenario tests table and, on the bottom PR, the IDR
+block → `report.sh --done`. Anything matching a Stop trigger → `report.sh --stopped`.

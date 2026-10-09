@@ -357,3 +357,56 @@ class LoopTest(Base):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ArtifactReportTest(Base):
+    def setUp(self):
+        super().setUp()
+        self.world = os.path.join(self.tmp.name, "world.json")
+        with open(self.world, "w") as fh:
+            json.dump(snap(), fh)
+        os.environ.update(HERDR_BIN=os.path.join(LIB, "testing", "fake_herdr.py"), FAKE_HERDR_WORLD=self.world,
+                          HERDR_PANE_ID="wA:p2")
+
+    def tearDown(self):
+        for k in ("HERDR_BIN", "FAKE_HERDR_WORLD", "HERDR_PANE_ID"):
+            os.environ.pop(k, None)
+        super().tearDown()
+
+    def write(self, name, text):
+        path = os.path.join(self.tmp.name, name)
+        with open(path, "w") as fh:
+            fh.write(text)
+        return path
+
+    def inbox(self):
+        box = os.path.join(self.tmp.name, "engine", "inbox")
+        return [json.load(open(os.path.join(box, f))) for f in sorted(os.listdir(box))] if os.path.isdir(box) else []
+
+    def test_stop_is_kept_flagged_and_sent_to_the_lead(self):
+        path = self.write("stop.md", "**Stopped: sc-1** — needs the product owner\n\nQuestion: …\n")
+        with d.locked_state() as st:
+            self.assertEqual(d.report_artifact(d.snapshot(), st, "stopped", path), "stopped reported")
+            line = st["outbox"]["wA:p1"][0]["line"]
+        self.assertIn("STOPPED from implementor (wA:p2) on derate", line)
+        rec = self.inbox()[0]
+        self.assertEqual((rec["kind"], rec["story"], rec["unit"], rec["file"]), ("stopped", "derate", "sc-1-a", path))
+        toks = json.load(open(self.world))["panes"][2]["tokens"]
+        self.assertEqual(toks["needs"], "1")
+        self.assertTrue(toks["status"].startswith("stopped: Stopped: sc-1"))
+
+    def test_nonconforming_idr_is_refused_and_nothing_is_kept(self):
+        path = self.write("idr.md", "# IDR: x\n\nno sections\n")
+        with d.locked_state() as st:
+            with self.assertRaises(d.RouteError) as cm:
+                d.report_artifact(d.snapshot(), st, "idr", path)
+            self.assertNotIn("wA:p1", st.get("outbox", {}))
+        self.assertIn("missing section ## Approach", str(cm.exception))
+        self.assertEqual(self.inbox(), [])
+
+    def test_unknown_kind_and_missing_file(self):
+        with d.locked_state() as st:
+            with self.assertRaises(d.RouteError):
+                d.report_artifact(d.snapshot(), st, "merged", __file__)
+            with self.assertRaises(d.RouteError):
+                d.report_artifact(d.snapshot(), st, "done", os.path.join(self.tmp.name, "nope.md"))

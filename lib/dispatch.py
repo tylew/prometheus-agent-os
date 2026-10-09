@@ -275,6 +275,58 @@ def report(snap: dict, st: dict, text: str, needs: bool = False, clear: bool = F
     return "needs-you sent to the seat"
 
 
+REPORT_KINDS = ("stopped", "idr", "done")
+
+
+def report_artifact(snap: dict, st: dict, kind: str, path: str) -> str:
+    """An implementor's stop file, IDR or done report: checked, kept in the engine inbox, and announced to
+    its unit's lead with the file named. An IDR that fails `idr.check` is refused with the problems."""
+    if kind not in REPORT_KINDS:
+        raise RouteError("report kind must be one of %s" % ", ".join(REPORT_KINDS))
+    path = os.path.abspath(path)
+    if not os.path.isfile(path):
+        raise RouteError("no such file: %s" % path)
+    if kind == "idr":
+        import idr
+        with open(path) as fh:
+            problems = idr.check(fh.read())
+        if problems:
+            raise RouteError("IDR refused — fix and report again:\n- " + "\n- ".join(problems))
+    me = os.environ.get("HERDR_PANE_ID")
+    if not me:
+        raise RouteError("report needs HERDR_PANE_ID (run inside an agent pane)")
+    p = pane(snap, me) or {}
+    role = _tokens(p).get("role") or os.environ.get("PROMETHEUS_ROLE", "agent")
+    story = _tokens(p).get("item")
+    unit = unit_of_pane(snap, me)
+    label = _tokens(unit).get("unit") if unit else None
+    inbox = os.path.join(state_dir(), "engine", "inbox")
+    os.makedirs(inbox, exist_ok=True)
+    rec = {"kind": kind, "file": path, "pane": me, "role": role, "story": story, "unit": label,
+           "at": int(time.time())}
+    with open(os.path.join(inbox, "%d-%s-%s.json" % (rec["at"], me.replace(":", "_"), kind)), "w") as fh:
+        json.dump(rec, fh)
+    if kind == "stopped":
+        herdr("pane", "report-metadata", me, "--source", "prometheus", "--token",
+              "status=stopped: %s" % _first_line(path)[:100], "--token", "needs=1")
+    line = "[prometheus] %s from %s (%s)%s: %s" % (
+        {"stopped": "STOPPED", "idr": "IDR ready", "done": "done"}[kind], role, me,
+        " on %s" % story if story else "", path)
+    if label:
+        enqueue(st, route(snap, {"unit": label, "role": "pm"}), line, unit=label)
+    else:
+        enqueue(st, route(snap, {"role": "seat"}), line)
+    return "%s reported" % kind
+
+
+def _first_line(path: str) -> str:
+    with open(path) as fh:
+        for line in fh:
+            if line.strip() and not line.startswith("---"):
+                return line.strip().lstrip("#* ").strip()
+    return ""
+
+
 # --------------------------------------------------------------------- delivery
 
 def _compose(pane_id: str, items: list[dict]) -> str:
@@ -654,6 +706,9 @@ def main(argv: list[str]) -> int:
     rp.add_argument("--needs-you", action="store_true")
     rp.add_argument("--clear", action="store_true")
     rp.add_argument("--holds", metavar="OWNER/REPO#N", help="this pane now holds the PR: its events come here")
+    rp.add_argument("--stopped", metavar="FILE", help="a Stop: the stop file (implementor)")
+    rp.add_argument("--idr", metavar="FILE", help="the story's IDR, checked before it is accepted (implementor)")
+    rp.add_argument("--done", metavar="FILE", help="the done report (implementor)")
     rp.add_argument("text", nargs="*")
     sub.add_parser("poll-agents")
     rt = sub.add_parser("route")
@@ -691,6 +746,14 @@ def main(argv: list[str]) -> int:
                 return 1
             print("queued for %s" % target)
             poke()
+        elif a.cmd == "report" and (a.stopped or a.idr or a.done):
+            kind, path = next((k, v) for k, v in (("stopped", a.stopped), ("idr", a.idr), ("done", a.done)) if v)
+            try:
+                print(report_artifact(snap, st, kind, path))
+                poke()
+            except RouteError as exc:
+                print("report: %s" % exc, file=sys.stderr)
+                return 1
         elif a.cmd == "report":
             if not a.clear and not a.text and not a.holds:
                 print("report: give a line, --holds, or --clear", file=sys.stderr)

@@ -56,8 +56,9 @@ Facts come from the registry, never memory. `<default>` below = `repo.default_br
   `isolation: "worktree"` (they isolate the cwd's repo, not the project).
 - **Tracker-gated projects: no edit before the story exists** (`stories`, `tracker`). Draft/ready and
   story state move together, PM-side (`tracker`).
-- **A direction-defining fork while building** (contract, boundary, data shape, a decision the work
-  contradicts) → stop, tell the PM. Never resolve it in code.
+- **A decision the story or IDR does not settle while building** (contract, boundary, data shape, a
+  decision the work contradicts) → the implementor's Stop (`agents/implementor.md` §6), or an IDR rewrite
+  first when it is a how-decision the IDR owns. Never resolved silently in code.
 - **`gt` for every mutation on graphite projects**; raw `git` only for reads, `git add <path>`, and
   where `gt` has no equivalent. Stacks branch off and submit against `<default>`.
 - **PRs open draft** (`gt submit --draft --no-edit`). Re-read `isDraft` after every submit; publishing
@@ -85,6 +86,18 @@ Facts come from the registry, never memory. `<default>` below = `repo.default_br
   checkout is parked on an arbitrary branch; `access: editable` is no exemption.
 - **The app runs from the base checkout only**, never a worktree; that switch is the PM's
   (`graphite.md` → Local run).
+
+## Stacking
+
+One story, one stack, one worktree. Bottom to top: backend, then frontend; no branch mixes the two, and
+each rung is safe to merge with nothing above it — additive beside the old contract, or behind the named
+flag, else Stop. Each rung is `sc-#####-<slug>[-<part>]`, created on top with `gt`, opened draft,
+validated with the full set for its packages. Before any branch is created, check for another open stack
+of the operator's in the same area; one exists ⇒ the story's planner asks the operator stack-or-fresh
+(never a silent default), and a story stacked by choice carries "Stacked on #<n> by operator choice" in
+its bottom PR body. Restack only at the upper rung's commit boundary; after any restack re-run the full
+validation set and confirm one alembic head. Review and merge bottom-up. The IDR is not a rung: it lives in
+the story folder and, collapsed, in the bottom PR body (`lib/idr.py block`).
 
 ## Related
 
