@@ -242,8 +242,11 @@ def open_tab(workspace_id: str, label: str, role: str, item: str | None = None,
     pane_id = _first_pane(workspace_id, tab_id)
     tag_pane(pane_id, role=role, item=item, pr=pr, worktree=worktree)
     unit = dispatch.unit_of_workspace(_snap(), workspace_id)
-    if worktree and unit:
-        link_worktree(worktree, dispatch._tokens(unit).get("project", ""))
+    # a --pr reviewer tab reads the PM-made review worktree named in its brief: link it too
+    links = worktree or (role == "reviewer" and pr and "#" in pr and
+                         os.path.join(env.workspace_root() or "", ".worktrees", "review-" + pr.rsplit("#", 1)[1]))
+    if links and unit:
+        link_worktree(links, dispatch._tokens(unit).get("project", ""))
     start(pane_id, role, label, extra_allow, claude_args)
     return pane_id
 

@@ -374,7 +374,8 @@
         {
           "cmd": "gh pr diff 43802 --repo voltusdev/voltus",
           "live": "gh pr diff --help"
-        }
+        },
+        "git -C {workspace}/.worktrees/review-probe-missing checkout --detach abc"
       ],
       "deny": [
         {
@@ -470,7 +471,10 @@
         "ln -s /x {state_dir}/reviews/scratch/../../y",
         "git -C {wt} worktree remove --force {state_dir}/reviews/scratch/../../../x",
         "git -C {wt} checkout abc -- js/x.ts",
-        "cd {wt} && git fetch origin abc && gh pr diff 43802"
+        "cd {wt} && git fetch origin abc && gh pr diff 43802",
+        "git -C {workspace}/.worktrees/review-1/../impl-x checkout --detach abc",
+        "git -C {workspace}/.worktrees/impl-x checkout --detach abc",
+        "git -C {workspace}/.worktrees/review-1 checkout abc -- js/x.ts"
       ]
     },
     "librarian": {

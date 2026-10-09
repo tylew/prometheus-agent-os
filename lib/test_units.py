@@ -139,6 +139,23 @@ class UnitsTest(unittest.TestCase):
             units.open_tab(ws, "review-11", "reviewer", pr="o/r#11", worktree=wt)
             self.assertFalse(os.path.islink(os.path.join(wt, "js", "node_modules")))  # existing: untouched
 
+    def test_open_tab_links_review_worktree_for_pr_only_tab(self):
+        ws_root = os.path.join(self.tmp.name, "ws")
+        os.makedirs(os.path.join(ws_root, ".claude", "prometheus", "projects"))
+        os.makedirs(os.path.join(ws_root, "repos", "r", "js", "node_modules"))
+        json.dump({"key": "besstie", "repo": {"root": "repos/r"}, "worktree_links": ["js/node_modules"]},
+                  open(os.path.join(ws_root, ".claude", "prometheus", "projects", "besstie.json"), "w"))
+        wt = os.path.join(ws_root, ".worktrees", "review-12")
+        os.makedirs(os.path.join(wt, "js"))
+        with unittest.mock.patch.dict(os.environ, {"WORKSPACE": ws_root}):
+            ws = units.create("sc-1-a", "story", "besstie", ["sc-1"], [])["workspace"]
+            pane = units.open_tab(ws, "review-12", "reviewer", pr="o/r#12")
+            self.assertEqual(os.readlink(os.path.join(wt, "js", "node_modules")),
+                             os.path.join(ws_root, "repos", "r", "js", "node_modules"))
+            p = next(x for x in self.world()["panes"] if x["pane_id"] == pane)
+            self.assertNotIn("worktree", p["tokens"])  # links only: tokens unchanged
+            units.open_tab(ws, "review-13", "reviewer", pr="o/r#13")  # no review worktree: nothing made
+
     def test_send_brief_lands_with_prompt_wait(self):
         ws = units.create("sc-1-a", "story", "besstie", ["sc-1"], [])["workspace"]
         pane = units.open_tab(ws, "review-10", "reviewer", pr="o/r#10")

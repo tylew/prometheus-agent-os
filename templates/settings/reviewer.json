@@ -1,5 +1,5 @@
 {
-  "$comment": "Depth-3 reviewer: never prompts a human, never edits code; posts its own round via gh api (reviews, comments). Agent = the pr-review-toolkit fan-out and, in a validate round, the Chrome walkers; mcp__claude-in-chrome__* = the walk's browser tools, listed one by one (anything else from that server stays denied); Workflow = deep mode on the operator's opt-in only. Launched with --permission-mode dontAsk; anything not allowed is denied and reported to the PM. Writes only its findings file and a validate round's screenshots under {state_dir}/reviews/ (launch.sh fills in the real state dir). Never writes a story: acceptance criteria are ticked by the validator (the operator's stories) or the author (a teammate's). open-tab.sh appends the project's validation commands. Path rules for writes are Edit(...) (they cover Write); a bare Edit deny would block the findings file too — dontAsk already denies every edit not allowed. A hold is the one PR write outside its round: gh pr edit --add-label HUMAN_NEEDED and one gh pr comment --body-file (every other edit/comment form denied). A test-discrimination check builds a disposable pre-change tree only under {state_dir}/reviews/scratch/<pr> (add, checkout, node_modules link, remove); a '..' in a scratch path is denied.",
+  "$comment": "Depth-3 reviewer: never prompts a human, never edits code; posts its own round via gh api (reviews, comments). Agent = the pr-review-toolkit fan-out and, in a validate round, the Chrome walkers; mcp__claude-in-chrome__* = the walk's browser tools, listed one by one (anything else from that server stays denied); Workflow = deep mode on the operator's opt-in only. Launched with --permission-mode dontAsk; anything not allowed is denied and reported to the PM. Writes only its findings file and a validate round's screenshots under {state_dir}/reviews/ (launch.sh fills in the real state dir). Never writes a story: acceptance criteria are ticked by the validator (the operator's stories) or the author (a teammate's). open-tab.sh appends the project's validation commands. Path rules for writes are Edit(...) (they cover Write); a bare Edit deny would block the findings file too — dontAsk already denies every edit not allowed. A hold is the one PR write outside its round: gh pr edit --add-label HUMAN_NEEDED and one gh pr comment --body-file (every other edit/comment form denied). A test-discrimination check builds a disposable pre-change tree only under {state_dir}/reviews/scratch/<pr> (add, checkout, node_modules link, remove); a '..' in a scratch path is denied. The PM-made review worktree ({workspace}/.worktrees/review-<pr>) is re-pinned to a moved head only by checkout --detach; a '..' in its path is denied.",
   "extends": [
     "delivery"
   ],
@@ -47,7 +47,8 @@
       "Bash(git -C * worktree add --detach {state_dir}/reviews/scratch/*)",
       "Bash(git -C {state_dir}/reviews/scratch/* checkout *)",
       "Bash(ln -s * {state_dir}/reviews/scratch/*)",
-      "Bash(git -C * worktree remove --force {state_dir}/reviews/scratch/*)"
+      "Bash(git -C * worktree remove --force {state_dir}/reviews/scratch/*)",
+      "Bash(git -C {workspace}/.worktrees/review-* checkout --detach *)"
     ],
     "deny": [
       "AskUserQuestion",
@@ -64,7 +65,8 @@
       "Bash(gh pr edit * --add-assignee*)",
       "Bash(gh pr comment * --edit-last*)",
       "Bash(gh pr comment * --delete-last*)",
-      "Bash(*/reviews/scratch/*..*)"
+      "Bash(*/reviews/scratch/*..*)",
+      "Bash(git -C */.worktrees/review-*..* checkout *)"
     ]
   }
 }

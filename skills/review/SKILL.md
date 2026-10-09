@@ -62,8 +62,8 @@ Newest round decides: round N resolved + round N+1 untouched ⇒ the author side
 
 ### Read the true head
 
-One call each, no `cd`: `gh pr view <pr> --json headRefOid` → `git -C <worktree> fetch origin <sha>` → read
-at that sha (`git -C <worktree> show <sha>:<path>`), or `gh pr diff <pr> --repo <slug>`. Never `origin/<branch>`: with `vcs.tool` =
+One call each, no `cd`: `gh pr view <pr> --json headRefOid` → `git -C <worktree> fetch origin <sha>` →
+`git -C <worktree> checkout --detach <sha>` → read there, or `gh pr diff <pr> --repo <slug>`. Never `origin/<branch>`: with `vcs.tool` =
 graphite every restack force-pushes and the branch ref lags. Tell: cited lines don't match the head.
 Commit ancestry and recorded decisions: [references/stacks.md](references/stacks.md) → *Reading the code*.
 

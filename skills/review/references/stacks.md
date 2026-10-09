@@ -70,9 +70,10 @@ git -C <repo.root> worktree add $WORKSPACE/.worktrees/review-<PR> --detach <head
 ```
 
 Never `--detach origin/<branch>` — it lags the real head. Read/grep there; per-PR pre-states via
-`git show <sha>:<path>`; the reviewer reads the head per SKILL.md → *Read the true head* (it cannot
-check out). Dependencies a package's suite needs are not in a fresh worktree — project runbooks say how;
-not runnable ⇒ "not run" under *Covered*. The PM removes the worktree once the loop ends.
+`git show <sha>:<path>`; the reviewer re-pins it to the head per SKILL.md → *Read the true head*.
+`open-tab.sh` links the registry's `worktree_links` (e.g. `js/node_modules`) into `review-<PR>`; other suite
+dependencies — project runbooks say how; not runnable ⇒ "not run" under *Covered*. The PM removes the
+worktree once the loop ends.
 
 **Read the true head, never a stale remote-tracking ref.** Graphite force-pushes, so `origin/<branch>` and
 any local worktree of it lag by one or more amends; a stale tree yields phantom findings against code the
