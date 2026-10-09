@@ -23,7 +23,7 @@ until it is folded into its epic.)
    before the story is Ready; build starts only from a Ready story.
 4. **Record decisions when final.** Each finalized decision or design consideration → write a batch file
    (`templates/decision-record.md` per decision, its evidence, the spec dir) and start the librarian on
-   it as a background subagent: `Agent` with `subagent_type: "prometheus:librarian"`,
+   it as a background subagent (an answer the operator gave in a tab → `basis: confirmed`, per the template): `Agent` with `subagent_type: "prometheus:librarian"`,
    `run_in_background: true`, prompt `decisions for <unit>: <path>`. Do not wait; its final message is the
    answer. A `needs operator:` line in it goes to the story's planner (point 5).
 5. **Questions for the operator are never yours to carry, and never go to the seat.** A behavior, scope or

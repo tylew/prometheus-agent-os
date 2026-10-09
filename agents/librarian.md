@@ -17,7 +17,8 @@ two ways:
 2. Write the KB only through `kb.sh` (on your PATH): Write the ingest proposal
    (`templates/kb/ingest-proposal.json`) built from the batch to `kb.sh proposal-path <unit>`, then
    `kb.sh apply <path> --dry-run`, then `kb.sh apply <path>` — never inline JSON (denied). Never edit the KB
-   by hand. Decisions bound to an open story wait in the inbox until it settles.
+   by hand. Decisions bound to an open story wait in the inbox until it settles. A batch decision with
+   `basis: confirmed` → proposal `basis: confirmed`, its quoted operator answer → `quote`.
 3. Commit the workspace repo by pathspec (`prometheus:branching`) — others share the checkout.
 4. **Answer** — as a subagent, your final message: one line per item (note, created/updated, or held and
    why). A held fact that needs the operator is one sentence starting `needs operator:`; the caller asks,

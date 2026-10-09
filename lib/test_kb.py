@@ -154,6 +154,30 @@ class DecisionTest(Base):
         kb.confirm(self.inbox("decision")[0]["id"])
         self.assertTrue(os.path.exists(os.path.join(self.root, "decision", "derate-stays-in-the-fe.md")))
 
+    def confirmed(self, binds, quote="keep it in the FE"):
+        d = dict(self.decision(binds), basis="confirmed", signoff="operator (pm tab, 2026-10-08)")
+        if quote:
+            d["quote"] = quote
+        return d
+
+    def test_operator_confirmed_decision_lands_on_apply(self):
+        r = kb.apply(prop(decisions=[self.confirmed(["operator"])]))
+        self.assertEqual(r["held"], [])
+        _, body = kb.parse(self.read("decision/derate-stays-in-the-fe.md"))
+        self.assertIn("operator (pm tab, 2026-10-08)", body)
+        self.assertIn("keep it in the FE", body)
+
+    def test_confirmed_without_quote_is_held(self):
+        kb.apply(prop(decisions=[self.confirmed(["operator"], quote=None)]))
+        self.assertIn("without the operator's answer", self.inbox("decision")[0]["reason"])
+        self.assertFalse(os.path.exists(os.path.join(self.root, "decision")))
+
+    def test_confirmed_story_bound_waits_for_story_only(self):
+        kb.apply(prop(decisions=[self.confirmed(["sc-1", "operator"])]))
+        self.assertFalse(os.path.exists(os.path.join(self.root, "decision")))
+        self.assertIn("recorded decision", kb.settle("sc-1", "Completed"))
+        self.assertEqual(self.inbox(), [])
+
 
 class ConcurrencyCheckTest(Base):
     def test_parallel_applies_do_not_duplicate_or_lose(self):

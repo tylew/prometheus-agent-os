@@ -1,5 +1,5 @@
 {
-  "$comment": "Template: one proposal per source, applied by kb.py apply (idempotent per proposal). Final facts land; these are held in the inbox: tentative facts, `stated` facts without a quote, ambiguous mentions, a new person or org (until confirmed), a field whose existing value differs, and every decision (until binds_to settles: every bound story Completed → recorded, any Won't Fix → dropped; operator-bound → confirmed by the operator).",
+  "$comment": "Template: one proposal per source, applied by kb.py apply (idempotent per proposal). Final facts land; these are held in the inbox: tentative facts, `stated` facts without a quote, ambiguous mentions, a new person or org (until confirmed), a field whose existing value differs, and every decision (until binds_to settles: every bound story Completed → recorded, any Won't Fix → dropped; operator-bound → confirmed by the operator, unless basis confirmed with the operator's answer in quote: that settles the operator binding at apply).",
   "source": {
     "kind": "meeting | pr | story | operator | doc",
     "ref": "<granola:id | owner/repo#n | sc-#####>",
@@ -39,7 +39,8 @@
       "context": "<the fork and its alternatives>",
       "why": "<the durable, non-obvious reason>",
       "basis": "decided | confirmed",
-      "signoff": "<ref: confirmed spec, meeting id, operator>",
+      "signoff": "<ref: confirmed spec, meeting id, operator (<tab>, <date>)>",
+      "quote": "<basis confirmed: the operator's answer, verbatim>",
       "binds_to": [
         "<sc-##### | operator>"
       ],

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # ---
 # name: kb
-# description: The only write path into the knowledge base at docs/kb/. Indexes notes, resolves mentions to entities by slug/title/alias/handle, searches by type/scope/edge, creates notes, applies ingest proposals under a lock (idempotent per proposal; final facts land; tentative facts, unquoted `stated` facts, ambiguous mentions, new people/orgs, contradicted fields and every decision are held in ~/.local/state/prometheus/kb-inbox/), confirms/drops/settles held items, checks schema and integrity, and migrates docs/vault/.
+# description: The only write path into the knowledge base at docs/kb/. Indexes notes, resolves mentions to entities by slug/title/alias/handle, searches by type/scope/edge, creates notes, applies ingest proposals under a lock (idempotent per proposal; final facts land; tentative facts, unquoted `stated` facts, ambiguous mentions, new people/orgs, contradicted fields and every decision not yet settled (an operator-confirmed one, with its quoted answer, settles its operator binding) are held in ~/.local/state/prometheus/kb-inbox/), confirms/drops/settles held items, checks schema and integrity, and migrates docs/vault/.
 # usage: kb.py {index|resolve <mention> [--type T]|search [--type T] [--scope S] [--text Q] [--edge E] [--links-to SLUG] [--orphans]|new <type> <title> [--scope S]|apply <proposal.json> [--dry-run]|inbox [list|confirm <id> [--as SLUG]|drop <id>|settle --story <sc-id> --state <Completed|Won't Fix>]|check|migrate [--write]} [--json]
 # ---
 from __future__ import annotations
@@ -367,7 +367,8 @@ def _write_decision(w: Writer, idx: dict, d: dict, source: dict) -> str:
             "decided": source.get("date", today()), "binds_to": d["binds_to"], "refs": refs, "edges": edges,
             "created": today(), "updated": today()}
     body = ("# %s\n\n## Context\n%s\n\n## Decision\n%s\n\n## Why\n%s\n\n## Sign-off\n%s\n"
-            % (d["title"], d.get("context", ""), d["decision"], d["why"], d["signoff"]))
+            % (d["title"], d.get("context", ""), d["decision"], d["why"],
+               d["signoff"] + ('\n\n> %s' % d["quote"] if d.get("quote") else "")))
     w.write(note_path(w.root, "decision", slug), meta, body, "create")
     for old in edges.get("supersedes", []):
         s = old[2:-2]
@@ -417,8 +418,17 @@ def apply(proposal: dict, dry: bool = False, workspace: str | None = None) -> di
             elif finals:
                 _fold(w, idx, hits[0], finals, source, pid, held)
         for d in proposal.get("decisions", []):
-            held.append(hold(pid, "decision", "waits for %s" % ", ".join(d["binds_to"]),
-                             {"decision": d, "settled": []}, source))
+            confirmed = d["basis"] == "confirmed" and (d.get("quote") or "").strip()
+            settled = ["operator"] if confirmed and "operator" in d["binds_to"] else []
+            pending = [b for b in d["binds_to"] if b not in settled]
+            if d["basis"] == "confirmed" and not confirmed:
+                held.append(hold(pid, "decision", "confirmed without the operator's answer (quote)",
+                                 {"decision": d, "settled": []}, source))
+            elif pending:
+                held.append(hold(pid, "decision", "waits for %s" % ", ".join(pending),
+                                 {"decision": d, "settled": settled}, source))
+            else:
+                _write_decision(w, idx, d, source)
         for e in proposal.get("edges", []):
             a, b = resolve(idx, e["from"]), resolve(idx, e["to"])
             if len(a) == 1 and len(b) == 1:

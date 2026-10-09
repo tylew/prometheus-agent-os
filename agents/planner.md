@@ -68,7 +68,8 @@ Input: one story. Output: the story finalized and moved to **Ready for Developme
 A stop file or a behavior question for your story arrives as a `[prometheus]` line naming a file. Read it,
 answer from the story and your research when they settle it; otherwise ask the operator in your tab. Then
 update the story (*What's decided*, Scenarios with the operator's confirmation), read it back, and clear
-the `blocked` label. *needs the product owner* with no answer from the operator: mark the story
+the `blocked` label. A fork the operator settled here that the KB should keep → batch per
+`templates/decision-record.md` (`basis: confirmed`) to a background `prometheus:librarian`. *needs the product owner* with no answer from the operator: mark the story
 `waiting: PO` (`report.sh --needs-you "waiting on the product owner: <ask>"`) and leave the label. A spike:
 offer once to file it; filed → the story gets *blocked by* the spike.
 

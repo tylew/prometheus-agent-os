@@ -17,7 +17,7 @@ hold the gated lifecycle. Write the KB only through `kb.sh` (on every agent's PA
 | a term or idea the work keeps using | `concept` | `general` or project keys |
 | a service, component, pipeline, tool | `system` | project keys |
 | durable how/why not about one entity | `topic` | `general` or project keys |
-| a final, sign-off-backed fork | `decision` | project keys — always through the inbox |
+| a final, sign-off-backed fork | `decision` | project keys — through the inbox unless operator-confirmed |
 
 Scope is frontmatter, never a folder. Widening scope edits the list; the note does not move.
 
@@ -25,12 +25,13 @@ Scope is frontmatter, never a folder. Widening scope edits the list; the note do
 
 A fact lands only with a final basis — `decided` · `merged` · `stated` (with a `quote`) · `confirmed`. Everything
 else is held in `<state_dir>/kb-inbox/`: tentative facts, unquoted `stated`, ambiguous mentions, a new
-person or org, a field whose existing value differs, every decision. Held is not lost: `kb.py inbox` lists it,
+person or org, a field whose existing value differs, an unsettled decision. Held is not lost: `kb.py inbox` lists it,
 the operator confirms (`confirm <id> [--as <slug>]`) or drops it, and a later final source releases a held fact.
 
 **Decisions** bind to stories (`binds_to: [sc-…]`, or `operator` when no story exists). The dispatcher runs
 `kb.py inbox settle --story <id> --state <state>` on Completed / Won't Fix: all bound stories Completed → the
-decision is written; any Won't Fix → dropped. A decision's `evidence` edges point at what it rests on; a
+decision is written; any Won't Fix → dropped. `basis: confirmed` with the operator's answer in `quote` settles
+the `operator` binding at apply — no second ask; `confirmed` without a quote is held. A decision's `evidence` edges point at what it rests on; a
 spec's `grounded_by` points at the decisions it rests on.
 
 ## Commands
