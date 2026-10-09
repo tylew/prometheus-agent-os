@@ -199,6 +199,26 @@
         "CI=true timeout 5 npm --prefix {wt}/js run test x -- --forceExit",
         "gt continue",
         "gt add --help",
+        {
+          "cmd": "gt checkout sc-1-x",
+          "live": "gt checkout --help"
+        },
+        {
+          "cmd": "gt down",
+          "live": "gt down --help"
+        },
+        {
+          "cmd": "gt up",
+          "live": "gt up --help"
+        },
+        {
+          "cmd": "gt top",
+          "live": "gt top --help"
+        },
+        {
+          "cmd": "gt bottom",
+          "live": "gt bottom --help"
+        },
         "git -C {wt} add x.py && git -C {wt} status --short"
       ],
       "deny": [
