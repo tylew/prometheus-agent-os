@@ -460,6 +460,16 @@ def dialogs(snap: dict, st: dict, probe=None) -> list[dict]:
     return events
 
 
+WAITING_STATUS = ("stopped:", "waiting:", "held:")
+
+
+def waiting(p: dict) -> bool:
+    """Waiting on someone (a stop, a teammate, a hold, an open question): never nudged, re-prompted or
+    resumed — a resume would kill a pending dialog."""
+    t = _tokens(p)
+    return t.get("needs") == "1" or (t.get("status") or "").startswith(WAITING_STATUS)
+
+
 def heartbeat(snap: dict, st: dict, minutes: int, now: float | None = None) -> list[dict]:
     """Units with depth-3 work in flight and no change for N minutes get one nudge per quiet spell."""
     now = now or time.time()
@@ -467,7 +477,8 @@ def heartbeat(snap: dict, st: dict, minutes: int, now: float | None = None) -> l
     for u in units(snap):
         label = _tokens(u)["unit"]
         workers = [p for p in snap.get("panes", [])
-                   if p.get("workspace_id") == u["workspace_id"] and _tokens(p).get("role") in DEPTH3]
+                   if p.get("workspace_id") == u["workspace_id"] and _tokens(p).get("role") in DEPTH3
+                   and not waiting(p)]
         if not workers:
             continue
         if any(p.get("agent_status") == "working" for p in workers):
@@ -556,6 +567,9 @@ def tick(heartbeat_min: int = 30, prompt=None, external: bool | None = None) -> 
                 unrouted.append("%s (%s)" % (ev["line"], exc))
                 continue
             enqueue(st, target, ev["line"], unit=ev.get("unit"))
+            if ev.get("unit"):
+                import unit_engine
+                unit_engine.observe(snap, ev)
         report, sends = take_deliveries(snap, st, real=prompt is None)
     failed = send_all(sends, prompt)
     if failed:
@@ -566,6 +580,20 @@ def tick(heartbeat_min: int = 30, prompt=None, external: bool | None = None) -> 
                 report["held"].append(d["pane"])
     report.update(events=len(events), unrouted=unrouted, log=log)
     return report
+
+
+def _merge_dict(old: dict, new: dict, cur: dict) -> None:
+    """Per field, all the way down: a nested record changed on the copy keeps what others changed in its
+    other fields meanwhile (a `hold` written during a round's open survives the round bump)."""
+    for k in set(new) | set(old):
+        if new.get(k) == old.get(k):
+            continue
+        if k not in new:
+            cur.pop(k, None)
+        elif isinstance(new[k], dict) and isinstance(old.get(k), dict) and isinstance(cur.get(k), dict):
+            _merge_dict(old[k], new[k], cur[k])
+        else:
+            cur[k] = new[k]
 
 
 def merge_state(base: dict, work: dict, st: dict) -> None:
@@ -582,12 +610,7 @@ def merge_state(base: dict, work: dict, st: dict) -> None:
                 if added:
                     st["outbox"].setdefault(pane_id, []).extend(added)
         elif isinstance(new, dict) and isinstance(cur, dict) and isinstance(old, dict):
-            for k in set(new) | set(old):
-                if new.get(k) != old.get(k):
-                    if k in new:
-                        cur[k] = new[k]
-                    else:
-                        cur.pop(k, None)
+            _merge_dict(old, new, cur)
         elif isinstance(new, list) and isinstance(cur, list) and isinstance(old, list):
             st[key] = [x for x in cur if x in new or x not in old] + [x for x in new if x not in old and x not in cur]
         else:

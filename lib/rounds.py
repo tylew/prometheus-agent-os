@@ -131,6 +131,9 @@ def fire(snap: dict, st: dict, now: float | None = None, opener=None) -> list[st
     """Open every due round; the PM hears one line per round."""
     log = []
     for ref, loop in due(snap, st, now):
+        if _unfinished(snap, loop, ref):
+            log.append("round %d on %s has no findings file yet — not reopened" % (loop["round"], ref))
+            continue
         loop.pop("due", None)
         label = "review-%s" % ref.rsplit("#", 1)[-1]
         try:
@@ -151,6 +154,17 @@ def fire(snap: dict, st: dict, now: float | None = None, opener=None) -> list[st
         except dispatch.RouteError as exc:
             log.append("auto round line unrouted: %s" % exc)
     return log
+
+
+def findings_path(ref: str, n: int) -> str:
+    return os.path.join(dispatch.state_dir(), "reviews", "%s-r%d.md" % (re.sub(r"[/#]", "-", ref), n))
+
+
+def _unfinished(snap: dict, loop: dict, ref: str) -> bool:
+    """A reviewer tab still holds the PR and its round wrote no findings file: a round in flight (or one a
+    crash left behind) — closing it would kill it, so the next round waits."""
+    held = [p for p in holders(snap, loop["workspace"], ref) if dispatch._tokens(p)["role"] == "reviewer"]
+    return bool(held) and not os.path.exists(findings_path(ref, loop["round"]))
 
 
 def _open(snap: dict, workspace_id: str, label: str, ref: str, brief: str) -> str:

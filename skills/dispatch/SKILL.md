@@ -51,9 +51,17 @@ every `INTERVAL`. No socket → full ticks only.
    `PROMETHEUS_ROUND_SETTLE` (300 s): the finished `review-` tab closes, a fresh one is briefed from the
    last brief (round + 1, *Is a round due?* first) and the PM gets one line. On the operator's own PR the PM
    runs `rounds.sh next <pr>` after its round comment. `rounds.sh hold <pr>` (`--off`) is the PM's veto.
-5. **Settle** — story Completed / Won't Fix → `kb.py inbox settle`.
-6. **Heartbeat** · **Health** (a lead whose agent exited → `claude --resume <session>`) · **Deliver**.
-7. **Restore image** — per live unit: tokens, and per agent tab its label, pane tokens and Claude session.
+   A next round never opens over a reviewer tab whose round wrote no findings file yet (a round in flight,
+   or one a crash left): closing it would kill it.
+5. **Unit engine** (`lib/unit_engine.py`, external phase, after the rounds) — for units switched on
+   (`engine.sh on <unit>`): per-story stage and wait in the dispatcher state (`engine`), fed by the agents'
+   inbox (`report.sh --stopped|--idr|--done`) and a copy of every lead-routed line; every observation goes
+   to the unit's feed (`engine.sh feed <unit>`, the map's agent list). **Shadow** until a duty is listed
+   (`engine.sh act <unit> <duty,…>`): it records what it would do; the PM still acts. Waits for restore.
+6. **Settle** — story Completed / Won't Fix → `kb.py inbox settle`.
+7. **Heartbeat** (never a pane waiting on someone: `needs`, or a `stopped:` / `waiting:` / `held:` status) ·
+   **Health** (a lead whose agent exited → `claude --resume <session>`) · **Deliver**.
+8. **Restore image** — per live unit: tokens, and per agent tab its label, pane tokens and Claude session.
    A unit in the image with no live workspace is *pending restore*: events for its PRs / stories are held
    for its PM (`restore_backlog`), and nothing is auto-created, until `restore.sh` brings it back or
    `--forget` drops it. `close-unit.sh` drops the image.
@@ -116,9 +124,11 @@ The configurator proposes acceptance criteria; the seat signs off or raises conc
 report.sh "<one line>"              your line on the map (status token)
 report.sh --needs-you "<question>"  red flag + the question to the seat, with your pane id to answer
 report.sh --holds <o/r#n>           this tab now holds the PR: its CI / review / comment lines come here
+report.sh --stopped|--idr|--done <file>   implementor: a stop, the IDR (checked first), the done report
 report.sh --clear
 ```
-The needs-you flag clears when you next work. A PM / planner with the operator in its tab asks in place.
+The needs-you flag clears when you next work. A planner or validator asks in its own tab, never through
+the PM or the seat.
 
 ## Proposals — the seat answers
 

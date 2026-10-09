@@ -861,6 +861,11 @@ def tick(snap: dict, st: dict) -> list[str]:
             log.append("%s failed: %s" % (source.__name__, exc))
     log += handle(snap, st, events, settle_fn=settle)
     log += rounds.fire(snap, st)
+    try:
+        import unit_engine
+        log += unit_engine.tick(snap, st)
+    except Exception as exc:  # noqa: BLE001 — the engine never stops the dispatcher
+        log.append("unit engine failed: %s" % exc)
     log += health(snap, st)
     return log
 

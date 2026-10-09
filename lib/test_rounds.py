@@ -104,6 +104,30 @@ class FireTest(Base):
             self.assertEqual(rounds.fire(snap(), st, now=10, opener=lambda *a: self.fail("opened")), [])
 
 
+class UnfinishedRoundTest(Base):
+    def st(self):
+        return {"cursors": {"pr:" + REF: {"state": "open", "head": "h2"}}, "outbox": {}, "last_change": {},
+                "loops": {REF: {"unit": "epic-1-x", "workspace": "wA", "brief": "b", "round": 1, "due": 1,
+                                "head": "h2"}}}
+
+    def test_an_idle_reviewer_with_no_findings_is_not_closed_by_the_next_round(self):
+        st = self.st()
+        log = rounds.fire(snap(reviewer="idle"), st, now=10, opener=lambda *a: self.fail("opened"))
+        self.assertIn("round 1 on o/r#10 has no findings file yet — not reopened", log)
+        self.assertEqual(st["loops"][REF]["due"], 1)
+
+    def test_with_its_findings_written_the_next_round_opens(self):
+        os.makedirs(os.path.join(self.tmp.name, "reviews"), exist_ok=True)
+        open(rounds.findings_path(REF, 1), "w").close()
+        opened = []
+        st = self.st()
+        st["loops"][REF]["brief"] = os.path.join(self.tmp.name, "b.md")
+        with open(st["loops"][REF]["brief"], "w") as fh:
+            fh.write("round: 1\n")
+        rounds.fire(snap(reviewer="idle"), st, now=10, opener=lambda s, ws, label, ref, b: opened.append(label) or "wA:p9")
+        self.assertEqual(opened, ["review-10"])
+
+
 class NextTest(Base):
     def test_next_makes_the_round_due_now_and_lifts_a_hold(self):
         st = {"cursors": {"pr:" + REF: {"head": "h5"}}, "loops": {REF: {"round": 1, "held": True}}}

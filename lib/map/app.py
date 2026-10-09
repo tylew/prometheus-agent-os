@@ -43,6 +43,7 @@ SPLIT_WIDTH = 32
 SPARK_WINDOW = 600
 SEAT_SPARK = 10  # activity cells on a seat line
 LIST_LINK_ROWS = 2
+FEED_ROWS = 3  # engine feed lines under the selected epic's agent list
 CTRL_RBRACKET = 29
 SPECIAL_KEYS = {
     curses.KEY_UP: "up", curses.KEY_DOWN: "down", curses.KEY_LEFT: "left", curses.KEY_RIGHT: "right",
@@ -597,7 +598,8 @@ class App:
         w = x1 - x0
         inner = w - 4
         link_rows = views.wrap_segments(views.link_line(node.links), inner)[:LIST_LINK_ROWS] if node.links else []
-        want = 2 + len(link_rows) + max(1, len(rows))
+        feed_rows = self.feed_tail(unit)
+        want = 2 + len(link_rows) + max(1, len(rows)) + len(feed_rows)
         room = y1 - y0
         h = min(want, max(5, room // 2)) if room - want < 8 else want
         h = min(h, room)
@@ -621,7 +623,11 @@ class App:
                     self.hits.append((row, row, cx, cx + len(text) - 1, "@url:" + seg[2]))
                 cx += len(text)
             row += 1
-        view = y0 + h - 1 - row
+        space = y0 + h - 1 - row
+        feed_n = min(len(feed_rows), max(0, space - 1))  # at least one agent row stays
+        view = space - feed_n
+        for n, line in enumerate(feed_rows[len(feed_rows) - feed_n:]):
+            self.put(y0 + h - 1 - feed_n + n, x0 + 2, views.fit(line, inner), attr["dim"])
         if not rows:
             self.put(row, x0 + 2, "no agents in this unit yet", attr["dim"])
         elif view > 0:
@@ -653,6 +659,17 @@ class App:
                 self.put(y0 + h - 1, x1 - 8, f" {self.list_scroll + view}/{len(rows)} ", border)
         rest = (y0 + h, x0, y1, x1)
         return rest if y1 - (y0 + h) >= 4 else None
+
+    def feed_tail(self, unit, n=FEED_ROWS):
+        """The unit engine's last feed lines, for a unit switched on (`engine=on`); [] otherwise."""
+        t = model.tokens(self.tree.raw.get(unit))
+        if t.get("engine") != "on" or not t.get("unit"):
+            return []
+        try:
+            import unit_engine
+            return ["» " + l.split("  ", 1)[-1] for l in unit_engine.tail(t["unit"], n)]
+        except Exception:  # noqa: BLE001 — the map never fails on the feed
+            return []
 
     def preview_title(self, key):
         node = self.node(key)
