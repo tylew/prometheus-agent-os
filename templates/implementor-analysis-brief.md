@@ -16,7 +16,10 @@ the data it reads or writes and back to what the user sees — each hop cited `f
 
 <!-- behavior at depth -->
 The edge cases, error paths, empty and loading states, and persisted state the scenarios touch, as the code
-handles them today — each cited `file:line`; where the code is silent, say so.
+handles them today — each cited `file:line`; where the code is silent, say so. Look through: empty and
+missing data, nulls, sign, units and scale, time zones and DST, ordering and duplicates, old records and
+frozen versions, permissions, concurrent edits, the flag off — a list to look through, not a quota. Name
+each way the change could fail as a candidate failure mode.
 
 <!-- seams and tests -->
 The outermost seam the package's own tests already run for this area (the test files, their framework and

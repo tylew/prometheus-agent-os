@@ -11,6 +11,8 @@ stack_position: <n of m | standalone>
 below: <#n approved | none>
 worktree: <absolute path, read-only, detached at the head>
 artifact: <state_dir>/reviews/<owner>-<repo>-<pr>-r<round>.md
+proof: <story_dir>/proof.json | none — the build proof (the operator's stories)
+failure_modes: <story_dir>/failure-modes.md | none
 ---
 
 # Review: PR #<number>, round <n>

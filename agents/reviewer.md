@@ -37,6 +37,9 @@ reverse-engineered from the diff.
   IDR, or code contradicting a decision ⇒ High), and find scenario tests by `git grep -nF "Scenario: <name>"`
   (a scenario with no test, a test that would pass with a `Then` false, a narrowed scenario ⇒ High).
   Research and analysis findings in the brief are leads to verify in the code, never evidence.
+- The brief's `proof` and `failure_modes`: a `held before` test or a test rewritten after its code with
+  no reason in the PR's table ⇒ High; a failure mode the code shows and the table omits ⇒ a finding at
+  its consequence; a test that would pass with its behavior absent ⇒ High.
 
 ## Never
 

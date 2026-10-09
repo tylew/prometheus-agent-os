@@ -99,7 +99,8 @@ op moves it back to its worktree first. Walk → `validate`.
 1. **Validate** — `packages[].validate` in full for every touched package, from the worktree, per the
    project's runbook (cwd, env). Tests alone are not the set: a lint failure low in a stack reds every PR
    above. On a stack, validate at every rung the change reaches; fix at the rung that introduced it.
-2. **Commit** — staged paths only; subject = prefix-free imperative, no `sc-#####`; `vcs.commit_trailer`
+2. **Commit** — on a story's rung, each commit is a skeleton, a tests or a code commit, never tests and
+   code together (`lib/proof.py`); `gt create` for the first, `gt modify -c` after. Staged paths only; subject = prefix-free imperative, no `sc-#####`; `vcs.commit_trailer`
    appended if set. `git show --stat HEAD`.
 3. **Submit** — `gt submit --draft --no-edit`. Then `gh pr view <n> --json title` (title rule: `SKILL.md`)
    and `isDraft`.
@@ -108,8 +109,9 @@ op moves it back to its worktree first. Walk → `validate`.
    repo's own `.github/pull_request_template.md`; absent one: *Shortcut issue* · *What changed and why* ·
    *Acceptance criteria* (one bullet per story scenario, name verbatim, how this PR makes it hold) ·
    *Automated testing* (tests added + each validation command run, real counts) · *Scenario tests* (every PR
-the whole table: one row per scenario, `passing` · `passing, held before` · `in #<n>` · `manual: <proof,
-where>`, exactly one row per scenario not `in #<n>`) · *Manual testing*
+the whole table: one row per scenario, `passing` · `passing, held before: <why>` · `in #<n>` · `manual:
+<proof, where>`, exactly one row per scenario not `in #<n>`; a test rewritten after its code says why) ·
+*Manual testing*
    (optional; checkbox ticked only by an operator walk, `validate`) · *Screenshot or Video Demo*
    (required when a user-visible surface changed, else omit) · *Risks* (required; `None — <why>` is
    valid) · *Notes for reviewer*. The bottom PR ends with the IDR block

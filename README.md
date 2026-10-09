@@ -53,11 +53,16 @@ registered `voltus-custom-skills-hub` clone at `origin/main`, with no prometheus
   Shortcut / meetings / data), then drafts the story in vantage's BDD voice and takes it to the definition of
   ready (one readiness comment, Ready for Development). Asks the operator **in its own tab**; its dialog holds
   only itself. Answers the story's stops.
-- **Implementor** — one Ready story: four analysis subagents (call chains, behavior at depth, seams and
-  tests, contracts and owners), then the IDR before any code (`lib/idr.py` checks it), then one failing
-  acceptance test per scenario carrying its `Scenario:` line, then the code, the registry's validation with
-  `VOLTUS=<worktree>`, draft PRs with a scenario-tests table and the IDR on the bottom PR. On a voltus-kanban
-  Stop trigger it stops (`report.sh --stopped`) — never asks, never guesses.
+- **Implementor** — drives one Ready story: four analysis subagents (call chains, behavior at depth, seams
+  and tests, contracts and owners), then the IDR and its failure modes before any code (`lib/idr.py` checks
+  the IDR), then per rung its own failing tests (one per scenario carrying its `Scenario:` line, one per
+  failure mode), builder subagents for the code, a read of each diff against the IDR, the registry's
+  validation with `VOLTUS=<worktree>`, the build proof, draft PRs with a scenario-tests table and the IDR on
+  the bottom PR. On a voltus-kanban Stop trigger it stops (`report.sh --stopped`) — never asks, never
+  guesses.
+- **Builder** — a background subagent of the implementor, one rung or fix at a time: a skeleton (names and
+  signatures, no behavior) or the code that makes the committed tests pass. `hooks/builder-guard.py` keeps
+  it off test files, the IDR, the failure modes and git writes; it returns a report or a stop block.
 - **Reviewer** — one round, fresh session; the IDR is its context (held to decision by decision); also the
   IDR check before code.
 - **Validator** — ends a story once our review gate is clean and a teammate approved: local dev on the top
@@ -102,6 +107,16 @@ any code at `<state>/engine/stories/<sc-id>/idr.md`, checked by a reviewer round
 stack's bottom PR, and landed at Completed in the team planning vault
 (`teams/b-team/vault/02-architecture/`) by vantage's own `/session-closeout`, with decision notes for the
 story's human rulings only. Prometheus agents never write the planning repo.
+
+## The build proof
+
+`lib/proof.py run` checks a story's stack from git, so no claim rests on the implementor's word: every commit
+is a skeleton, tests or code commit, never tests and code together; each test a tests commit adds fails at
+that commit inside its body (the skeleton keeps it from failing at import) and passes at the rung's head;
+every story scenario has its `Scenario:` test; every failure mode names a test that exists or says why it
+cannot happen. It runs only the named tests, in throwaway detached worktrees, with each package's registry
+`scenario_run`. `report.sh --done` refuses without a clean `proof.json` whose rung heads are current; the
+reviewer reads it, and a `held before` test with no reason is High.
 
 ## The unit engine
 
