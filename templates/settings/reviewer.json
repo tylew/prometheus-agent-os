@@ -1,5 +1,5 @@
 {
-  "$comment": "Depth-3 reviewer: never prompts a human, never edits code; posts its own round via gh api (reviews, comments). Agent = the pr-review-toolkit fan-out and, in a validate round, the Chrome walkers; mcp__claude-in-chrome__* = the walk's browser tools, listed one by one (anything else from that server stays denied); Workflow = deep mode on the operator's opt-in only. Launched with --permission-mode dontAsk; anything not allowed is denied and reported to the PM. Writes only its findings file and a validate round's screenshots under {state_dir}/reviews/ (launch.sh fills in the real state dir). Never writes a story: acceptance criteria are ticked by the validator (the operator's stories) or the author (a teammate's). open-tab.sh appends the project's validation commands. Path rules for writes are Edit(...) (they cover Write); a bare Edit deny would block the findings file too — dontAsk already denies every edit not allowed.",
+  "$comment": "Depth-3 reviewer: never prompts a human, never edits code; posts its own round via gh api (reviews, comments). Agent = the pr-review-toolkit fan-out and, in a validate round, the Chrome walkers; mcp__claude-in-chrome__* = the walk's browser tools, listed one by one (anything else from that server stays denied); Workflow = deep mode on the operator's opt-in only. Launched with --permission-mode dontAsk; anything not allowed is denied and reported to the PM. Writes only its findings file and a validate round's screenshots under {state_dir}/reviews/ (launch.sh fills in the real state dir). Never writes a story: acceptance criteria are ticked by the validator (the operator's stories) or the author (a teammate's). open-tab.sh appends the project's validation commands. Path rules for writes are Edit(...) (they cover Write); a bare Edit deny would block the findings file too — dontAsk already denies every edit not allowed. A hold is the one PR write outside its round: gh pr edit --add-label HUMAN_NEEDED and one gh pr comment --body-file (every other edit/comment form denied).",
   "extends": [
     "delivery"
   ],
@@ -39,7 +39,9 @@
       "mcp__claude-in-chrome__browser_batch",
       "mcp__shortcut__stories-get-by-id",
       "Bash(cp * {state_dir}/reviews/*)",
-      "Bash(mkdir -p {state_dir}/reviews/*)"
+      "Bash(mkdir -p {state_dir}/reviews/*)",
+      "Bash(gh pr edit * --add-label HUMAN_NEEDED)",
+      "Bash(gh pr comment * --body-file *)"
     ],
     "deny": [
       "AskUserQuestion",
@@ -47,7 +49,15 @@
       "Bash(git push *)",
       "Bash(gt *)",
       "Bash(gh pr merge *)",
-      "mcp__shortcut__stories-create"
+      "mcp__shortcut__stories-create",
+      "Bash(gh pr edit * --body*)",
+      "Bash(gh pr edit * --title*)",
+      "Bash(gh pr edit * --remove-*)",
+      "Bash(gh pr edit * --base*)",
+      "Bash(gh pr edit * --add-reviewer*)",
+      "Bash(gh pr edit * --add-assignee*)",
+      "Bash(gh pr comment * --edit-last*)",
+      "Bash(gh pr comment * --delete-last*)"
     ]
   }
 }

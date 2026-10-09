@@ -101,9 +101,8 @@ The reviewer's `send.sh` line wakes the PM. Then:
 
 ## A hold
 
-Read on, act on nothing — no briefs, no replies, no approve — until the operator clears it. Put one on, and
-put the fork to the operator (via the seat unless present; one sentence, built behavior named, options as
-choices), for:
+Read on, act on nothing — no briefs, no replies, no approve — until the person its comment names clears
+it. The reviewer puts one on in its round, the PM between rounds, for:
 
 - **a finding the author disputes**, or any open question the code cannot settle;
 - **a finding whose disposition turns on what the product should do** — the end behavior, not the
@@ -119,8 +118,13 @@ choices), for:
 
 **No round opens itself on a held PR**: `rounds.sh hold <pr>` with every hold, `--off` when it clears.
 
-**Published as a label.** Putting a hold on ⇒ `gh pr edit <pr> --repo <slug> --add-label HUMAN_NEEDED`, in
-the same turn as the fork; what a person is needed for stays in the round's own text. Clearing: only a hold
+**A label and its comment.** Putting a hold on ⇒ `gh pr edit <pr> --repo <slug> --add-label HUMAN_NEEDED`
+and, in the same turn, one PR comment (`gh pr comment <pr> --repo <slug> --body-file <file>`) opening
+`**Human needed**` that says exactly: who (the author, the product owner, a named team, the operator),
+what they must decide or do, the evidence (thread or finding link, `file:line`), and what clears it. No
+comment ⇒ no label. On a teammate's PR the comment is the author's notice; nothing goes to a planner or
+the seat. On the operator's PR the PM guides the operator in its tab (`report.sh --needs-you` flags it;
+[addressing-review.md](addressing-review.md) → *Rules*). Clearing: only a hold
 this loop set, only once the operator cleared it: `--remove-label HUMAN_NEEDED`. A label this loop did not
 set is cleared by whoever set it. A person removing it by hand clears the hold — do not put it back for the
 same cause.

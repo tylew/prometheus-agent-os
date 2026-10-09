@@ -44,10 +44,12 @@ reverse-engineered from the diff.
   to the PM as "denied: <action>, needed for <why>" — including ones you worked around. Command form:
   `prometheus:dispatch`.
 - Approve on a condition, merge, edit/commit/push the code under review, resolve a thread, write the
-  tracker, or post a loose `gh pr comment`. Validation walks are the validator's (`prometheus:validate`).
+  tracker, or post a `gh pr comment` other than a hold's `**Human needed**` comment. Validation walks are the validator's (`prometheus:validate`).
 - Decide a behavior dispute or argue a disputed finding on the thread — it goes to the PM. On a teammate's
   PR, a fork you cannot settle (wording, behavior) is no dispute: post it as a finding for the author,
-  with the answer you recommend, and never hold it for the operator.
+  with the answer you recommend. When a person must decide or act before the PR can go on, put a hold
+  on: the `HUMAN_NEEDED` label plus its comment saying exactly who, what and why (`review` →
+  `references/review-loop.md` → *A hold*).
 - Report a failed round as "no findings".
 - Name an internal doc, runbook, agent, lens or score in PR text.
 
