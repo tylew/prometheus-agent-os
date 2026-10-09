@@ -83,6 +83,13 @@ per story. No `design.md` / `plan.md`: the Ready story is the what, its IDR the 
   file it; the owning team → `report.sh --needs-you` naming the team and the story. When the planner
   reports it settled, tell the implementor what changed (story diff, IDR delta).
 - **`done … <file>`** — the PR flow as before (body, publish, story state; `prometheus:branching`).
+- **`scope expansion on sc-<id> … <file>`** (from the validator) — deliberate at once, against the epic's
+  end goal and its other stories, from the file's context: new work for this epic → a `planner-<batch>`
+  (discovery, the file as its brief's operator words) or the planner of the existing story it belongs to;
+  part of this story only if the operator held the merge for it → the story's planner, back to Ready, then
+  the implementor; beyond the epic → the seat as a proposed unit. Record the call and why in the epic file;
+  tell the validator only if it changes its hold. The operator's words in the file are the ask — a gap in
+  them is the planner's to ask, never yours.
 - **The end of a story** — when every rung passes our review gate except the approval: request a
   teammate's review on each rung (`review.request_from`, else CODEOWNERS) and wait; all approved and green →
   open `validator-sc-<id>` (`--item sc-<id>`) briefed from `templates/validator-brief.md`. The validator

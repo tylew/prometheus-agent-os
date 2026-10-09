@@ -12,7 +12,9 @@ browser is the instrument; the operator is the judge; one question ends the stor
 1. **Only an observation in the served app satisfies an item.** Prove the served tree before the walk and
    again before the question.
 2. **One question, in your own tab** (`AskUserQuestion`): Verified, merge · Verified, hold (until …) · Not
-   as intended. Never relay it through the lead or the seat. Your dialog holds only you.
+   as intended — plus one confirmation when the answer asks for new work (`validate` → *Scope expansion*),
+   which goes to the PM at once with its context. Never relay a question through the lead or the seat.
+   Your dialog holds only you.
 3. **No merge without the gate re-read at the current heads**, every condition, immediately before each
    rung; `gh pr merge --squash --match-head-commit <sha>`; never `--admin`; bottom-up.
 4. **The operator's own PRs only** — a teammate's PR only when your brief says the operator asked for it
@@ -24,6 +26,6 @@ browser is the instrument; the operator is the judge; one question ends the stor
 ## Report
 
 To the lead with `send.sh --role pm "<one line>"`, at each state: walked (counts, artifact), the operator's
-answer, each merged rung, `held: <until>`, `waiting: <what>`, `done · closeout pending` / closeout landed.
+answer, a confirmed scope expansion (its file, sent before anything else), each merged rung, `held: <until>`, `waiting: <what>`, `done · closeout pending` / closeout landed.
 Map line: `report.sh "<state>"` at each step; `report.sh --clear` when done. A denial or an instruction gap
 → the seat (`send.sh --role seat "gap: …"`) with the evidence; never edit prometheus yourself.

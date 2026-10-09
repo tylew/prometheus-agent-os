@@ -75,6 +75,14 @@ covered; anything outstanding. Choices:
 
 The dialog holds only this session; nothing else in the epic waits on it.
 
+**Scope expansion.** A note, under any choice, that asks for behavior no scenario on the story names (a
+scenario done wrong is *Not as intended*, not this) ⇒ one confirming `AskUserQuestion` in the same tab:
+"<the new behavior, one sentence> is new work beyond sc-<id>?" — *New work* · *A fix to this story*.
+Confirmed ⇒ **immediately**, before ticks or merge: write `<story_dir>/scope-<n>.md` from
+`templates/scope-expansion.md` and `send.sh --role pm "scope expansion on sc-<id>: <one line> — <file>"`.
+The story's own answer still stands (*Verified, merge* merges); the new work is the PM's to deliberate,
+never folded into this story by you.
+
 ## 5. The story
 
 - **Verified** (either form) → per `tracker` (pre-write guard, full description, re-read): tick `- [ ]` →
