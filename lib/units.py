@@ -24,7 +24,7 @@ import members  # noqa: E402
 import registry  # noqa: E402
 
 KINDS = ("epic", "story", "story-set", "goal-set", "review")  # the four old kinds retire after the fold
-ROLES = ("pm", "planner", "implementor", "reviewer", "librarian", "runner", "configurator")
+ROLES = ("pm", "planner", "implementor", "reviewer", "validator", "closeout", "librarian", "runner", "configurator")
 READY_STATES = ("idle", "done")
 BUSY_STATES = ("working", "blocked")
 PASS_ENV = ("PROMETHEUS_STATE_DIR", "PROMETHEUS_FILTER", "PROMETHEUS_EXTERNAL", "PROMETHEUS_KB_ROOT")

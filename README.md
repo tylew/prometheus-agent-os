@@ -25,7 +25,7 @@ epic workspace "epic-<id>-<slug>" (one per epic)
   ├─ tab planner          writes the epic's stories
   ├─ tab impl-<item>      implementor, fresh per work item, started in its worktree
   ├─ tab review-<pr>      reviewer, fresh per round
-  └─ tab validate-<pr>    walks the scenarios on local dev in Chrome
+  └─ tab validator-sc-<id>  walks the scenarios on local dev, asks "Verified and merge?", merges
 ```
 
 Every tab runs `lib/launch.sh <role>`: resolves `$WORKSPACE`, sets `PROMETHEUS_ROLE`, merges

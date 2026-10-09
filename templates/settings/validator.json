@@ -1,0 +1,60 @@
+{
+  "$comment": "Validator: ends one story \u2014 local dev, the Chrome walk, ONE AskUserQuestion in its own tab, the criteria ticks, the bottom-up merge, the closeout tab. Not dontAsk: its question (and any prompt its dev bring-up raises) is answered in its own tab and holds only it. Merges only with --squash --match-head-commit (never --admin); gt sync and gt submit --update-only restack the next rung during a merge. No code edits, no commits.",
+  "extends": [
+    "delivery"
+  ],
+  "permissions": {
+    "allow": [
+      "Agent",
+      "Skill",
+      "Bash(gh pr merge * --squash --match-head-commit *)",
+      "Bash(gt sync *)",
+      "Bash(gt sync)",
+      "Bash(gt submit --update-only *)",
+      "Bash(gt log *)",
+      "Bash(git -C * switch *)",
+      "Bash(git -C * checkout *)",
+      "Bash(git -C * reflog *)",
+      "Bash(python3 */lib/units.py open-tab *)",
+      "Bash(*/skills/agent-tabs/scripts/open-tab.sh *)",
+      "Bash(*/skills/agent-tabs/scripts/send-brief.sh *)",
+      "Bash(python3 */lib/registry.py *)",
+      "Bash(python3 \"*/lib/registry.py\" *)",
+      "Bash(send.sh *)",
+      "Bash(report.sh *)",
+      "Bash(cp * {state_dir}/engine/stories/*)",
+      "Bash(mkdir -p {state_dir}/engine/stories/*)",
+      "Edit(/{state_dir}/engine/stories/**)",
+      "mcp__shortcut__stories-get-by-id",
+      "mcp__shortcut__stories-update",
+      "mcp__claude-in-chrome__navigate",
+      "mcp__claude-in-chrome__computer",
+      "mcp__claude-in-chrome__read_page",
+      "mcp__claude-in-chrome__find",
+      "mcp__claude-in-chrome__get_page_text",
+      "mcp__claude-in-chrome__tabs_context_mcp",
+      "mcp__claude-in-chrome__tabs_create_mcp",
+      "mcp__claude-in-chrome__tabs_close_mcp",
+      "mcp__claude-in-chrome__read_console_messages",
+      "mcp__claude-in-chrome__read_network_requests",
+      "mcp__claude-in-chrome__javascript_tool",
+      "mcp__claude-in-chrome__file_upload",
+      "mcp__claude-in-chrome__upload_image",
+      "mcp__claude-in-chrome__form_input",
+      "mcp__claude-in-chrome__browser_batch"
+    ],
+    "deny": [
+      "Bash(gh pr merge * --admin*)",
+      "Bash(gh pr merge * --merge*)",
+      "Bash(gh pr merge * --rebase*)",
+      "Bash(git commit *)",
+      "Bash(git push *)",
+      "Bash(gt create *)",
+      "Bash(gt modify *)",
+      "Bash(gt submit --publish *)",
+      "Edit(/{workspace}/repos/**)",
+      "Edit(/{workspace}/.worktrees/**)",
+      "mcp__shortcut__stories-create"
+    ]
+  }
+}

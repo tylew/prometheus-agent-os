@@ -1,119 +1,119 @@
 ---
 name: validate
-description: "Manual validation of a unit's change on local dev, and bringing local dev up for it. The project manager proves the served tree, arranges fixtures and opens a reviewer validate round; the reviewer builds the checklist (one item per Then clause of the operator's scenarios, the PR's manual steps, the diff's user-visible surface), walks every item in Chrome through subagents with screenshots, captures evidence on a fail and reports to the PM; the operator answers one human-readable summary (Verified / Not as intended); on Verified the reviewer ticks the story's acceptance criteria and attaches the screenshots to it; the PM records the walk, moves the story and turns a fail into a fix brief. Use to validate, QA, walk scenarios or sign off a PR before merge or deploy, and to bring up / start / run a project locally."
+description: "The end of a story, run by one validator session per story: bring local dev up and prove the served tree, arrange fixtures, build the checklist (one item per Then clause, the PR's manual steps, the diff's user-visible surface), walk it in Chrome through subagents with screenshots, ask the operator ONE question in its own tab (Verified, merge · Verified, hold · Not as intended), tick the acceptance criteria with evidence, re-check the gate and merge the stack bottom-up, then open the vantage closeout. Also the merge of a teammate's PR when the operator explicitly asks. Use to validate, QA, walk scenarios, sign off or merge a story, and to bring up / start / run a project locally."
 ---
 
-# validate — the browser is the instrument, the operator is the judge
+# validate — the browser is the instrument, the operator is the judge, one question ends a story
 
-The PM runs local dev and the operator question; a reviewer in a `validate-<pr#>` tab walks the checklist
-in Chrome. Only an observation in the served app satisfies an item — code reading, a curl probe or a green
-suite never does. Scope is **visual** (copy, labels, tooltips, badges, states, layout) **and functional**
-(what an action does, persists, shows after reload, refreshes without one); label every item with its kind.
+The **validator** (`validator-sc-<id>` tab, `agents/validator.md`) owns every step below. Only an
+observation in the served app satisfies an item — code reading, a curl probe or a green suite never does.
+Scope is **visual** (copy, labels, tooltips, badges, states, layout) **and functional** (what an action
+does, persists, shows after reload); label every item with its kind.
 
-## 0. Local dev, proven — PM
+## When a validator opens
 
-- Bare "dev" is ambiguous: local dev vs the deployed env (`registry.py field deploy.envs --key <project>`).
-  Ask, one sentence, options as choices. Deployed → not this skill.
-- Bring-up and the served-tree proof: `references/dev-up.md`. Not up, or up on another branch → bring it up
-  first. Never restart pieces mid-walk: observed items are invalidated.
+The operator's own story, when every rung of its stack: passes our review approval gate except the approval
+itself (GitHub rejects the author's own), has a teammate's approval, and has every check green except
+`review.approval_gated_checks`. One validation at a time per project: the base checkout is shared and
+hot-reloads, so a second story waits in the feed.
 
-## 1. Fixtures, then the round — PM
+## 0. Local dev, proven
+
+- Bring-up and the served-tree proof: `references/dev-up.md` — on the stack's **top** branch, from the base
+  checkout. Not up, or up on another branch → bring it up first. Never restart pieces mid-walk: observed
+  items are invalidated.
+
+## 1. Fixtures
 
 Arrange every precondition the scenarios' `Given`s need (a run of the right type, a flag off, a seeded row,
-a second profile) and name each by id. Not arrangeable locally → listed in the brief as unavailable; the
-reviewer marks its items `blocked`. Everything toggled is restored after the round; the restore is reported.
+a second profile) and name each by id. Not arrangeable locally → its items are `blocked`, with why.
+Everything toggled is restored after the walk; the restore is recorded.
 
-Then open the round: `open-tab.sh <ws> validate-<pr#> reviewer --pr <o/r#n>` (`agent-tabs`), brief from
-`templates/validate-brief.md` (branch, sha, both probes, local base URL, fixtures, scenarios verbatim,
-artifact path). A fresh tab per round.
-
-## 2. The whole checklist before the first item — reviewer
+## 2. The whole checklist before the first item
 
 Sources, earlier owns the wording on conflict:
 
-1. **The unit's Gherkin scenarios** (from the brief). One item per `Then` / `But` clause; its `Given`s are
-   setup, its `When` the action, the clause the pass condition — copied, not re-derived. A `Scenario
-   Outline` yields one item per `Examples` row. A `Then` unobservable locally → *Not covered* with the reason.
-2. **The PR's manual steps** and its stated risks (a risk is a probe).
-3. **The diff's user-visible surface**: copy, tooltips, routing (which dialog, which request), list / badge /
-   column values, gated and disabled states, cache invalidation. Uncovered by any scenario → still an item,
-   marked `extra`.
+1. **The story's Gherkin scenarios.** One item per `Then` / `But` clause; its `Given`s are setup, its
+   `When` the action, the clause the pass condition — copied, not re-derived. A `Scenario Outline` yields
+   one item per `Examples` row. A `Then` unobservable locally → *Not covered* with the reason. The PRs'
+   `manual:` scenario-test rows are items too.
+2. **The PRs' manual steps** and their stated risks (a risk is a probe).
+3. **The diff's user-visible surface**: copy, tooltips, routing, list / badge / column values, gated and
+   disabled states, cache invalidation. Uncovered by any scenario → still an item, marked `extra`.
 
-Each item is one observable: exact local URL (base path from the brief) · element by its on-screen name ·
-action · pass condition in what the page shows, never a mechanism. A UI item names the component as a user
-knows it, the change, the page, and where on the page.
+Each item is one observable: exact local URL · element by its on-screen name · action · pass condition in
+what the page shows. Mark each **observe** (the browser can check it) or **judge** (wording, placement, a
+product call — walked and captured; the judgment is the operator's).
 
-Mark each item **observe** (the browser can check it — a value, a state, a request) or **judge** (wording,
-placement, a product call). A judge item is still walked; the browser captures exactly what is shown, and
-the judgment is the operator's (§4).
+## 3. Walk it in Chrome
 
-## 3. Walk it in Chrome — reviewer
-
-Load the claude-in-chrome tools (`claude-in-chrome` skill). One subagent (`Agent`) per page group — items
-sharing a page and fixture, ordered to avoid back-and-forth; groups that mutate shared state run in
-sequence, independent groups in parallel. Each subagent's brief: the URLs, the items verbatim, the fixtures
-by id, "open a new tab, never reuse an existing one", "never trigger a JS alert / confirm", and the return
-per item — what the page showed (exact text / state), a screenshot saved to
-`<artifact without .md>/<item #>.png` (copied out of the browser tool's temp dir as it lands — it is
-wiped; `mkdir -p` / `cp`), the request and status where the item depends on one, `pass` / `fail` /
-`blocked` against the condition as written.
+Load the claude-in-chrome tools. One subagent (`Agent`) per page group — items sharing a page and fixture;
+groups that mutate shared state run in sequence, independent groups in parallel. Each subagent's brief: the
+URLs, the items verbatim, the fixtures by id, "open a new tab, never reuse an existing one", "never trigger
+a JS alert / confirm", and the return per item — what the page showed (exact text / state), a screenshot
+saved to `<artifact without .md>/<item #>.png` (copied out of the browser tool's temp dir as it lands), the
+request and status where the item depends on one, `pass` / `fail` / `blocked`.
 
 Re-check every subagent's evidence against the condition before recording it. Write each item to the
-artifact as it lands — an interrupted round resumes from the file.
+artifact as it lands. **On a fail, capture while the state is live**: failing request + body, FE console,
+the wrong rendered value, the backend access-log line. **Blocking** (feature broken, app wedged) → stop the
+walk; **non-blocking** → carry it. A fail is never re-explained into a pass.
 
-**On a fail, capture while the state is live** (in the subagent's brief): failing request + body, FE
-console, the wrong rendered value. **Blocking** (feature broken, app wedged) → stop the walk and report;
-**non-blocking** → carry it, continue. A fail is never re-explained into a pass; a wrong pass condition is
-said plainly and re-run as a new item.
+Then write the summary (`references/walk-record.md` → *Summary*) into the artifact.
 
-Then write the summary (`references/walk-record.md` → *Summary*) into the artifact, post nothing to the PR,
-and report one line to the PM: counts, blocking yes/no, artifact path. **End the turn but keep the tab**: the
-PM sends the operator's verdict back to it (§4b).
+## 4. One question — in the validator's own tab
 
-## 4. Human verification — one question — PM
+`AskUserQuestion`, once, the human-readable summary in it: the story; the PRs bottom-up with their
+approvals and checks; counts (`n passed · n failed · n blocked`); fails and judge items; what is not
+covered; anything outstanding. Choices:
 
-Read the artifact; add the backend access-log line for each failed request. Put the summary to the operator
-as **one** question — options **Verified** (behavior and wording are what the user should get) · **Not as
-intended** (the note names the line and how it should differ):
+- **Verified, merge** — behavior and wording are what the user should get; merge now.
+- **Verified, hold** — merge later; the note names until when: a date, a named PR merging, or "until I
+  say".
+- **Not as intended** — the note names the line and how it should differ.
 
-- **Operator present** (turn began with input not tagged `[prometheus]`) → `AskUserQuestion` in place,
-  the summary in the question.
-- **Otherwise** → `"$CLAUDE_PLUGIN_ROOT/skills/dispatch/scripts/send.sh" --role seat "validate <pr#>:
-  <summary path> — verified / not as intended?"`, then end the turn; the answer wakes it.
+The dialog holds only this session; nothing else in the epic waits on it.
 
-Then hand the verdict to the round: `send.sh --pane <validate tab's pane> "verdict: Verified | Not as
-intended — <operator note verbatim>"`.
+## 5. The story
 
-## 4b. The story — reviewer, on the verdict line
+- **Verified** (either form) → per `tracker` (pre-write guard, full description, re-read): tick `- [ ]` →
+  `- [x]` for each criterion whose items all **passed** in this walk; a criterion with a failed, blocked or
+  not-covered item stays unticked, named with why. The user-visible screenshots go into the description's
+  one `<details>`. Tick each PR's manual-pass line with date, env and item count; point its *Screenshot or
+  Video Demo* at the story. Never on a partial walk.
+- **Not as intended**, or any fail → nothing on the story; each line becomes a fix brief to the
+  implementor (`report.sh --needs-you` is not used: one line to the lead naming the artifact); the story
+  goes back to implement and gets a fresh validator after the fix.
 
-The reviewer checks off the acceptance criteria; nobody else does (`tracker` → *Who writes what*).
+## 6. Merge — on "Verified, merge" (or a hold whose condition is met)
 
-- **Verified** → per `tracker` (pre-write guard, full `description`, re-read):
-  - tick `- [ ]` → `- [x]` for each criterion whose scenario's items all **passed** in this walk. A
-    criterion with a failed, blocked or not-covered item stays unticked, named in the report with why;
-  - the user-visible screenshots go into the description's one `<details>` (`tracker` →
-    its board reference → *Screenshots*).
-- **Not as intended** → nothing on the story; the note goes into the artifact.
+1. **Re-read the gate at the current heads**, every condition, a failed read is a no: each rung approved,
+   checks green, mergeable, no open thread of ours, heads equal to the walked ones (or the same diff by
+   patch-id). Anything moved → no merge; report; a review round is due.
+2. **Bottom-up**, for each rung: `gh pr merge <n> --squash --match-head-commit <head sha>` — never
+   `--admin`. Then in the stack's worktree `gt sync` (restacks the next rung onto `<default>`) and wait for
+   its retarget and checks; approvals survive the push (`dismiss_stale_reviews_on_push` is off). A dismissed
+   approval or a red check → `waiting: re-approval` / the check, reported, the merge resumes when it clears.
+3. The story moves to Completed when the top rung merges (`tracker`; the integration usually moves it —
+   re-read, move only if it did not).
+4. **Partial outcomes are states**, reported and shown on the map, never silent: `merging: rung 2/3`,
+   `held: <until>`, `done · closeout pending`.
 
-Report one line to the PM — criteria ticked `n/m`, screenshots attached, the story link — then end the turn.
+## 7. Closeout — the IDR and the story's rulings into the planning vault
 
-A note on Verified is kept (usually the next story). Each fail and each Not-as-intended line → a fix brief
-to the item's implementor (`templates/implementor-brief.md`, via `send.sh`): expected, seen, evidence, the
-scenario it breaks. The fix is re-walked in a new validate round for the affected items, then re-verified.
+After the top rung merges: write `<story_dir>/closeout.md` from `templates/closeout-summary.md` (the IDR,
+the story's human rulings with who and when, links), open `closeout-sc-<id>` (`open-tab.sh <ws>
+closeout-sc-<id> closeout --item sc-<id> --worktree <the project's base checkout>`), send it the summary as
+its first message, then `/session-closeout`. Vantage lands it by its own rules (one direct `plan(<team>):
+…` commit). It may ask the operator to approve its proposals in its own tab. Not landed → the story shows
+`done · closeout pending` with the tab to open.
 
-## 5. Record — PM
+## A teammate's PR
 
-`references/walk-record.md` → `<docs.specs><slug>/validation.md` (`registry.py field docs.specs --key
-<project>`), one section per walk, appended, with the operator's answer.
+Never merged by prometheus unless the operator explicitly asks, naming the PR. Then a validator runs §6
+only — no walk, no story ticks, no closeout — and §4 becomes one question: "merge #<n>?" with the gate.
 
-- **Clean pass** (every item passed, summary Verified) → tick the PR's manual-pass line with date, env and
-  item count, and point its *Screenshot or Video Demo* at the story (`branching` owns the body); story gate
-  if this walk was it (`tracker`) — the reviewer has ticked the criteria (§4b). Never on a partial walk.
-- **Any fail or Not as intended** → line stays unticked; the fix runs through §4.
-- A bring-up trap → the project runbook; a validating rule → here.
+## Record
 
-## Report
-
-To the seat (`templates/pm-report.md`) or in place: counts first (`n passed · n failed · n blocked`, the
-verification answer), then fails, then one line per item (id · visual/functional · observe/judge · verdict ·
-operator note), then what was not covered.
+`references/walk-record.md` → `<story_dir>/validation.md`, one section per walk, appended, with the
+operator's answer. A bring-up trap → the project runbook; a validating rule → here.

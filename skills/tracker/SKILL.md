@@ -27,7 +27,7 @@ operator gate. Say what would have been posted; the operator decides. State move
 |---|---|---|
 | `planner` | creates stories (Backlog, typed, epic homed, owner, estimate) and sub-issues; the whole description; the readiness comment; the move to Ready for Development; clearing `blocked` once a stop is settled | advance past Ready for Development |
 | `project-manager` | state at each gate after Ready; estimate re-check; the `question` / `blocked` labels; relations; the five comment cases | create a story; edit Scenarios or acceptance criteria text — a change goes to the planner; tick a criterion |
-| reviewer (validate round) | AC ticks and the screenshots `<details>`, on a Verified walk (`validate` §4b) | anything else on the board |
+| validator | AC ticks and the screenshots `<details>` on a Verified walk; Completed after the top rung merges when the integration did not move it (`validate` §5–§6) | anything else on the board |
 | implementor | nothing (allow-lists deny it) | — |
 
 ## Always
@@ -68,7 +68,7 @@ Move: `mcp__shortcut__stories-update` with `storyPublicId` + `workflow_state_id`
 - **Re-assert after un-draft.** The GitHub integration moves a story linked from a draft PR to
   `in_development` (correct; leave it). On un-draft, set `ready_for_review` after the integration's event
   lands, then re-read — automation can land after your write.
-- **ACs are ticked by the validate round's reviewer** (`validate` §4b): `- [ ]` → `- [x]` for each
+- **ACs are ticked by the validator** (`validate` §5): `- [ ]` → `- [x]` for each
   criterion a Verified walk passed; full `description` resent, re-read. Never `completed` with an
   unchecked box: unchecked = not done (another walk), or the criterion is wrong → planner revises it. A criterion
   only a deployed env can show is ticked at merge from the evidence that stands in for it, and what was

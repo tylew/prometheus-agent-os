@@ -7,7 +7,7 @@
 set -euo pipefail
 
 role=${1:-}
-[[ -n $role ]] || { echo "usage: launch.sh <seat|librarian|planner|pm|implementor|reviewer> [--args] [claude args...]" >&2; exit 2; }
+[[ -n $role ]] || { echo "usage: launch.sh <seat|librarian|planner|pm|implementor|reviewer|validator|closeout> [--args] [claude args...]" >&2; exit 2; }
 shift
 args_only=0
 if [[ ${1:-} == --args ]]; then args_only=1; shift; fi
@@ -15,12 +15,40 @@ if [[ ${1:-} == --args ]]; then args_only=1; shift; fi
 case $role in
   seat)        agent=orchestrator ;;
   pm)          agent=project-manager ;;
-  librarian|runner|configurator|planner|implementor|reviewer) agent=$role ;;
+  librarian|runner|configurator|planner|implementor|reviewer|validator) agent=$role ;;
+  closeout)    agent= ;;
   *) echo "launch: unknown role '$role'" >&2; exit 2 ;;
 esac
 
 plugin_root=${0:A:h:h}
 workspace=$(python3 "$plugin_root/lib/env.py") || { echo "launch: workspace root not found" >&2; exit 1; }
+
+if [[ $role == closeout ]]; then
+  # vantage's own session, run as the operator: no prometheus agent, settings or MCP; vantage resolves the
+  # planning repo itself. The plugin comes from a detached worktree of the registered skills-hub clone at
+  # origin/main, refreshed per launch, so nothing is installed and the reference clone is never edited.
+  hub=$(python3 "$plugin_root/lib/registry.py" field repo.root --key voltus-custom-skills-hub 2>/dev/null) \
+    || { echo "launch: closeout needs the voltus-custom-skills-hub registry entry" >&2; exit 1; }
+  [[ $hub == /* ]] || hub=$workspace/$hub
+  vdir=${PROMETHEUS_STATE_DIR:-$HOME/.local/state/prometheus}/vantage-plugin
+  ccmd=(claude --plugin-dir "$vdir/vantage")
+  ccmd+=("$@")
+  if [[ ${PROMETHEUS_DRY_RUN:-} == 1 ]]; then
+    if (( args_only )); then python3 -c 'import json,sys; print(json.dumps(sys.argv[1:]))' "${ccmd[@]:1}"
+    else print -r -- "git -C ${(q)hub} worktree add --detach ${(q)vdir} origin/main &&" ${(q)ccmd[@]}; fi
+    exit 0
+  fi
+  {
+    git -C "$hub" fetch -q origin main
+    if [[ -d $vdir ]]; then git -C "$vdir" checkout -q --detach origin/main
+    else git -C "$hub" worktree add -q --detach "$vdir" origin/main; fi
+  } >&2 || { echo "launch: could not prepare the vantage plugin at $vdir" >&2; exit 1; }
+  if (( args_only )); then
+    python3 -c 'import json,sys; print(json.dumps(sys.argv[1:]))' "${ccmd[@]:1}"
+    exit 0
+  fi
+  exec "${ccmd[@]}"
+fi
 
 state_dir=${PROMETHEUS_STATE_DIR:-$HOME/.local/state/prometheus}
 settings_dir=$state_dir/settings
@@ -138,7 +166,7 @@ cmd=(claude --plugin-dir "$plugin_root" --settings "$settings" --agent "promethe
 case $role in
   implementor|reviewer|librarian) cmd+=(--permission-mode dontAsk) ;;
 esac
-[[ $role == reviewer || $role == planner ]] && cmd+=(--chrome)  # validate rounds walk the app; the planner's UI lens reads it
+[[ $role == reviewer || $role == planner || $role == validator ]] && cmd+=(--chrome)  # walks and the planner's UI lens
 cmd+=("$@")
 if (( args_only )); then
   python3 -c 'import json,sys; print(json.dumps(sys.argv[1:]))' "${cmd[@]:1}"

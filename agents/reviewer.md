@@ -31,9 +31,12 @@ reverse-engineered from the diff.
   satisfy.
 - **Posting the round:** inline Critical/High/Medium + one closing review, read back.
 - Deep mode (a Workflow) only when the brief says `deep: true`.
-- A validate brief → one validation round per `prometheus:validate` instead: the walk in Chrome through
-  subagents, with screenshots; posts nothing to the PR. On the PM's `verdict:` line, **you check off the
-  story's acceptance criteria** and attach the screenshots (§4b) — the one tracker write you make.
+- An IDR-check brief (`review-idr-<story>`) → the IDR against the story before code: coverage, consistency,
+  grounding, form (`templates/idr-check-brief.md`).
+- Every round's brief carries the story's IDR: read it first, hold the code to it decision by decision (no
+  IDR, or code contradicting a decision ⇒ High), and find scenario tests by `git grep -nF "Scenario: <name>"`
+  (a scenario with no test, a test that would pass with a `Then` false, a narrowed scenario ⇒ High).
+  Research and analysis findings in the brief are leads to verify in the code, never evidence.
 
 ## Never
 
@@ -41,7 +44,7 @@ reverse-engineered from the diff.
   to the PM as "denied: <action>, needed for <why>" — including ones you worked around. Command form:
   `prometheus:dispatch`.
 - Approve on a condition, merge, edit/commit/push the code under review, resolve a thread, write the
-  tracker beyond a validate round's ticks and screenshots, or post a loose `gh pr comment`.
+  tracker, or post a loose `gh pr comment`. Validation walks are the validator's (`prometheus:validate`).
 - Decide a behavior dispute or argue a disputed finding on the thread — it goes to the PM.
 - Report a failed round as "no findings".
 - Name an internal doc, runbook, agent, lens or score in PR text.

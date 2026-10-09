@@ -198,3 +198,30 @@ class PlannerLaunchTest(unittest.TestCase):
             args = json.loads(out.stdout)
             self.assertIn("--chrome", args)
             self.assertNotIn("dontAsk", args)
+
+
+class ValidatorLaunchTest(unittest.TestCase):
+    def test_validator_asks_in_its_tab_and_merges_only_by_squash_at_a_head(self):
+        import json
+        with tempfile.TemporaryDirectory() as st:
+            out = run_launch("validator", "--args", state_dir=st)
+            self.assertEqual(out.returncode, 0, out.stderr)
+            args = json.loads(out.stdout)
+            self.assertIn("--chrome", args)
+            self.assertNotIn("dontAsk", args)
+            perms = json.load(open(os.path.join(st, "settings", "validator.json")))["permissions"]
+            self.assertNotIn("AskUserQuestion", perms.get("deny", []))
+            self.assertIn("Bash(gh pr merge * --squash --match-head-commit *)", perms["allow"])
+            self.assertIn("Bash(gh pr merge * --admin*)", perms["deny"])
+            self.assertIn("Bash(git commit *)", perms["deny"])
+
+    def test_closeout_loads_vantage_without_prometheus_settings(self):
+        import json
+        with tempfile.TemporaryDirectory() as st:
+            out = run_launch("closeout", "--args", state_dir=st)  # PROMETHEUS_DRY_RUN: no git
+            self.assertEqual(out.returncode, 0, out.stderr)
+            args = json.loads(out.stdout)
+            self.assertEqual(args[0], "--plugin-dir")
+            self.assertTrue(args[1].endswith(os.path.join("vantage-plugin", "vantage")))
+            self.assertNotIn("--settings", args)
+            self.assertNotIn("--agent", args)

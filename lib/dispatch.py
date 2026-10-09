@@ -24,9 +24,10 @@ import herdr as hz  # noqa: E402
 SAFE_STATES = ("idle", "done", "working")
 LEADS = ("pm",)
 DEPTH3 = ("implementor", "reviewer")
-CHILDREN = DEPTH3 + ("planner",)
+CHILDREN = DEPTH3 + ("planner", "validator", "closeout")
 CONTROL = ("seat", "librarian")
-ROLES = ("seat", "librarian", "runner", "configurator", "pm", "planner", "implementor", "reviewer")
+ROLES = ("seat", "librarian", "runner", "configurator", "pm", "planner", "implementor", "reviewer", "validator",
+         "closeout")
 INLINE_LIMIT = 400
 
 

@@ -74,6 +74,12 @@ per story. No `design.md` / `plan.md`: the Ready story is the what, its IDR the 
   file it; the owning team → `report.sh --needs-you` naming the team and the story. When the planner
   reports it settled, tell the implementor what changed (story diff, IDR delta).
 - **`done … <file>`** — the PR flow as before (body, publish, story state; `prometheus:branching`).
+- **The end of a story** — when every rung passes our review gate except the approval: request a
+  teammate's review on each rung (`review.request_from`, else CODEOWNERS) and wait; all approved and green →
+  open `validator-sc-<id>` (`--item sc-<id>`) briefed from `templates/validator-brief.md`. The validator
+  owns local dev, the walk, the one question, the merge and the closeout (`prometheus:validate`); you never
+  ask Verified and never merge. A teammate's PR: only when the operator asks you to merge it by name — then
+  a validator with `teammate_merge: yes`.
 
 **Teammates' PRs in your epic** (a review request, or a PR touching the operator's owned paths) skip design,
 plan and build: the review loop on every PR of the stack, bottom rung first, until each merges, closes or the
@@ -103,7 +109,7 @@ holds; it starts the role's agent (settings, `--name <label>`, `dontAsk` for imp
 |---|---|---|
 | `impl-<item-slug>` | implementor | the work item, its scenario, confirmed UI descriptions, absolute worktree path, ref, the `branching` non-negotiables verbatim — `templates/implementor-brief.md` |
 | `review-<pr#>` | reviewer | PR number, round, stack position, the unit's scenarios — `templates/reviewer-brief.md` |
-| `validate-<pr#>` | reviewer | a validate round on local dev: branch + sha, served-tree proof, base URL, fixtures, the unit's scenarios — `templates/validate-brief.md` (`validate`) |
+| `validator-sc-<id>` | validator | the end of a story: local dev, the walk, the one question, the merge, the closeout — `templates/validator-brief.md` (`validate`) |
 | `planner-<batch>` / `planner-sc-<id>` | planner | discovery: the goal, the project, the epic, the operator's words verbatim · ready mode: the story, the project, the epic |
 
 Briefs, later messages and closing tabs: `agent-tabs`.
