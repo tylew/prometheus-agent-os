@@ -291,6 +291,11 @@
         },
         "python3 \"{plugin_root}/lib/registry.py\" field repo.slug --key besstie",
         "make -C {wt}/voltuspy/brightfield-besstie lint VOLTUS={wt}",
+        {
+          "cmd": "gh pr view 43788 --repo voltusdev/voltus --json body,headRefOid,labels --jq .body",
+          "live": "gh pr view --help",
+          "why": "the PR-object read (review SKILL.md → PR); gh api …/pulls/<n> stays unallowed — its write denies cannot be fenced from review posting"
+        },
         "gh api repos/o/r/commits/abc",
         "gh api repos/o/r/compare/a...b",
         {
@@ -340,6 +345,10 @@
         "cp /tmp/shot.png {state_dir}/reviews/o-r-1-validate-r1/3.png"
       ],
       "deny": [
+        {
+          "cmd": "gh api repos/o/r/pulls/1 -X PATCH -f state=closed",
+          "live": "gh api repos/o/r/pulls/1 -X PATCH -f state=closed --hostname probe.invalid"
+        },
         "mcp__claude-in-chrome__gif_creator",
         {
           "cmd": "cd {wt} && git status",

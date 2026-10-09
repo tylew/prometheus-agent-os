@@ -46,7 +46,7 @@ Newest round decides: round N resolved + round N+1 untouched ⇒ the author side
 - **Registry** — `python3 "$CLAUDE_PLUGIN_ROOT/lib/registry.py" field <dotted> --key <k>`: `repo.slug`,
   `repo.default_branch`, `vcs.tool`, `owned_paths`, `review.docs`, `review.approval_gated_checks`,
   `packages` (`validate` per package), `runbooks`.
-- **PR**: `gh pr view <pr> --json body,headRefOid,baseRefName,headRefName,labels,author,mergeable,reviewDecision,reviewRequests`;
+- **PR**: `gh pr view <pr> --json body,headRefOid,baseRefName,headRefName,labels,author,mergeable,reviewDecision,reviewRequests` — the only PR-object read (`gh api …/pulls/<pr>` is not allowed);
   threads + earlier reviews: `gh api repos/<slug>/pulls/<pr>/comments --paginate`,
   `gh api repos/<slug>/pulls/<pr>/reviews --paginate`.
 

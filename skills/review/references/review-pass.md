@@ -10,7 +10,7 @@ Run by the reviewer, after the SKILL.md preconditions. Rating, posting and the e
 Intent comes from these, never reverse-engineered from the diff:
 
 - the brief's scenarios (verbatim) and story scope;
-- the PR body and every thread (`gh pr view`, the comments + reviews APIs); on a stack, every rung's body;
+- the PR body and every thread (reads: SKILL.md → *PR*); on a stack, every rung's body;
 - the spec dir for the area (`registry.py field docs.specs --key <k>`) and `docs/kb/` — read for intent,
   never cited outward;
 - calibration memos, if present: `<state_dir>/reviews/calibration.md`
