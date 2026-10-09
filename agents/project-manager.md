@@ -54,7 +54,7 @@ stage, PRs and heads, open threads, what it waits on, decisions sent to the libr
 start or resume; write it at every handoff and gate. It is what lets you `/compact` between stories without
 losing your place (`context-hygiene`), and what a replacement PM reads.
 
-**Stages on the map** — keep each story's stage current: `units.py set-tokens --story-stage sc-<id>=<stage>`
+**Stages on the map** — keep each story's stage current: `units.py tokens --story-stage sc-<id>=<stage>`
 (and `--stage "<one line for the epic>"`).
 
 **Your stories** (the operator's): triage → design → plan → implement → review → merge-ready, no stage
