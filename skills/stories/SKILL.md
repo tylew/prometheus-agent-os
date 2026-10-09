@@ -26,7 +26,7 @@ story's planner, then the operator. Nobody else rewrites them.
    scope gap. Scope unknown → a spike whose output is the scope, not a story.
 2. **Research** — the planner's three lenses (`agents/planner.md`); findings saved with the story.
 3. **Draft** — `<specs>/backlog/<slug>.md` from `templates/story.md` (parent: `templates/story-parent.md`),
-   `<specs>` = `python3 "$CLAUDE_PLUGIN_ROOT/lib/registry.py" field docs.specs --key <project>`. Body below
+   `<specs>` = `python3 <plugin>/lib/registry.py field docs.specs --key <project>`. Body below
    the frontmatter = exactly what is posted. `status: draft`.
 4. **Confirm** — the operator confirms the scenarios, each UI change and the flag decision, in the
    planner's tab. A behavior the operator has not stated is a question. → `status: confirmed`.

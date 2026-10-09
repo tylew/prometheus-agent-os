@@ -39,7 +39,7 @@ scenarios are tested, Rollout and observability; at most 400 words outside fence
 `<story_dir>/failure-modes.md` from `templates/failure-modes.md`: every way the change can fail that the
 *behavior at depth* and *call chains* analyses show, each with the test that will cover it or `cannot happen:
 <why, cited>`. Check it:
-`python3 "$CLAUDE_PLUGIN_ROOT/lib/idr.py" check <story_dir>/idr.md`; over budget after one honest trim ⇒
+`python3 <plugin>/lib/idr.py check <story_dir>/idr.md`; over budget after one honest trim ⇒
 Stop (needs a spike). Report it: `report.sh --idr <story_dir>/idr.md` (refused with the problems if it does
 not conform). Then **wait for "IDR checked, start"** — no product code before it. The IDR's decisions bind;
 a decision that changes is rewritten in the IDR first and re-reported, then the code follows.
@@ -83,10 +83,10 @@ test). Anything more goes to a builder in `fix` mode.
   `## Scenario tests` table — every PR the whole table, one row per scenario, state `passing` ·
   `passing, held before` · `in #<n>` · `manual: <proof, where>`, and exactly one row per scenario not
   `in #<n>` — and, on the bottom PR only, the IDR block:
-  `python3 "$CLAUDE_PLUGIN_ROOT/lib/idr.py" block <body.md> <story_dir>/idr.md > <body.md>.new`.
+  `python3 <plugin>/lib/idr.py block <body.md> <story_dir>/idr.md > <body.md>.new`.
 - `report.sh --holds <owner/repo#n>` for each PR, so its CI, review and comment lines come to you.
 - Self-review on each PR in three or four lines (in the body's *Notes for reviewer*).
-- **Proof**: `python3 "$CLAUDE_PLUGIN_ROOT/lib/proof.py" run --story sc-<id> --worktree <abs>` after the
+- **Proof**: `python3 <plugin>/lib/proof.py run --story sc-<id> --worktree <abs>` after the
   last submit and after any restack. Each problem it prints is fixed in a new commit, never argued; it
   writes `<story_dir>/proof.json`.
 - Done: write the report (paths changed, each validation command and its real result, PR links, the

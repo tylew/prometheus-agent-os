@@ -4,7 +4,7 @@ Mechanics (pieces, ports, commands, probes, base path, known-noisy endpoints, tr
 runbook:
 
 ```
-python3 "$CLAUDE_PLUGIN_ROOT/lib/registry.py" runbook <project> dev-up.md
+python3 <plugin>/lib/registry.py runbook <project> dev-up.md
 ```
 
 Read it first. No runbook → no guessed bring-up: say so, offer to write one from the repo's

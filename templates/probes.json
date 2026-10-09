@@ -342,7 +342,20 @@
         "CI=true timeout 5 npm --prefix {wt}/js run test x -- --forceExit",
         "mcp__shortcut__stories-update",
         "mcp__claude-in-chrome__file_upload",
-        "cp /tmp/shot.png {state_dir}/reviews/o-r-1-validate-r1/3.png"
+        "cp /tmp/shot.png {state_dir}/reviews/o-r-1-validate-r1/3.png",
+        "git -C {wt} worktree add --detach {state_dir}/reviews/scratch/probe-missing abc",
+        "git -C {state_dir}/reviews/scratch/probe-missing checkout abc -- js/x.ts",
+        "ln -s {workspace}/repos/voltus/js/node_modules {state_dir}/reviews/scratch/probe-missing/js/node_modules",
+        "git -C {wt} worktree remove --force {state_dir}/reviews/scratch/probe-missing",
+        "CI=true npm --prefix {state_dir}/reviews/scratch/probe-missing/js run test brightfield-besstie",
+        {
+          "cmd": "git -C {wt} fetch origin abc",
+          "live": "git -C {wt} fetch origin abc"
+        },
+        {
+          "cmd": "gh pr diff 43802 --repo voltusdev/voltus",
+          "live": "gh pr diff --help"
+        }
       ],
       "deny": [
         {
@@ -432,7 +445,12 @@
         {
           "cmd": "gh api repos/o/r/pulls/comments/1 --input=b.json",
           "live": "gh api repos/o/r/pulls/comments/1 --input=b.json --hostname probe.invalid"
-        }
+        },
+        "git -C {state_dir}/reviews/scratch/../../x checkout -- .",
+        "ln -s /x {state_dir}/reviews/scratch/../../y",
+        "git -C {wt} worktree remove --force {state_dir}/reviews/scratch/../../../x",
+        "git -C {wt} checkout abc -- js/x.ts",
+        "cd {wt} && git fetch origin abc && gh pr diff 43802"
       ]
     },
     "librarian": {

@@ -70,7 +70,7 @@ git -C <repo.root> worktree add $WORKSPACE/.worktrees/review-<PR> --detach <head
 ```
 
 Never `--detach origin/<branch>` — it lags the real head. Read/grep there; per-PR pre-states via
-`git show <sha>:<path>`; the reviewer moves it with `git fetch origin <sha>` + reads at the sha (it cannot
+`git show <sha>:<path>`; the reviewer reads the head per SKILL.md → *Read the true head* (it cannot
 check out). Dependencies a package's suite needs are not in a fresh worktree — project runbooks say how;
 not runnable ⇒ "not run" under *Covered*. The PM removes the worktree once the loop ends.
 

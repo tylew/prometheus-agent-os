@@ -16,13 +16,12 @@ Resolve the checkout the git command mutates, not the product being developed (a
 project still commits KB notes to the workspace repo):
 
 ```bash
-R="$CLAUDE_PLUGIN_ROOT/lib/registry.py"
-python3 "$R" repo --cwd <dir git runs in>          # → key
-python3 "$R" field vcs.tool --key <key>            # → flow
-python3 "$R" entry --key <key> --json              # repo.root, repo.default_branch, owned_paths,
-                                                   # vcs.pr_title_prefix, vcs.commit_trailer,
-                                                   # packages[].validate, migrations, runbooks
-python3 "$R" runbook <key> <name>                  # path of a runbook under .claude/prometheus/projects/<key>/
+python3 <plugin>/lib/registry.py repo --cwd <dir git runs in>  # → key
+python3 <plugin>/lib/registry.py field vcs.tool --key <key>    # → flow
+python3 <plugin>/lib/registry.py entry --key <key> --json      # repo.root, repo.default_branch, owned_paths,
+                                                               # vcs.pr_title_prefix, vcs.commit_trailer,
+                                                               # packages[].validate, migrations, runbooks
+python3 <plugin>/lib/registry.py runbook <key> <name>          # path of a runbook under .claude/prometheus/projects/<key>/
 ```
 
 Facts come from the registry, never memory. `<default>` below = `repo.default_branch`.

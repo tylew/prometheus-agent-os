@@ -115,7 +115,7 @@ the whole table: one row per scenario, `passing` · `passing, held before: <why>
    (optional; checkbox ticked only by an operator walk, `validate`) · *Screenshot or Video Demo*
    (required when a user-visible surface changed, else omit) · *Risks* (required; `None — <why>` is
    valid) · *Notes for reviewer*. The bottom PR ends with the IDR block
-   (`python3 "$CLAUDE_PLUGIN_ROOT/lib/idr.py" block <body.md> <story_dir>/idr.md`), refreshed whenever the
+   (`python3 <plugin>/lib/idr.py block <body.md> <story_dir>/idr.md`), refreshed whenever the
    IDR changes.
    - **Exactly one `sc-#####`** — the delivered story; every ref moves that story and links the PR. A
      stacked sibling is cited by PR URL. The link fires on the first `gh pr edit` and cannot be undone:

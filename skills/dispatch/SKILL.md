@@ -82,7 +82,8 @@ outbox.
 **Command form (dontAsk roles).** Never `cd` — after `builtin cd` every relative path or `git` is denied,
 a relative `cd` too, and the tab already starts in its worktree. Elsewhere: `git -C <abs>` and absolute paths. `&&` / `;` and
 pipes into `grep` / `head` / `wc` pass when every part is allowed. Scripts (`send.sh`, `report.sh` …) by bare
-name, never a path. No shell variables (`X=…; $X`, `$PWD`, `$CLAUDE_PLUGIN_ROOT`) — spell absolute paths; the
+name (on PATH; not in `lib/`), never a path. No shell variables (`X=…; $X`, `$PWD`, `$CLAUDE_PLUGIN_ROOT`) —
+spell absolute paths (`<plugin>` = the plugin's absolute root: `python3 <plugin>/lib/registry.py …`); the
 only env prefix is `CI=true`. No `$(…)`, `awk`, `python3 -c`, heredoc or `for` loop — one call per item. Make
 validation: `make -C <worktree>/<package path> <target> VOLTUS=<worktree>`. A denied form is rewritten in this
 shape, never dropped silently.

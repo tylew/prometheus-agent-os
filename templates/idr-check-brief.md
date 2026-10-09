@@ -20,7 +20,7 @@ Read the story, then the IDR. Check, citing the IDR line and the evidence for ea
   contracts, the named seam's existence).
 - **Failure modes** — every mode the code shows on the scenarios' paths (spot-check the call chains at
   `ref`) is in the table with a test or a cited `cannot happen`; a missing one is a finding.
-- **Form** — `python3 "$CLAUDE_PLUGIN_ROOT/lib/idr.py" check <idr>` is clean.
+- **Form** — `python3 <plugin>/lib/idr.py check <idr>` is clean.
 
 Rate with the review tiers (`prometheus:review` → findings). Write the findings to `artifact`, post nothing,
 and send the lead one line: counts, `clean` or not, behavior findings named, the artifact path.

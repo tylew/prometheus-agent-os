@@ -43,7 +43,7 @@ Newest round decides: round N resolved + round N+1 untouched ⇒ the author side
 
 - **Brief** (`templates/reviewer-brief.md`): PR, round, `requested`, `deep`, stack (bottom-up) and
   position, read-only worktree, open threads, scenarios verbatim, prior rounds' findings files.
-- **Registry** — `python3 "$CLAUDE_PLUGIN_ROOT/lib/registry.py" field <dotted> --key <k>`: `repo.slug`,
+- **Registry** — `python3 <plugin>/lib/registry.py field <dotted> --key <k>`: `repo.slug`,
   `repo.default_branch`, `vcs.tool`, `owned_paths`, `review.docs`, `review.approval_gated_checks`,
   `packages` (`validate` per package), `runbooks`.
 - **PR**: `gh pr view <pr> --json body,headRefOid,baseRefName,headRefName,labels,author,mergeable,reviewDecision,reviewRequests` — the only PR-object read (`gh api …/pulls/<pr>` is not allowed);
@@ -62,8 +62,8 @@ Newest round decides: round N resolved + round N+1 untouched ⇒ the author side
 
 ### Read the true head
 
-`gh pr view <pr> --json headRefOid` → `git fetch origin <sha>` → read in the brief's worktree, at that
-sha (`git show <sha>:<path>`), or from `gh pr diff <pr>`. Never `origin/<branch>`: with `vcs.tool` =
+One call each, no `cd`: `gh pr view <pr> --json headRefOid` → `git -C <worktree> fetch origin <sha>` → read
+at that sha (`git -C <worktree> show <sha>:<path>`), or `gh pr diff <pr> --repo <slug>`. Never `origin/<branch>`: with `vcs.tool` =
 graphite every restack force-pushes and the branch ref lags. Tell: cited lines don't match the head.
 Commit ancestry and recorded decisions: [references/stacks.md](references/stacks.md) → *Reading the code*.
 

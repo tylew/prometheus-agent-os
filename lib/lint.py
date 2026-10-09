@@ -32,6 +32,8 @@ STALE_PATTERNS = (
     ("review-lead", "a voltus-besstie agent (now the reviewer)"),
     ("~/.claude/prometheus", "the old state dir (now ~/.local/state/prometheus)"),
     ("docs/vault/", "the voltus-besstie vault (now the knowledge base)"),
+    ("$CLAUDE_PLUGIN_ROOT/lib/", "a shell variable in a command; dontAsk denies it — <plugin>/lib/ (dispatch: Command form)"),
+    ("${CLAUDE_PLUGIN_ROOT}/lib/", "a shell variable in a command; dontAsk denies it — <plugin>/lib/ (dispatch: Command form)"),
 )
 
 # Role -> agent, mirroring launch.sh's case; the seat runs the orchestrator agent.
@@ -47,7 +49,7 @@ REGISTRY_RE = re.compile(r"\.claude/prometheus/[A-Za-z0-9_.*/<>{}-]*")
 SKILL_REF_RE = re.compile(r"(?<![\w./-])prometheus:([a-z0-9][a-z0-9-]*)")
 BARE_SCRIPT_RE = re.compile(r"(?<![\w./*{}$-])([A-Za-z0-9_-]+\.sh)\b")
 DELIM = set(" \t\n`'\"()[],;|=")
-ACCEPTED_PREFIXES = ("", "$CLAUDE_PLUGIN_ROOT/", "${CLAUDE_PLUGIN_ROOT}/", "*/", "./")
+ACCEPTED_PREFIXES = ("", "$CLAUDE_PLUGIN_ROOT/", "${CLAUDE_PLUGIN_ROOT}/", "<plugin>/", "*/", "./")
 CHECKS = ("frontmatter", "headers", "paths", "settings", "stale", "duplicates", "registry")
 
 

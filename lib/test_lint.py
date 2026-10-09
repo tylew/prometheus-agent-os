@@ -215,6 +215,13 @@ class TestStale(Base):
                    "Read team.json and docs/vault/x.md; state in ~/.claude/prometheus.\n")
         self.assertEqual(len(self.errors("stale")), 3)
 
+    def test_plugin_root_variable_in_a_command(self):
+        self.write("skills/dispatch/SKILL.md", "---\nname: dispatch\ndescription: d\n---\n"
+                   "`python3 \"$CLAUDE_PLUGIN_ROOT/lib/tool.py\"`, `${CLAUDE_PLUGIN_ROOT}/lib/tool.py`; "
+                   "scripts in $CLAUDE_PLUGIN_ROOT/skills/dispatch/scripts/; `python3 <plugin>/lib/tool.py`.\n")
+        self.assertEqual(len(self.errors("stale")), 2)
+        self.assertEqual(self.errors("paths"), [])
+
     def test_allowlist(self):
         self.assertTrue(lint.allowlisted("templates/settings/launch.json"))
         self.assertTrue(lint.allowlisted("lib/test_registry.py"))

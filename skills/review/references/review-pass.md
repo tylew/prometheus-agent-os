@@ -41,6 +41,12 @@ Enumerate callers and consumers of every changed symbol; follow a changed value 
 Dimensions: correctness, error handling (swallowed context, silent fallback), tests (discriminating — fails
 on the pre-change code), types and invariants, comments, security.
 
+**Proving a test discriminates** — a disposable tree at `<scratch>` = `<state_dir>/reviews/scratch/<pr>`, one
+call each: `git -C <worktree> worktree add --detach <scratch> <head>`; FE only, `ln -s <repo.root>/js/node_modules
+<scratch>/js/node_modules`; `git -C <scratch> checkout <base sha> -- <changed non-test paths>`; the package's
+test command with `--prefix <scratch>/js` (or `make -C <scratch>/<package path>`) — it must fail; then
+`git -C <worktree> worktree remove --force <scratch>`. Anywhere else is denied.
+
 **Comment volume is a finding in its own right.** Comments are checked for truth, not existence: a
 multi-line narrative block, a restatement of the code, a rationale or safety argument that belongs in the PR
 body — raised at the severity its cost warrants (a stale security claim is not cosmetic). Judged against the
@@ -61,8 +67,10 @@ unavailable ⇒ say so under *Covered*, never imply the dimension ran.
 | simplification | `pr-review-toolkit:code-simplifier` | optional; its output is Low unless it names a behavioral gap |
 
 Each prompt carries: repo slug, PR, head sha, the worktree's absolute path, `owned_paths`, the matching
-lenses (paths + `applies_to`), the dimension's scope; "read-only — never edit, post, comment or write the
-tracker; `samples/` is read-only reference, never the target"; return findings with repo-relative `path`,
+lenses (paths + `applies_to`), the dimension's scope; the *Command form* paragraph of `prometheus:dispatch` and the touched packages'
+`validate` commands, pasted verbatim (a specialist loads no skills); for `pr-test-analyzer`, the
+discrimination recipe above; "read-only — never edit, post, comment or write the tracker (the scratch tree is
+the one exception); `samples/` is read-only reference, never the target"; return findings with repo-relative `path`,
 head-side `line`, severity, what and why.
 
 **Reconcile, then verify.** Drop a specialist hit that restates a Semgrep hit (keep the better-reasoned

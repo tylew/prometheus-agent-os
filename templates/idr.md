@@ -1,5 +1,5 @@
 ---
-description: The story's Implementation Decision Record — written by the implementor before any product code at <state_dir>/engine/stories/<sc-id>/idr.md (units.story_dir), checked with `python3 "$CLAUDE_PLUGIN_ROOT/lib/idr.py" check <file>`, carried collapsed on the stack's bottom PR, landed in the team planning vault by vantage /session-closeout at Completed. Shape and budget are voltus-kanban rules/idr.md. Delete this frontmatter; the file starts at the title.
+description: The story's Implementation Decision Record — written by the implementor before any product code at <state_dir>/engine/stories/<sc-id>/idr.md (units.story_dir), checked with `python3 <plugin>/lib/idr.py check <file>`, carried collapsed on the stack's bottom PR, landed in the team planning vault by vantage /session-closeout at Completed. Shape and budget are voltus-kanban rules/idr.md. Delete this frontmatter; the file starts at the title.
 ---
 
 # IDR: <what the story delivers, in the story's words>

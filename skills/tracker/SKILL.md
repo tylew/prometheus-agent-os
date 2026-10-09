@@ -10,7 +10,7 @@ How a story is written to and moved on the board. The story body standard lives 
 ## Config — read, never recall
 
 ```bash
-python3 "$CLAUDE_PLUGIN_ROOT/lib/registry.py" tracker --key <project>
+python3 <plugin>/lib/registry.py tracker --key <project>
 ```
 
 → `kind`, `org_slug`, `team_id`, `team_name`, `workflow.{id,intake,states[{key,id,name,gate}]}`, `labels`,
