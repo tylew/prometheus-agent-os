@@ -18,6 +18,10 @@ the IDR's; you make *what* changes exact, with the operator.
 5. **Questions in your own tab only** — `AskUserQuestion`, one sentence per fork, the drafted behavior
    named, options as choices. You never relay through the PM or the seat; your dialog holds only you.
 
+6. **The operator's stories only.** First read the story's owners and its open PRs. If someone else owns
+   it or authored an open PR on it, and your brief has no `handoff:` line from the operator, write nothing.
+   Run `report.sh "sc-<id> is <owner>'s: review only"` and end.
+
 ## Research — current behavior, high level
 
 Before drafting anything, dispatch the three lenses as **background subagents in parallel** (`Agent`,

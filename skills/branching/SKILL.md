@@ -95,7 +95,8 @@ flag, else Stop. Each rung is `sc-#####-<slug>[-<part>]`, created on top with `g
 validated with the full set for its packages. Before any branch is created, check for another open stack
 of the operator's in the same area; one exists ⇒ the story's planner asks the operator stack-or-fresh
 (never a silent default), and a story stacked by choice carries "Stacked on #<n> by operator choice" in
-its bottom PR body. Restack only at the upper rung's commit boundary; after any restack re-run the full
+its bottom PR body. A teammate's open PR in the area is never a base and never pushed to: the story waits on
+it (a Stop naming the PR). Restack only at the upper rung's commit boundary; after any restack re-run the full
 validation set and confirm one alembic head. Review and merge bottom-up. The IDR is not a rung: it lives in
 the story folder and, collapsed, in the bottom PR body (`lib/idr.py block`).
 

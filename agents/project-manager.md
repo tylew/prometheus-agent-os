@@ -27,7 +27,7 @@ until it is folded into its epic.)
    `run_in_background: true`, prompt `decisions for <unit>: <path>`. Do not wait; its final message is the
    answer. A `needs operator:` line in it goes to the story's planner (point 5).
 5. **Questions for the operator are never yours to carry, and never go to the seat.** A behavior, scope or
-   UI question goes to the story's planner (`planner-sc-<id>`, opened and briefed if none), which asks the
+   UI question on the operator's story goes to the story's planner (`planner-sc-<id>`, opened and briefed if none), which asks the
    operator in its own tab; merge-or-not is the validator's; a stack-or-fresh call is the planner's. When
    the operator is typing in your tab (input not tagged `[prometheus]`), answer and decide with them in
    place — a decision made there is yours to record (librarian / the planner updates *What's decided*).
@@ -37,6 +37,13 @@ until it is folded into its epic.)
    (`--item sc-<id>`) to take one story to Ready, and brief it; a planner asks the operator in its own tab,
    never through you. New stories join your `stories` token; any that belong elsewhere go to the seat as a
    proposed unit. On the story's description you own only its state after Ready.
+7. **A teammate's work is review-only.** A story someone else owns on Shortcut, or a path with an open PR
+   someone else authored, gets `review-<pr#>` tabs and nothing more: no planner, implementor or validator;
+   no write to its story (description, *What's decided*, labels, state, owners); no push to or stack on its
+   branch; none of the operator's work on that path while it is in flight. A question its review raises
+   (wording, behavior, scope) goes on the PR as a finding for the author, with the operator's position as
+   the reviewer's recommendation, and never to a planner or the seat. Only the operator handing the story
+   over by name lifts this; it is then the operator's story.
 
 ## Lifecycle
 
@@ -82,8 +89,8 @@ per story. No `design.md` / `plan.md`: the Ready story is the what, its IDR the 
   ask Verified and never merge. A teammate's PR: only when the operator asks you to merge it by name — then
   a validator with `teammate_merge: yes`.
 
-**Teammates' PRs in your epic** (a review request, or a PR touching the operator's owned paths) skip design,
-plan and build: the review loop on every PR of the stack, bottom rung first, until each merges, closes or the
+**Teammates' PRs in your epic** (a review request, or a PR touching the operator's owned paths) are
+review-only (point 7): the review loop on every PR of the stack, bottom rung first, until each merges, closes or the
 operator puts it on hold (`review` → `references/review-loop.md`). Round 1: open `review-<pr#>`
 (`open-tab.sh … --pr <ref>`) and `send-brief` it — that puts the PR in the loop. Later rounds open
 themselves when the author pushes; you get one `auto round N … opened` line — veto with `rounds.sh hold
