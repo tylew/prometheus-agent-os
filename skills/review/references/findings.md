@@ -73,7 +73,7 @@ recommendation.
 | 0 critical · 0 high, gate holds | `APPROVE` |
 | 0 critical · 0 high, a gate condition open | `COMMENT`, naming the open condition |
 | unrequested review (brief `requested: no`), 0 critical · 0 high | `COMMENT` ([review-loop.md](review-loop.md) → *Unrequested review*) |
-| own PR, any counts | `COMMENT`, disposition in the counts line |
+| own PR, any counts | `COMMENT`; the counts line states the event the rows above give ("changes requested" only for Critical/High; Mediums alone ⇒ "clean at this head" or the open gate condition) |
 
 **Nothing is approved on a condition.** *(Home.)* An approve means the gate held at the head it names; a
 Medium never conditions it however many stand. Rigor lives in the severity and in the loop coming back.
