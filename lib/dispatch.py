@@ -284,7 +284,8 @@ REPORT_KINDS = ("stopped", "idr", "done")
 
 def report_artifact(snap: dict, st: dict, kind: str, path: str) -> str:
     """An implementor's stop file, IDR or done report: checked, kept in the engine inbox, and announced to
-    its unit's lead with the file named. An IDR that fails `idr.check` is refused with the problems."""
+    its unit's lead with the file named. An IDR that fails `idr.check` is refused with the problems; a done
+    report without a clean proof.json beside it whose rung heads are still current, likewise."""
     if kind not in REPORT_KINDS:
         raise RouteError("report kind must be one of %s" % ", ".join(REPORT_KINDS))
     path = os.path.abspath(path)
@@ -296,6 +297,16 @@ def report_artifact(snap: dict, st: dict, kind: str, path: str) -> str:
             problems = idr.check(fh.read())
         if problems:
             raise RouteError("IDR refused — fix and report again:\n- " + "\n- ".join(problems))
+    if kind == "done":
+        import proof
+        saved = os.path.join(os.path.dirname(path), "proof.json")
+        if not os.path.isfile(saved):
+            raise RouteError("done refused — no proof.json beside %s: run proof.py run" % path)
+        with open(saved) as fh:
+            rec = json.load(fh)
+        issues = proof.current(rec, rec.get("worktree", ""))
+        if issues:
+            raise RouteError("done refused — the proof is not clean and current:\n- " + "\n- ".join(issues))
     me = os.environ.get("HERDR_PANE_ID")
     if not me:
         raise RouteError("report needs HERDR_PANE_ID (run inside an agent pane)")

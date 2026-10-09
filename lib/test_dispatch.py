@@ -404,6 +404,31 @@ class ArtifactReportTest(Base):
         self.assertIn("missing section ## Approach", str(cm.exception))
         self.assertEqual(self.inbox(), [])
 
+    def test_done_needs_a_clean_current_proof_beside_it(self):
+        import proof
+        folder = os.path.join(self.tmp.name, "sc-1")
+        os.makedirs(folder)
+        path = os.path.join(folder, "done.md")
+        with open(path, "w") as fh:
+            fh.write("done\n")
+        with d.locked_state() as st:
+            with self.assertRaises(d.RouteError) as cm:
+                d.report_artifact(d.snapshot(), st, "done", path)
+            self.assertIn("no proof.json", str(cm.exception))
+            with open(os.path.join(folder, "proof.json"), "w") as fh:
+                json.dump({"worktree": "/wt", "rungs": [{"branch": "b", "head": "abc"}], "problems": ["x mixed"]}, fh)
+            with unittest.mock.patch.object(proof, "git", return_value="abc\n"):
+                with self.assertRaises(d.RouteError) as cm:
+                    d.report_artifact(d.snapshot(), st, "done", path)
+                self.assertIn("x mixed", str(cm.exception))
+                with open(os.path.join(folder, "proof.json"), "w") as fh:
+                    json.dump({"worktree": "/wt", "rungs": [{"branch": "b", "head": "abc"}], "problems": []}, fh)
+                self.assertEqual(d.report_artifact(d.snapshot(), st, "done", path), "done reported")
+            with unittest.mock.patch.object(proof, "git", return_value="def\n"):
+                with self.assertRaises(d.RouteError) as cm:
+                    d.report_artifact(d.snapshot(), st, "done", path)
+                self.assertIn("moved since the proof", str(cm.exception))
+
     def test_unknown_kind_and_missing_file(self):
         with d.locked_state() as st:
             with self.assertRaises(d.RouteError):
