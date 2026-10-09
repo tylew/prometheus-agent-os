@@ -345,6 +345,26 @@
               },
               "runbook": {
                 "type": "string"
+              },
+              "tests": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "string"
+                },
+                "description": "Globs (repo-relative, ** spans directories) of the package's test files — the proof's tests / code commit split."
+              },
+              "scenario_run": {
+                "type": "string",
+                "pattern": "<tests>.*<report>|<report>.*<tests>",
+                "description": "Runs only the named tests: <worktree>, <tests> (absolute paths, space-separated), <report> (the result file)."
+              },
+              "report": {
+                "enum": [
+                  "junit",
+                  "jest-json"
+                ],
+                "description": "How <report> is parsed into passed / failed / error per test."
               }
             }
           }

@@ -237,3 +237,17 @@ class PlanningFieldTest(unittest.TestCase):
         self.assertEqual(schema_lite.validate(ok, {"$ref": "#/$defs/project"}, schema), [])
         bad = dict(base, planning={"repo": "voltusdev/voltus-vantage-planning"})
         self.assertTrue(schema_lite.validate(bad, {"$ref": "#/$defs/project"}, schema))
+
+
+class ScenarioRunFieldTest(unittest.TestCase):
+    def test_package_proof_fields_validate(self):
+        import json
+        import schema_lite
+        schema = json.load(open(registry.SCHEMA))
+        pkg = {"name": "be", "validate": ["make test"], "tests": ["py/tests/**"],
+               "scenario_run": "run <worktree> <tests> --out=<report>", "report": "junit"}
+        base = {"key": "p", "description": "d", "access": "editable", "repo": {"root": "repos/p"}}
+        self.assertEqual(schema_lite.validate(dict(base, packages=[pkg]), {"$ref": "#/$defs/project"}, schema), [])
+        for bad in ({"report": "tap"}, {"scenario_run": "run everything"}):
+            self.assertTrue(schema_lite.validate(dict(base, packages=[dict(pkg, **bad)]),
+                                                 {"$ref": "#/$defs/project"}, schema))
