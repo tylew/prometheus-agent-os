@@ -102,3 +102,14 @@ for an intake-level gap, labelled from config `labels` (`needs-scoping`, `needs-
 - Urgency shortens clarification, not the bar. Unknown scope → a `spike`-labelled time-boxed story whose
   output is the scope. Too big to size → split (`create.md`).
 - An assumption is written into *What's decided* / *Still open*, never silent.
+
+## Screenshots
+
+A user-visible change's screenshots live in the description's one `<details>`, written by the validate
+round's reviewer on a Verified walk (`validate` §4b): `<summary>What does it look like?</summary>`, then one
+`![<what it shows>](<url>)` per image. Upload first, through Chrome on the story page: the attachment
+input via `mcp__claude-in-chrome__file_upload` with the saved file's absolute path
+(`mcp__shortcut__stories-upload-file` runs remotely and cannot read a local path); read each url back from
+the story's `files` (`stories-get-by-id`). Chrome on Shortcut's login page → "Log in with SSO", then the
+work Google account already signed in to Chrome; never type a password — no session ⇒ report it, nothing
+uploaded. The story is the screenshots' only home: never the repo, never a comment.

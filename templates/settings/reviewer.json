@@ -1,5 +1,5 @@
 {
-  "$comment": "Depth-3 reviewer: never prompts a human, never edits code; posts its own round via gh api (reviews, comments). Agent = the pr-review-toolkit fan-out and, in a validate round, the Chrome walkers; mcp__claude-in-chrome__* = the walk's browser tools, listed one by one (anything else from that server stays denied); Workflow = deep mode on the operator's opt-in only. Launched with --permission-mode dontAsk; anything not allowed is denied and reported to the PM. Writes only its findings file under {state_dir}/reviews/ (launch.sh fills in the real state dir). open-tab.sh appends the project's validation commands. Path rules for writes are Edit(...) (they cover Write); a bare Edit deny would block the findings file too — dontAsk already denies every edit not allowed.",
+  "$comment": "Depth-3 reviewer: never prompts a human, never edits code; posts its own round via gh api (reviews, comments). Agent = the pr-review-toolkit fan-out and, in a validate round, the Chrome walkers; mcp__claude-in-chrome__* = the walk's browser tools, listed one by one (anything else from that server stays denied); Workflow = deep mode on the operator's opt-in only. Launched with --permission-mode dontAsk; anything not allowed is denied and reported to the PM. Writes only its findings file and a validate round's screenshots under {state_dir}/reviews/ (launch.sh fills in the real state dir). In a validate round it ticks the story's acceptance criteria and adds the screenshots <details> on a Verified walk: mcp__shortcut__stories-update, plus Chrome on the story page for the attachment upload. open-tab.sh appends the project's validation commands. Path rules for writes are Edit(...) (they cover Write); a bare Edit deny would block the findings file too — dontAsk already denies every edit not allowed.",
   "extends": [
     "delivery"
   ],
@@ -34,7 +34,13 @@
       "mcp__claude-in-chrome__read_network_requests",
       "mcp__claude-in-chrome__javascript_tool",
       "mcp__claude-in-chrome__file_upload",
-      "mcp__claude-in-chrome__upload_image"
+      "mcp__claude-in-chrome__upload_image",
+      "mcp__claude-in-chrome__form_input",
+      "mcp__claude-in-chrome__browser_batch",
+      "mcp__shortcut__stories-get-by-id",
+      "mcp__shortcut__stories-update",
+      "Bash(cp * {state_dir}/reviews/*)",
+      "Bash(mkdir -p {state_dir}/reviews/*)"
     ],
     "deny": [
       "AskUserQuestion",
@@ -42,7 +48,6 @@
       "Bash(git push *)",
       "Bash(gt *)",
       "Bash(gh pr merge *)",
-      "mcp__shortcut__stories-update",
       "mcp__shortcut__stories-create"
     ]
   }

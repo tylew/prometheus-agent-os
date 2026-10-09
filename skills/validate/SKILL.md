@@ -1,6 +1,6 @@
 ---
 name: validate
-description: "Manual validation of a unit's change on local dev, and bringing local dev up for it. The project manager proves the served tree, arranges fixtures and opens a reviewer validate round; the reviewer builds the checklist (one item per Then clause of the operator's scenarios, the PR's manual steps, the diff's user-visible surface), walks every item in Chrome through subagents, captures evidence on a fail and reports to the PM; the operator answers one human-readable summary (Verified / Not as intended); the PM records the walk and turns a fail into a fix brief. Use to validate, QA, walk scenarios or sign off a PR before merge or deploy, and to bring up / start / run a project locally."
+description: "Manual validation of a unit's change on local dev, and bringing local dev up for it. The project manager proves the served tree, arranges fixtures and opens a reviewer validate round; the reviewer builds the checklist (one item per Then clause of the operator's scenarios, the PR's manual steps, the diff's user-visible surface), walks every item in Chrome through subagents with screenshots, captures evidence on a fail and reports to the PM; the operator answers one human-readable summary (Verified / Not as intended); on Verified the reviewer ticks the story's acceptance criteria and attaches the screenshots to it; the PM records the walk, moves the story and turns a fail into a fix brief. Use to validate, QA, walk scenarios or sign off a PR before merge or deploy, and to bring up / start / run a project locally."
 ---
 
 # validate — the browser is the instrument, the operator is the judge
@@ -53,8 +53,10 @@ Load the claude-in-chrome tools (`claude-in-chrome` skill). One subagent (`Agent
 sharing a page and fixture, ordered to avoid back-and-forth; groups that mutate shared state run in
 sequence, independent groups in parallel. Each subagent's brief: the URLs, the items verbatim, the fixtures
 by id, "open a new tab, never reuse an existing one", "never trigger a JS alert / confirm", and the return
-per item — what the page showed (exact text / state), a screenshot, the request and status where the item
-depends on one, `pass` / `fail` / `blocked` against the condition as written.
+per item — what the page showed (exact text / state), a screenshot saved to
+`<artifact without .md>/<item #>.png` (copied out of the browser tool's temp dir as it lands — it is
+wiped; `mkdir -p` / `cp`), the request and status where the item depends on one, `pass` / `fail` /
+`blocked` against the condition as written.
 
 Re-check every subagent's evidence against the condition before recording it. Write each item to the
 artifact as it lands — an interrupted round resumes from the file.
@@ -65,7 +67,8 @@ console, the wrong rendered value. **Blocking** (feature broken, app wedged) →
 said plainly and re-run as a new item.
 
 Then write the summary (`references/walk-record.md` → *Summary*) into the artifact, post nothing to the PR,
-and report one line to the PM: counts, blocking yes/no, artifact path.
+and report one line to the PM: counts, blocking yes/no, artifact path. **End the turn but keep the tab**: the
+PM sends the operator's verdict back to it (§4b).
 
 ## 4. Human verification — one question — PM
 
@@ -78,6 +81,22 @@ intended** (the note names the line and how it should differ):
 - **Otherwise** → `"$CLAUDE_PLUGIN_ROOT/skills/dispatch/scripts/send.sh" --role seat "validate <pr#>:
   <summary path> — verified / not as intended?"`, then end the turn; the answer wakes it.
 
+Then hand the verdict to the round: `send.sh --pane <validate tab's pane> "verdict: Verified | Not as
+intended — <operator note verbatim>"`.
+
+## 4b. The story — reviewer, on the verdict line
+
+The reviewer checks off the acceptance criteria; nobody else does (`tracker` → *Who writes what*).
+
+- **Verified** → per `tracker` (pre-write guard, full `description`, re-read):
+  - tick `- [ ]` → `- [x]` for each criterion whose scenario's items all **passed** in this walk. A
+    criterion with a failed, blocked or not-covered item stays unticked, named in the report with why;
+  - the user-visible screenshots go into the description's one `<details>` (`tracker` →
+    its board reference → *Screenshots*).
+- **Not as intended** → nothing on the story; the note goes into the artifact.
+
+Report one line to the PM — criteria ticked `n/m`, screenshots attached, the story link — then end the turn.
+
 A note on Verified is kept (usually the next story). Each fail and each Not-as-intended line → a fix brief
 to the item's implementor (`templates/implementor-brief.md`, via `send.sh`): expected, seen, evidence, the
 scenario it breaks. The fix is re-walked in a new validate round for the affected items, then re-verified.
@@ -88,7 +107,8 @@ scenario it breaks. The fix is re-walked in a new validate round for the affecte
 <project>`), one section per walk, appended, with the operator's answer.
 
 - **Clean pass** (every item passed, summary Verified) → tick the PR's manual-pass line with date, env and
-  item count (`branching` owns the body); story gate if this walk was it (`tracker`). Never on a partial walk.
+  item count, and point its *Screenshot or Video Demo* at the story (`branching` owns the body); story gate
+  if this walk was it (`tracker`) — the reviewer has ticked the criteria (§4b). Never on a partial walk.
 - **Any fail or Not as intended** → line stays unticked; the fix runs through §4.
 - A bring-up trap → the project runbook; a validating rule → here.
 

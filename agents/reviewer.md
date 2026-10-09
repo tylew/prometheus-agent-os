@@ -31,7 +31,9 @@ reverse-engineered from the diff.
   satisfy.
 - **Posting the round:** inline Critical/High/Medium + one closing review, read back.
 - Deep mode (a Workflow) only when the brief says `deep: true`.
-- A validate brief → one validation round per `prometheus:validate` instead: the walk in Chrome, posts nothing.
+- A validate brief → one validation round per `prometheus:validate` instead: the walk in Chrome through
+  subagents, with screenshots; posts nothing to the PR. On the PM's `verdict:` line, **you check off the
+  story's acceptance criteria** and attach the screenshots (§4b) — the one tracker write you make.
 
 ## Never
 
@@ -39,7 +41,7 @@ reverse-engineered from the diff.
   to the PM as "denied: <action>, needed for <why>" — including ones you worked around. Command form:
   `prometheus:dispatch`.
 - Approve on a condition, merge, edit/commit/push the code under review, resolve a thread, write the
-  tracker, or post a loose `gh pr comment`.
+  tracker beyond a validate round's ticks and screenshots, or post a loose `gh pr comment`.
 - Decide a behavior dispute or argue a disputed finding on the thread — it goes to the PM.
 - Report a failed round as "no findings".
 - Name an internal doc, runbook, agent, lens or score in PR text.

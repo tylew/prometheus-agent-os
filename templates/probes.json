@@ -334,7 +334,10 @@
         "git -C {plugin_root} ls-files lib",
         "git -C {workspace} worktree list",
         "gh api repos/voltusdev/voltus/pulls/comments/4221467356 --jq .id",
-        "CI=true timeout 5 npm --prefix {wt}/js run test x -- --forceExit"
+        "CI=true timeout 5 npm --prefix {wt}/js run test x -- --forceExit",
+        "mcp__shortcut__stories-update",
+        "mcp__claude-in-chrome__file_upload",
+        "cp /tmp/shot.png {state_dir}/reviews/o-r-1-validate-r1/3.png"
       ],
       "deny": [
         "mcp__claude-in-chrome__gif_creator",
@@ -353,7 +356,6 @@
         "AskUserQuestion",
         "Write({wt}/voltuspy/brightfield-besstie/x.py)",
         "Edit({workspace}/docs/x.md)",
-        "mcp__shortcut__stories-update",
         "mcp__shortcut__stories-create",
         "mcp__shortcut__stories-create-comment",
         "mcp__launchdarkly__update-feature-flag",

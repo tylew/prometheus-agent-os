@@ -81,8 +81,10 @@ with os.fdopen(fd, "w") as fh:
 os.replace(mcp_path + ".tmp", mcp_path)
 mperms = merged.setdefault("permissions", {})
 mperms["allow"] = list(dict.fromkeys(mperms.get("allow", []) + ["mcp__%s" % s for s in mine]))
+# a non-writer may still hold single write tools (the validate reviewer's stories-update)
+granted = mcp_map.get("write_grants", {}).get(role_name, {})
 deny = [("mcp__%s__%s" % (s, t)) for s in mine for t in mcp_map["write_tools"].get(s, [])
-        if role_name not in mcp_map["writers"].get(s, [])]
+        if role_name not in mcp_map["writers"].get(s, []) and t not in granted.get(s, [])]
 mperms["deny"] = list(dict.fromkeys(mperms.get("deny", []) + deny))
 for tool, spec in mcp_map.get("cli", {}).items():
     if role_name in spec.get("roles", []):
@@ -136,6 +138,7 @@ cmd=(claude --plugin-dir "$plugin_root" --settings "$settings" --agent "promethe
 case $role in
   implementor|reviewer|librarian) cmd+=(--permission-mode dontAsk) ;;
 esac
+[[ $role == reviewer ]] && cmd+=(--chrome)  # validate rounds walk the app and attach screenshots to the story
 cmd+=("$@")
 if (( args_only )); then
   python3 -c 'import json,sys; print(json.dumps(sys.argv[1:]))' "${cmd[@]:1}"

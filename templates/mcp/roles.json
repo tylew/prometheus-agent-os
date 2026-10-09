@@ -152,5 +152,12 @@
         "composio link *"
       ]
     }
+  },
+  "write_grants": {
+    "reviewer": {
+      "shortcut": [
+        "stories-update"
+      ]
+    }
   }
 }

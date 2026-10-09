@@ -3,6 +3,7 @@ description: Project manager → reviewer. One validate round on local dev, a fr
 unit: <workspace-label>
 project: <registry key>
 pr: <owner/repo#number>
+story: <sc-##### — its acceptance criteria are ticked by this round on a Verified walk>
 round: <n>
 branch: <branch> @ <sha>
 proof: adds `<symbol>` ✓ · removes `<symbol>` ✓
@@ -23,6 +24,7 @@ artifact: <state_dir>/reviews/<owner>-<repo>-<pr>-validate-r<round>.md
 
 ## Deliver
 One round per `prometheus:validate` §2–§3: build the checklist, walk it in Chrome through subagents, write
-the record and the summary to `artifact`, post nothing to the PR, then one `send.sh --role pm` line —
-counts, blocking yes/no, artifact path — and end the turn. Denied actions and anything needing a call go
+the record and the summary to `artifact` (screenshots beside it), post nothing to the PR, then one
+`send.sh --role pm` line — counts, blocking yes/no, artifact path — and end the turn. The PM's `verdict:`
+line comes back to this tab: then §4b — tick the story's criteria and attach the screenshots on Verified. Denied actions and anything needing a call go
 under *Needs a call* in the file.
