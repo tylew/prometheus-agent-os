@@ -224,3 +224,16 @@ class MigrationTest(Base):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class PlanningFieldTest(unittest.TestCase):
+    def test_planning_and_request_from_validate(self):
+        import json
+        import schema_lite
+        schema = json.load(open(registry.SCHEMA))
+        base = {"key": "p", "description": "d", "access": "editable", "repo": {"root": "repos/p"}}
+        ok = dict(base, planning={"repo": "voltusdev/voltus-vantage-planning", "team_dir": "teams/b-team"},
+                  review={"request_from": ["voltusdev/team-brightfield"]})
+        self.assertEqual(schema_lite.validate(ok, {"$ref": "#/$defs/project"}, schema), [])
+        bad = dict(base, planning={"repo": "voltusdev/voltus-vantage-planning"})
+        self.assertTrue(schema_lite.validate(bad, {"$ref": "#/$defs/project"}, schema))

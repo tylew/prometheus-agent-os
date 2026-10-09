@@ -332,6 +332,14 @@ def dispatcher_pane(workspace_id: str) -> str:
 
 # -------------------------------------------------------------- quick work
 
+def story_dir(story: str) -> str:
+    """A story's working folder: the planner's research findings and the IDR (`idr.md`) while it is built."""
+    sid = story if story.startswith("sc-") else "sc-%s" % story
+    path = os.path.join(dispatch.state_dir(), "engine", "stories", sid)
+    os.makedirs(os.path.join(path, "research"), exist_ok=True)
+    return path
+
+
 def configure(workspace_id: str, slug: str, issue: str) -> dict:
     """One plugin change: a `config-<slug>` configurator tab beside the seat with the issue as its brief."""
     slug = re.sub(r"[^a-z0-9-]+", "-", slug.lower()).strip("-")

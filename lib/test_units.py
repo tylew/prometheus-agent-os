@@ -276,3 +276,20 @@ class UnitsTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class StoryDirTest(unittest.TestCase):
+    def test_story_dir_is_keyed_by_story(self):
+        with tempfile.TemporaryDirectory() as st:
+            old = os.environ.get("PROMETHEUS_STATE_DIR")
+            os.environ["PROMETHEUS_STATE_DIR"] = st
+            try:
+                path = units.story_dir("110005")
+                self.assertEqual(path, units.story_dir("sc-110005"))
+                self.assertTrue(path.endswith(os.path.join("engine", "stories", "sc-110005")))
+                self.assertTrue(os.path.isdir(os.path.join(path, "research")))
+            finally:
+                if old is None:
+                    del os.environ["PROMETHEUS_STATE_DIR"]
+                else:
+                    os.environ["PROMETHEUS_STATE_DIR"] = old

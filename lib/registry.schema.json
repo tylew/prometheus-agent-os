@@ -302,6 +302,24 @@
             }
           }
         },
+        "planning": {
+          "description": "The team planning repo (vantage) this project's stories plan in: the planner reads it; vantage's own /session-closeout lands the IDR and human rulings there at Completed. Prometheus agents never write it.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "repo",
+            "team_dir"
+          ],
+          "properties": {
+            "repo": {
+              "type": "string",
+              "pattern": "^[^/\\s]+/[^/\\s]+$"
+            },
+            "team_dir": {
+              "type": "string"
+            }
+          }
+        },
         "packages": {
           "type": "array",
           "items": {
@@ -406,6 +424,13 @@
               }
             },
             "ignore_authors": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "request_from": {
+              "description": "Who the engine requests as the human approver on the operator's own PRs (GitHub logins or org/team slugs); unset = the PR's CODEOWNERS.",
               "type": "array",
               "items": {
                 "type": "string"
