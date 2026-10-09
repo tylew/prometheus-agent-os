@@ -138,7 +138,7 @@ cmd=(claude --plugin-dir "$plugin_root" --settings "$settings" --agent "promethe
 case $role in
   implementor|reviewer|librarian) cmd+=(--permission-mode dontAsk) ;;
 esac
-[[ $role == reviewer ]] && cmd+=(--chrome)  # validate rounds walk the app and attach screenshots to the story
+[[ $role == reviewer || $role == planner ]] && cmd+=(--chrome)  # validate rounds walk the app; the planner's UI lens reads it
 cmd+=("$@")
 if (( args_only )); then
   python3 -c 'import json,sys; print(json.dumps(sys.argv[1:]))' "${cmd[@]:1}"

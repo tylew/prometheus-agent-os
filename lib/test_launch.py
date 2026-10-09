@@ -144,6 +144,8 @@ class DeliveryBaseTest(unittest.TestCase):
             self.assertNotIn("extends", s[role])
         for role in ("seat", "runner", "planner", "librarian", "configurator"):
             self.assertNotIn(read, s[role].get("permissions", {}).get("allow", []))
+        self.assertIn("Agent", s["planner"]["permissions"]["allow"])
+        self.assertIn("Bash(git push *)", s["planner"]["permissions"]["deny"])
         self.assertIn("AskUserQuestion", s["reviewer"]["permissions"]["deny"])
         self.assertNotIn("AskUserQuestion", s["pm"]["permissions"].get("deny", []))
         for role in ("pm", "implementor", "reviewer"):  # one home: no rule restated in a role file
@@ -185,3 +187,14 @@ class McpTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class PlannerLaunchTest(unittest.TestCase):
+    def test_planner_gets_chrome_and_asks_in_its_tab(self):
+        import json
+        with tempfile.TemporaryDirectory() as st:
+            out = run_launch("planner", "--args", state_dir=st)
+            self.assertEqual(out.returncode, 0, out.stderr)
+            args = json.loads(out.stdout)
+            self.assertIn("--chrome", args)
+            self.assertNotIn("dontAsk", args)

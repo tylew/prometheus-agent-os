@@ -1,109 +1,135 @@
 ---
 name: stories
-description: "The behavior-spec story standard and lifecycle: who writes stories (the planner only), the draft → operator-confirmed → created flow through docs/specs/<project>/backlog/, the five-heading body with 3–5 Gherkin scenarios and one checkbox per scenario, splitting into parent + sub-issues, and who may edit which part of a story afterwards (planner: scenarios + AC; PM: state, What's decided, Still open)."
+description: "The story standard and lifecycle: who writes stories (the planner only), research → draft → operator-confirmed → created → Ready, the BDD-voice body (vantage story style) with one Gherkin block and one checkbox per scenario, the definition of ready and its readiness comment, splitting into parent + sub-issues, and who may edit which part afterwards."
 ---
 
 # stories
 
-Home of the story body standard. A story is a behavior spec: *what* a user sees change, never *how*.
-Shortcut mechanics (create, update, link, states, comments) → `tracker`. Specs and plans → `knowledge`.
+Home of the story body standard in prometheus. A story is a behavior spec: *what* a user sees change,
+never *how* — the how is the story's IDR. Canonical sources, which this file applies and never forks:
+vantage `rules/story-style.md` (BDD voice) and voltus-kanban `rules/definition-of-ready.md` (BDD column),
+in `voltusdev/voltus-custom-skills-hub`. Shortcut mechanics → `tracker`.
 
 ## Who
 
-| | `planner` | `project-manager` |
-|---|---|---|
-| Creates stories | only author | never — scope gap → `send.sh --role planner` |
-| Owns in the body | title, type, epic, estimate, *What we're building and why*, `Feature`, Scenarios, acceptance criteria | state, *What's decided*, *Still open*, ticking boxes |
+| | `planner` | engine / PM | `validator` |
+|---|---|---|---|
+| Creates stories | only author | never — scope gap → the planner | never |
+| Owns in the body | everything: title, type, epic, estimate, all five sections | state, labels | ticking acceptance boxes with evidence |
 
-A change to Scenarios or acceptance criteria — from a PM, review or design — goes back to the planner,
-then the operator. Nobody else rewrites them.
+A change to Scenarios or acceptance criteria — from review, a stop or the IDR check — goes back to the
+story's planner, then the operator. Nobody else rewrites them.
 
 ## Lifecycle
 
-1. **Source** — an operator ask, a meeting-derived candidate, a PM scope request, an existing candidate.
-   Scope unknown → not a story: leave it a candidate, or a time-boxed spike whose output is the scope.
-2. **Draft** — `<specs>/backlog/<slug>.md` from `templates/story.md` (parent: `templates/story-parent.md`),
-   `<specs>` = `python3 "$CLAUDE_PLUGIN_ROOT/lib/registry.py" field docs.specs --key <project>`.
-   Body below the frontmatter = exactly what is posted; frontmatter is local only. `status: draft`.
-3. **Confirm** — the operator confirms the scenarios. The planner proposes wording, never behavior: a
-   behavior the operator has not stated is a question. One sentence per fork, the drafted behavior
-   named, options as choices. Confirmed → `status: confirmed`. Nothing reaches Shortcut before this.
-4. **Create** — per `tracker`: Backlog, type, epic homed, owner, then estimate; read back. Write
-   `story: sc-#####` + `status: created` into the draft, then delete the draft. A draft found with
-   `story:` set is already created — delete it, never recreate.
-5. **Report** — the new story ids to the planner's PM, which keeps them in its unit or proposes a separate
-   unit to the seat.
+1. **Source** — an operator ask, a discovery planner's preliminary issue, a meeting-derived candidate, a
+   scope gap. Scope unknown → a spike whose output is the scope, not a story.
+2. **Research** — the planner's three lenses (`agents/planner.md`); findings saved with the story.
+3. **Draft** — `<specs>/backlog/<slug>.md` from `templates/story.md` (parent: `templates/story-parent.md`),
+   `<specs>` = `python3 "$CLAUDE_PLUGIN_ROOT/lib/registry.py" field docs.specs --key <project>`. Body below
+   the frontmatter = exactly what is posted. `status: draft`.
+4. **Confirm** — the operator confirms the scenarios, each UI change and the flag decision, in the
+   planner's tab. A behavior the operator has not stated is a question. → `status: confirmed`.
+5. **Create or overwrite** — per `tracker`: a new story in Backlog (type, epic homed, owner, then
+   estimate); an existing story's description overwritten. Read back. Write `story: sc-#####` +
+   `status: created` into the draft, then delete the draft; a draft with `story:` set is never recreated.
+6. **Ready** — the definition of ready (below); one readiness comment; Ready for Development when every
+   criterion holds.
 
-After creation the description is the record. `design.md` carries the Scenarios block **verbatim** from
-the story; it never forks its own. Any edit to the description: re-fetch, replace only your own
-sections, overwrite, read back — never post from a stale copy.
+After creation the description is the record. The IDR never restates the scenarios. Any edit: re-fetch,
+change only what you own, overwrite, read back — never post from a stale copy.
 
 ## Title and type
 
-- **Title** = verb + an outcome a user can see: "Show the plan discount on the invoice PDF", not
-  "Invoice PDF: discount field, resolver, seed". No status words, never `sc-#####`.
+- **Title** = verb + an outcome a user can see: "Show the plan discount on the invoice PDF". No status
+  words, never `sc-#####`.
 - **Type**: `bug` = exists and misbehaves · `feature` = does not exist yet · `chore` = no user-facing
-  change. Missing UI is a feature, not a bug. Classify by reality, not by how it was reported.
+  change. Missing UI is a feature, not a bug.
 
-## The body
+## The body — BDD voice
 
-**Two passes.** Outline one line per claim (the gap · the change · each decision · each open item · each
-scenario); then render each in the fewest words that carry it. Never compose prose into the headings.
+**Two passes.** Outline one line per claim; then render each in the fewest words that carry it.
 
-- **Budget: 150–200 words of prose; 300 is the ceiling, not the target.** Past 300, cut — delete, don't
-  collapse. The Scenarios block is outside the count, capped at 3–5 scenarios instead.
-- **Five headings, exact text, this order:** `## What we're building and why` · `## What's decided` ·
-  `## Still open` · `## Scenarios` · `## Acceptance criteria`. No engineering heading: paths, test
-  plans, rollout, merge order → `design.md` / `plan.md` / the PR.
-- **No code identifier anywhere** — no path, class, function, column, table, endpoint or flag key, in
-  any section. Test: would a product user who cannot read the code recognise the name? A flag is named
-  by what it gates ("while the release flag is off"). Exception: words the product shows on screen.
+- **Budget: 150–200 words of prose; 300 is the ceiling.** The Scenarios block is outside the count.
+- **Sections, exact headings, this order:** `## What we're building and why` · [`## What we saw
+  (YYYY-MM-DD)`, bugs and review findings only] · `## What's decided` · `## Still open` · `## Scenarios` ·
+  `## Acceptance criteria`. No `## Engineering notes`: paths, seams, test plan, rollout → the IDR.
+- **No code identifier and no file named, anywhere** — no path, class, function, column, table,
+  endpoint. **One exception:** the release-flag sentence in *What's decided* carries the flag key in
+  backticks ("Ships dark behind the release flag `invoices-release-pdf`; with the flag off nothing
+  changes."). Inside the Scenarios block the flag is named in words. Words the product shows on screen
+  are not identifiers.
 - **What we're building and why** — today's behavior → the gap → "This story …" saying what a user sees
-  change. Business before mechanism. Bug: the symptom leads, then what should happen instead. No
-  root-cause essay.
-- **What's decided** — `- **the claim** (Name, YYYY-MM-DD).` A reason clause only when the claim reads
-  as arbitrary without it. "Nothing yet." when none. A changed ruling says what it replaces; the
-  replaced bullet is deleted.
+  change; where the work came from as a named link; "Not in this story: …" for the boundary.
+- **What we saw (YYYY-MM-DD)** — what was observed and where, screen text quoted exactly, screenshots,
+  then **Steps to reproduce**.
+- **What's decided** — `- **the claim** (Name, YYYY-MM-DD). Why.` Product decisions only. Each UI change
+  in the user's words: the page, the area, the control or text as a user sees it, what changes — never a
+  component name. A changed ruling says what it replaces. "Nothing yet." when none.
 - **Still open** — `- **Name:** the ask. Blocks this story.` or `… Not blocking: we build <default>; a
-  different answer changes <what>.` One owner per item; "Nothing." when none. Answered → fold into
-  *What's decided*, delete the item.
-- **At most one `<details>`**, omitted by default, titled with the question a PO would ask ("who does
-  this affect?"). Blank lines around its inner content. Never the only copy of anything.
-- No link to a local spec or plan; internal docs and their jargon stay out.
+  different answer changes <what>.` "Nothing." when none.
+- **At most one `<details>`**, titled with the question a PO would ask. Never the only copy of anything.
+- No link to a local spec, plan or vault note; internal jargon stays out.
 
 ## Scenarios
 
-One fenced `gherkin` block, **3–5 scenarios**, behavior only.
+One fenced `gherkin` block, **3–8 scenarios** (a bug may have 2), behavior only.
 
-- `Feature` + `As a / I want / So that`, then `Scenario` or `Scenario Outline` + `Examples`.
-- **`Then` = what a user can observe.** "Then the invoice PDF shows a Plan discount line" is a scenario;
-  "Then the row is written to the discount column" is a plan step.
-- One `When` — the single user action.
-- Same behavior across inputs → one `Scenario Outline`, not one Scenario per input.
-- `Background` only when **every** scenario needs the same `Given`.
-- Cover the no-change case (legacy record, other party, the negative). A story shipping behind a flag
-  owes a flag-off scenario.
-- Each scenario name stands alone — it becomes a checkbox and a validation item.
-- **More than 5 → the story is too big: split.**
+- `Feature` + `As a / I want / So that`, then `Scenario` or `Scenario Outline` + `Examples`; optional
+  `Background` (only a `Given` every scenario shares) and `Rule`.
+- **One behavior per scenario; the name states the outcome** ("Monthly plan shows no discount line").
+- **Declarative, in the reader's words** — never a click path, selector, endpoint or identifier.
+- **`Then` = what a user or a test can observe.**
+- One `When`; a scenario needing a second `When` is two scenarios.
+- Cover the no-change case. Work behind a flag has a flag-off scenario. A bug has the failing case and a
+  guard scenario.
+- Each scenario stands alone; names are unique.
+- **More than 8 → split.**
 
 ## Acceptance criteria
 
-One `- [ ]` per scenario, in block order, the name **verbatim**. No criterion that is not a scenario, no
-scenario without a box; a `Scenario Outline` is one box. An internal-structure assertion ("no second code
-path", "a test fails if the check is removed") is a plan step → `plan.md` / the PR. Boxes are ticked as
-validation confirms each scenario.
+One `- [ ]` per scenario, in block order, the name **verbatim**; an Outline is one box. No criterion that
+is not a scenario. Boxes are ticked by the validator, with evidence, as it proves each scenario.
+
+## Ready — the definition of ready (BDD column)
+
+The planner checks every item before moving the story:
+
+- [ ] **Problem statement** — the gap, in *What we're building and why*.
+- [ ] **Expected behavior** — what the system does after the change.
+- [ ] **Out of scope** — "Not in this story: …".
+- [ ] **Scenarios** — the block parses, pairs one-to-one with its checkboxes, every `Then` is observable;
+      no how anywhere (no engineering section, no file named).
+- [ ] **Flag decision** — the flag sentence in *What's decided* (key, context kind, default = old
+      behavior), or why no flag; an epic's release flag named instead when the epic has one.
+- [ ] **Dependencies** — *blocked by* relations on the tracker, each with its reason in words.
+- [ ] **Planning links** — as Shortcut doc or story URLs, never a vault note.
+- [ ] **Estimate** — Fibonacci, ≤ 5 targeted, 8 splits.
+
+Target package, test seam, rollout and observability are not asked of the story: the IDR holds them.
+
+**One readiness comment** (it replaces the board's five-case comment rule for this one purpose):
+
+```
+**Readiness review sc-#####:** ready — <one line: scope and what makes it testable>.
+```
+
+or, when anything is missing (the story stays in Backlog):
+
+```
+**Not ready: sc-#####** — missing: 1. <criterion> (<who owes it>) 2. …
+```
+
+Signed per `tracker`. All met → move the story to **Ready for Development** (`tracker`), read back.
 
 ## Estimate and split
 
-Fibonacci **1 · 2 · 3 · 5 · 8**; target ≤ 5. Size on implementation surface, design reach (new pattern,
-shared code), validation effort, and dependencies. Re-checked when `design.md` settles scope; a re-check
-landing on 8 splits.
+Fibonacci **1 · 2 · 3 · 5 · 8**; target ≤ 5. Size on implementation surface, design reach, validation
+effort and dependencies. An IDR that changes the scope re-checks it; 8 splits.
 
-**Split** when scenarios exceed 5 or the estimate is 8: a parent from `templates/story-parent.md` plus
-one sub-issue per slice, each a full story from `templates/story.md` with its own 3–5 scenarios and
-estimate ≤ 5. The parent carries no Scenarios block; its acceptance criteria are its sub-issue titles,
-done when each is Completed. The operator confirms the split with the scenarios. Each child is created
-and homed like any story, then linked to the parent (`tracker`). One design for the package, at the
-parent's spec folder; one plan per child.
+**Split** when scenarios exceed 8 or the estimate is 8: a parent from `templates/story-parent.md` plus one
+sub-issue per slice, each a full story with its own scenarios, estimate ≤ 5 and its own IDR. The parent
+carries no Scenarios block; its acceptance criteria are its sub-issue titles. The operator confirms the
+split with the scenarios.
 
 Worked example of the register and scenario grain: `references/example.md`.

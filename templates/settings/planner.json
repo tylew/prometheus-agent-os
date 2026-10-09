@@ -1,0 +1,37 @@
+{
+  "$comment": "Planner additions to launch.json. Not dontAsk: the operator answers the planner's questions and may approve a prompt in its tab; a dialog here holds only this planner. Not a delivery role (no delivery.json): reads only. Agent runs the research lenses as background subagents; Chrome (launch.sh --chrome) is the UI lens, read-only by its brief; redash.sh is the data lens; the planning vault is read through gh api. Shortcut writes come from roles.json (the planner is a writer).",
+  "permissions": {
+    "allow": [
+      "Read",
+      "Glob",
+      "Grep",
+      "Agent",
+      "Bash(git fetch *)",
+      "Bash(git -C * fetch *)",
+      "Bash(git -C * show *)",
+      "Bash(git -C * log *)",
+      "Bash(git -C * ls-tree *)",
+      "Bash(git -C * grep *)",
+      "Bash(git -C * rev-parse *)",
+      "Bash(gh pr list *)",
+      "Bash(gh pr view *)",
+      "Bash(ls *)",
+      "Bash(cat *)",
+      "Bash(head *)",
+      "Bash(wc *)",
+      "Bash(redash.sh *)",
+      "Bash(*/skills/data/scripts/redash.sh *)",
+      "Bash(gh api repos/voltusdev/voltus-vantage-planning/contents/*)",
+      "Bash(gh api \"repos/voltusdev/voltus-vantage-planning/git/trees/*\")",
+      "Edit(/{state_dir}/engine/stories/**)",
+      "Edit(/{workspace}/docs/specs/*/backlog/**)"
+    ],
+    "deny": [
+      "Bash(git commit *)",
+      "Bash(git push *)",
+      "Bash(gt *)",
+      "Bash(gh pr create *)",
+      "Bash(gh pr merge *)"
+    ]
+  }
+}

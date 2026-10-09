@@ -13,7 +13,7 @@ story: <sc-##### once created>
 ## What we're building and why
 
 <Today's behavior → the gap → "This story …" saying what a user sees change. Business before mechanism.
- For a bug, the symptom leads.>
+ For a bug, the symptom leads.> Not in this story: <the boundary>.
 
 ## What's decided
 
@@ -58,8 +58,10 @@ Feature: <the capability, as the title says it>
 - [ ] <second scenario name, verbatim>
 - [ ] <third scenario name, verbatim>
 
-<!-- Rules (prometheus:stories): 150–200 words of prose, 300 ceiling; Scenarios outside the count, 3–5;
-     Then = what a user can observe; no path, class, function, column, table, endpoint or flag key
-     anywhere — a flag is named by what it gates; a flag-gated story owes a flag-off scenario;
-     Background only when every scenario needs it; one checkbox per scenario, an Outline is one box;
-     at most one <details>, titled with the question it answers. Engineering detail → design.md / plan.md. -->
+<!-- Rules (prometheus:stories; vantage story style, BDD voice): 150–200 words of prose, 300 ceiling;
+     Scenarios outside the count, 3–8 (a bug may have 2); Then = what a user or a test can observe; no
+     path, class, function, column, table or endpoint anywhere — the only identifier is the flag key in
+     the release-flag sentence under What's decided, and the block names the flag in words; a flagged
+     story owes a flag-off scenario; UI changes in What's decided in the user's words, never a component
+     name; "Not in this story: …" for the boundary; one checkbox per scenario, an Outline is one box; at
+     most one <details>. The how — paths, seams, rollout, observability — is the story's IDR. -->

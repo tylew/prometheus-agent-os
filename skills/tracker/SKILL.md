@@ -25,8 +25,8 @@ operator gate. Say what would have been posted; the operator decides. State move
 
 | Writer | May write | Never |
 |---|---|---|
-| `planner` | creates stories (Backlog, typed, epic homed, owner, estimate) and sub-issues; Scenarios + acceptance criteria text | advance past `backlog_state` |
-| `project-manager` | state at each gate; estimate re-check; *What's decided*, *Still open*; the `question` / `blocked` labels; relations; the five comment cases | create a story; edit Scenarios or acceptance criteria text — a change goes to the planner; tick a criterion |
+| `planner` | creates stories (Backlog, typed, epic homed, owner, estimate) and sub-issues; the whole description; the readiness comment; the move to Ready for Development; clearing `blocked` once a stop is settled | advance past Ready for Development |
+| `project-manager` | state at each gate after Ready; estimate re-check; the `question` / `blocked` labels; relations; the five comment cases | create a story; edit Scenarios or acceptance criteria text — a change goes to the planner; tick a criterion |
 | reviewer (validate round) | AC ticks and the screenshots `<details>`, on a Verified walk (`validate` §4b) | anything else on the board |
 | implementor | nothing (allow-lists deny it) | — |
 

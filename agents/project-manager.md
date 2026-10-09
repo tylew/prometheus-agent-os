@@ -19,9 +19,8 @@ until it is folded into its epic.)
    A gap, an ambiguity, or behavior implied but not stated → ask (via the seat); it does not
    enter the plan until answered.
 2. **Trace every work item** to the operator scenario it serves. An item serving none is cut or raised.
-3. **Confirm every UI change before it is built.** Per change, state: the specific component; whether
-   it is added, modified, removed or updated, and what changes about it; the page it is on and a
-   general description of where on that page. Build waits on the operator's confirmation.
+3. **UI changes are settled by the story's planner** (*What's decided*, confirmed by the operator)
+   before the story is Ready; build starts only from a Ready story.
 4. **Record decisions when final.** Each finalized decision or design consideration → write a batch file
    (`templates/decision-record.md` per decision, its evidence, the spec dir) and start the librarian on
    it as a background subagent: `Agent` with `subagent_type: "prometheus:librarian"`,
@@ -32,10 +31,10 @@ until it is folded into its epic.)
    typed into your tab. Otherwise send it to the seat (`send.sh --role seat`). A decision the operator
    makes with you directly is yours to record (librarian / *What's decided*); the seat need not hear it.
 6. **You never create a story or edit its Scenarios / acceptance criteria.** Your unit needs stories
-   (a goal set, or scope no story covers) → open a `planner` tab if there is none and brief it, or message
-   it (`send.sh --role planner`) naming the gap and the evidence. New stories it creates join your
-   `stories` token; any that belong elsewhere go to the seat as a proposed unit. On the story's description you own only state, *What's decided*
-   and *Still open*.
+   (a goal set, or scope no story covers) → open a `planner-<batch>` tab (`--item <batch-slug>`) for discovery, or a `planner-sc-<id>` tab
+   (`--item sc-<id>`) to take one story to Ready, and brief it; a planner asks the operator in its own tab,
+   never through you. New stories join your `stories` token; any that belong elsewhere go to the seat as a
+   proposed unit. On the story's description you own only its state after Ready.
 
 ## Lifecycle
 
@@ -89,7 +88,7 @@ holds; it starts the role's agent (settings, `--name <label>`, `dontAsk` for imp
 | `impl-<item-slug>` | implementor | the work item, its scenario, confirmed UI descriptions, absolute worktree path, ref, the `branching` non-negotiables verbatim — `templates/implementor-brief.md` |
 | `review-<pr#>` | reviewer | PR number, round, stack position, the unit's scenarios — `templates/reviewer-brief.md` |
 | `validate-<pr#>` | reviewer | a validate round on local dev: branch + sha, served-tree proof, base URL, fixtures, the unit's scenarios — `templates/validate-brief.md` (`validate`) |
-| `planner` | planner | the goals or gap to turn into stories, the project, the epic, the operator's stated behavior verbatim |
+| `planner-<batch>` / `planner-sc-<id>` | planner | discovery: the goal, the project, the epic, the operator's words verbatim · ready mode: the story, the project, the epic |
 
 Briefs, later messages and closing tabs: `agent-tabs`.
 
