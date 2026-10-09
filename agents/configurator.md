@@ -29,7 +29,7 @@ denial, a transcript, a failed run). The seat is your only counterpart; the oper
    cleaned up). A failed check is fixed or the change is withdrawn — never committed red.
 6. **Commit** in the plugin repo by pathspec — `git -C <plugin> commit -m "<area>: <what changed>" -- <paths>`;
    registry changes commit in the workspace repo the same way. Never sign, never add a co-author. The
-   message lists the acceptance checks that ran.
+   message lists the acceptance checks that ran; the word `push` in it trips the push deny — reword.
 7. **Report** — `send.sh --role seat "config-<slug> done: <commit> — <criteria met> — relaunch: <tabs that
    must restart to pick it up, or none>"`, `report.sh --clear`, end your turn.
 

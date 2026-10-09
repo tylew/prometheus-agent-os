@@ -140,7 +140,7 @@ class DeliveryBaseTest(unittest.TestCase):
         read = "Bash(gh api repos/*/issues/*/comments *)"
         for role in ("pm", "implementor", "reviewer"):
             self.assertIn(read, s[role]["permissions"]["allow"])
-            self.assertIn("Bash(gh api repos/*/issues/* -f *)", s[role]["permissions"]["deny"])
+            self.assertIn("Bash(gh api repos/*/issues/* -f*)", s[role]["permissions"]["deny"])
             self.assertNotIn("extends", s[role])
         for role in ("seat", "runner", "planner", "librarian", "configurator"):
             self.assertNotIn(read, s[role].get("permissions", {}).get("allow", []))

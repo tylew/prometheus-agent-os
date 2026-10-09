@@ -98,6 +98,34 @@
         {
           "cmd": "gh api repos/o/r/pulls/comments/1 -X DELETE",
           "live": "gh api repos/o/r/pulls/comments/1 -X DELETE --hostname probe.invalid"
+        },
+        {
+          "cmd": "gh api repos/o/r/issues/1/comments -XPOST",
+          "live": "gh api repos/o/r/issues/1/comments -XPOST --hostname probe.invalid"
+        },
+        {
+          "cmd": "gh api repos/o/r/issues/1/comments --method=PATCH",
+          "live": "gh api repos/o/r/issues/1/comments --method=PATCH --hostname probe.invalid"
+        },
+        {
+          "cmd": "gh api repos/o/r/issues/1/comments -fbody=x",
+          "live": "gh api repos/o/r/issues/1/comments -fbody=x --hostname probe.invalid"
+        },
+        {
+          "cmd": "gh api repos/o/r/issues/1/comments -Fbody=x",
+          "live": "gh api repos/o/r/issues/1/comments -Fbody=x --hostname probe.invalid"
+        },
+        {
+          "cmd": "gh api repos/o/r/issues/1/comments --field=body=x",
+          "live": "gh api repos/o/r/issues/1/comments --field=body=x --hostname probe.invalid"
+        },
+        {
+          "cmd": "gh api repos/o/r/issues/1/comments --raw-field=body=x",
+          "live": "gh api repos/o/r/issues/1/comments --raw-field=body=x --hostname probe.invalid"
+        },
+        {
+          "cmd": "gh api repos/o/r/issues/1/comments --input=b.json",
+          "live": "gh api repos/o/r/issues/1/comments --input=b.json --hostname probe.invalid"
         }
       ]
     },
@@ -231,6 +259,22 @@
         {
           "cmd": "git -C {wt} add -A",
           "live": "git -C {wt} add -A"
+        },
+        {
+          "cmd": "gh api repos/o/r/pulls/comments/1 -XDELETE",
+          "live": "gh api repos/o/r/pulls/comments/1 -XDELETE --hostname probe.invalid"
+        },
+        {
+          "cmd": "gh api repos/o/r/pulls/comments/1 --method=DELETE",
+          "live": "gh api repos/o/r/pulls/comments/1 --method=DELETE --hostname probe.invalid"
+        },
+        {
+          "cmd": "gh api repos/o/r/pulls/comments/1 -fbody=x",
+          "live": "gh api repos/o/r/pulls/comments/1 -fbody=x --hostname probe.invalid"
+        },
+        {
+          "cmd": "gh api repos/o/r/pulls/comments/1 --input=b.json",
+          "live": "gh api repos/o/r/pulls/comments/1 --input=b.json --hostname probe.invalid"
         }
       ]
     },
@@ -333,6 +377,50 @@
         {
           "cmd": "touch {workspace}/probe-missing-dir/x",
           "live": "touch {workspace}/probe-missing-dir/x"
+        },
+        {
+          "cmd": "gh api repos/o/r/issues/1/comments -XPOST",
+          "live": "gh api repos/o/r/issues/1/comments -XPOST --hostname probe.invalid"
+        },
+        {
+          "cmd": "gh api repos/o/r/issues/1/comments --method=PATCH",
+          "live": "gh api repos/o/r/issues/1/comments --method=PATCH --hostname probe.invalid"
+        },
+        {
+          "cmd": "gh api repos/o/r/issues/1/comments -fbody=x",
+          "live": "gh api repos/o/r/issues/1/comments -fbody=x --hostname probe.invalid"
+        },
+        {
+          "cmd": "gh api repos/o/r/issues/1/comments -Fbody=x",
+          "live": "gh api repos/o/r/issues/1/comments -Fbody=x --hostname probe.invalid"
+        },
+        {
+          "cmd": "gh api repos/o/r/issues/1/comments --field=body=x",
+          "live": "gh api repos/o/r/issues/1/comments --field=body=x --hostname probe.invalid"
+        },
+        {
+          "cmd": "gh api repos/o/r/issues/1/comments --raw-field=body=x",
+          "live": "gh api repos/o/r/issues/1/comments --raw-field=body=x --hostname probe.invalid"
+        },
+        {
+          "cmd": "gh api repos/o/r/issues/1/comments --input=b.json",
+          "live": "gh api repos/o/r/issues/1/comments --input=b.json --hostname probe.invalid"
+        },
+        {
+          "cmd": "gh api repos/o/r/pulls/comments/1 -XDELETE",
+          "live": "gh api repos/o/r/pulls/comments/1 -XDELETE --hostname probe.invalid"
+        },
+        {
+          "cmd": "gh api repos/o/r/pulls/comments/1 --method=DELETE",
+          "live": "gh api repos/o/r/pulls/comments/1 --method=DELETE --hostname probe.invalid"
+        },
+        {
+          "cmd": "gh api repos/o/r/pulls/comments/1 -fbody=x",
+          "live": "gh api repos/o/r/pulls/comments/1 -fbody=x --hostname probe.invalid"
+        },
+        {
+          "cmd": "gh api repos/o/r/pulls/comments/1 --input=b.json",
+          "live": "gh api repos/o/r/pulls/comments/1 --input=b.json --hostname probe.invalid"
         }
       ]
     },
@@ -463,7 +551,12 @@
           "cmd": "git -C {plugin_root} push",
           "live": false
         },
-        "Edit({workspace}/repos/voltus/x.py)"
+        "Edit({workspace}/repos/voltus/x.py)",
+        {
+          "cmd": "git -C {plugin_root} commit -m \"x: do not push yet\" -- agents/configurator.md",
+          "live": false,
+          "why": "rule wildcards span spaces, so the push deny also catches the word in a message; recorded so a narrowing shows here"
+        }
       ]
     }
   }

@@ -1,5 +1,5 @@
 {
-  "$comment": "Shared base for the delivery roles (pm, implementor, reviewer): a role file opts in with \"extends\": [\"delivery\"] and lib/launch.sh merges launch.json → this → the role (lists add up). Holds the reads all three need ({workspace} is an additional directory so cat / grep / ls reach plugin skills, docs and node_modules — the Read tool already does), the review artifact write under {state_dir}/reviews/, and the PR conversation read (gh api …/issues/*/comments, …/pulls/comments/<id>) — read-only: every write form on those paths is denied. FE validation runs in the npm --prefix <worktree>/js form (no cd); test only with CI=true (optionally under timeout), snapshot writes (-u / --updateSnapshot) denied. A deny whose pattern has an inner * is listed bare and with ' *' (live, the trailing ' *' does not match the bare command). A rule lives here or in a role file, never both.",
+  "$comment": "Shared base for the delivery roles (pm, implementor, reviewer): a role file opts in with \"extends\": [\"delivery\"] and lib/launch.sh merges launch.json → this → the role (lists add up). Holds the reads all three need ({workspace} is an additional directory so cat / grep / ls reach plugin skills, docs and node_modules — the Read tool already does), the review artifact write under {state_dir}/reviews/, and the PR conversation read (gh api …/issues/*/comments, …/pulls/comments/<id>) — read-only: every write form on those paths is denied, a write flag matched bare-prefixed (-X*, --input*) so its attached form (-XPOST, --method=PATCH) is denied too. FE validation runs in the npm --prefix <worktree>/js form (no cd); test only with CI=true (optionally under timeout), snapshot writes (-u / --updateSnapshot) denied. A deny whose pattern has an inner * is listed bare and with ' *' (live, the trailing ' *' does not match the bare command). A rule lives here or in a role file, never both.",
   "permissions": {
     "allow": [
       "Read",
@@ -57,22 +57,22 @@
       "Bash(CI=true timeout * npm --prefix * run test *)"
     ],
     "deny": [
-      "Bash(gh api repos/*/issues/* -f *)",
-      "Bash(gh api repos/*/issues/* -F *)",
-      "Bash(gh api repos/*/issues/* --field *)",
-      "Bash(gh api repos/*/issues/* --raw-field *)",
-      "Bash(gh api repos/*/issues/* -X *)",
-      "Bash(gh api repos/*/issues/* --method *)",
-      "Bash(gh api repos/*/issues/* --input *)",
+      "Bash(gh api repos/*/issues/* -f*)",
+      "Bash(gh api repos/*/issues/* -F*)",
+      "Bash(gh api repos/*/issues/* --field*)",
+      "Bash(gh api repos/*/issues/* --raw-field*)",
+      "Bash(gh api repos/*/issues/* -X*)",
+      "Bash(gh api repos/*/issues/* --method*)",
+      "Bash(gh api repos/*/issues/* --input*)",
       "Bash(*npm --prefix * run test * -u*)",
       "Bash(*npm --prefix * run test *--updateSnapshot*)",
-      "Bash(gh api repos/*/pulls/comments/* -X *)",
-      "Bash(gh api repos/*/pulls/comments/* --method *)",
-      "Bash(gh api repos/*/pulls/comments/* -f *)",
-      "Bash(gh api repos/*/pulls/comments/* -F *)",
-      "Bash(gh api repos/*/pulls/comments/* --field *)",
-      "Bash(gh api repos/*/pulls/comments/* --raw-field *)",
-      "Bash(gh api repos/*/pulls/comments/* --input *)"
+      "Bash(gh api repos/*/pulls/comments/* -X*)",
+      "Bash(gh api repos/*/pulls/comments/* --method*)",
+      "Bash(gh api repos/*/pulls/comments/* -f*)",
+      "Bash(gh api repos/*/pulls/comments/* -F*)",
+      "Bash(gh api repos/*/pulls/comments/* --field*)",
+      "Bash(gh api repos/*/pulls/comments/* --raw-field*)",
+      "Bash(gh api repos/*/pulls/comments/* --input*)"
     ],
     "additionalDirectories": [
       "{workspace}"
