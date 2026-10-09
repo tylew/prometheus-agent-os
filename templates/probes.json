@@ -361,7 +361,8 @@
         "gh api repos/voltusdev/voltus/pulls/comments/4221467356 --jq .id",
         "CI=true timeout 5 npm --prefix {wt}/js run test x -- --forceExit",
         "mcp__claude-in-chrome__file_upload",
-        "cp /tmp/shot.png {state_dir}/reviews/o-r-1-validate-r1/3.png",
+        "cat /var/folders/xx/yy/T/claude-chrome-screenshots-AbC123/screenshot-1-0.png > {state_dir}/reviews/o-r-1-validate-r1/3.png",
+        "cat /private/var/folders/xx/yy/T/claude-chrome-screenshots-AbC123/screenshot-1-0.png > {state_dir}/reviews/o-r-1-validate-r1/4.png",
         "git -C {wt} worktree add --detach {state_dir}/reviews/scratch/probe-missing abc",
         "git -C {state_dir}/reviews/scratch/probe-missing checkout abc -- js/x.ts",
         "ln -s {workspace}/repos/voltus/js/node_modules {state_dir}/reviews/scratch/probe-missing/js/node_modules",
@@ -378,6 +379,14 @@
         "git -C {workspace}/.worktrees/review-probe-missing checkout --detach abc"
       ],
       "deny": [
+        {
+          "cmd": "cat /tmp/shot.png > {state_dir}/reviews/o-r-1-validate-r1/3.png",
+          "live": "cat /tmp/shot.png > {state_dir}/reviews/o-r-1-validate-r1/3.png"
+        },
+        {
+          "cmd": "cp /private/var/folders/xx/yy/T/claude-chrome-screenshots-AbC123/screenshot-1-0.png {state_dir}/reviews/o-r-1-validate-r1/5.png",
+          "live": "cp /private/var/folders/xx/yy/T/claude-chrome-screenshots-AbC123/screenshot-1-0.png {state_dir}/reviews/o-r-1-validate-r1/5.png"
+        },
         {
           "cmd": "gh api repos/o/r/pulls/1 -X PATCH -f state=closed",
           "live": "gh api repos/o/r/pulls/1 -X PATCH -f state=closed --hostname probe.invalid"

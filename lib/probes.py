@@ -9,6 +9,10 @@
 #   Bash: `Bash` / `Bash(*)` = all; `Bash(x)` exact; `*` anywhere = any run of characters; a trailing ` *` also
 #   matches the bare command only when the pattern has no other `*` (live-verified); legacy `Bash(x:*)` =
 #   `Bash(x *)`. Compound commands split on unquoted && || ; | & and newlines: any part denied → deny, any part ask → ask, every part allowed → allow.
+#   Bash path checks (live-verified): an allowed `cp` needs every source inside the working dirs (cwd +
+#   additionalDirectories) — no Read rule counts; `cat <src> [> <dst>]`, allowed or unmatched by Bash rules, needs
+#   each src inside them or matched by a path-scoped Read allow, and dst matched by a path-scoped Edit allow;
+#   these Bash checks take a path as written or resolved (either spelling matches).
 #   Tools: bare name = every call; `mcp__s` / `mcp__s__*` = every tool of server s; an MCP tool whose server
 #   is not in the role's --mcp-config is "unavailable" (counts as refused) — except a built-in server
 #   (BUILTIN_SERVERS), present in every session. Edit rules cover Write/MultiEdit/
@@ -28,6 +32,7 @@ import argparse
 import json
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -187,13 +192,14 @@ def resolve_rule_path(spec: str, settings_dir: str, cwd: str) -> str:
     return os.path.join(cwd, spec[2:] if spec.startswith("./") else spec)
 
 
-def path_matches(spec: str, path: str, settings_dir: str, cwd: str) -> bool:
+def path_matches(spec: str, path: str, settings_dir: str, cwd: str, either: bool = False) -> bool:
     full = resolve_rule_path(spec, settings_dir, cwd)
     if full.endswith("/"):
         full += "**"
     rx = glob_to_regex(full)
-    # Claude Code checks the path as written and resolved: both must match (a symlink in either spelling fails)
-    return all(re.fullmatch(rx, p) is not None or re.fullmatch(rx, p + "/") is not None
+    # Claude Code checks the path as written and resolved: both must match (a symlink in either spelling fails);
+    # a Bash command's path check (either=True) takes either spelling (live-verified)
+    return (any if either else all)(re.fullmatch(rx, p) is not None or re.fullmatch(rx, p + "/") is not None
                for p in {os.path.normpath(path), os.path.realpath(path)})
 
 
@@ -227,6 +233,39 @@ def _part_verdict(perms: dict, part: str) -> str | None:
     return None
 
 
+def _scoped(perms: dict, level: str, tool: str, path: str, settings_dir: str, cwd: str) -> bool:
+    """A path-scoped rule of `tool` at `level` matches `path` (a bare `Read` / `Edit` does not count)."""
+    return any(parse_rule(r)[0] == tool and (parse_rule(r)[1] or "").strip() not in ("", "*", "**")
+               and path_matches(parse_rule(r)[1], path, settings_dir, cwd, either=True) for r in perms.get(level, []))
+
+
+def _path_verdict(perms: dict, part: str, verdict: str | None, settings_dir: str, cwd: str) -> str | None:
+    """The header's Bash path checks, applied to one part's rule verdict."""
+    try:
+        words = shlex.split(part)
+    except ValueError:
+        return verdict
+    roots = [os.path.realpath(d) for d in [cwd, *perms.get("additionalDirectories", [])]]
+    inside = lambda f: any(os.path.realpath(f) == r or os.path.realpath(f).startswith(r.rstrip("/") + "/")
+                           for r in roots)
+    if verdict == "allow" and words and words[0] == "cp":
+        srcs = [w for w in words[1:] if not w.startswith("-")][:-1]
+        return "allow" if all(inside(f) for f in srcs) else None
+    if verdict in ("allow", None) and words and words[0] == "cat" \
+            and not any(w.startswith("-") or w in ("<", "|") for w in words[1:]):
+        redirect = len(words) >= 3 and words[-2] in (">", ">>")
+        srcs, dst = (words[1:-2], words[-1]) if redirect else (words[1:], None)
+        if ">" in srcs or ">>" in srcs:
+            return verdict
+        if any(_scoped(perms, "deny", "Read", f, settings_dir, cwd) for f in srcs) \
+                or (dst and _scoped(perms, "deny", "Edit", dst, settings_dir, cwd)):
+            return "deny"
+        ok = all(inside(f) or _scoped(perms, "allow", "Read", f, settings_dir, cwd) for f in srcs) \
+            and (dst is None or _scoped(perms, "allow", "Edit", dst, settings_dir, cwd))
+        return "allow" if ok else None
+    return verdict
+
+
 def decide(perms: dict, probe: dict, dont_ask: bool, servers: list[str] | None = None,
            settings_dir: str = "/", cwd: str = "/") -> tuple[str, str]:
     """→ (verdict, reason). verdict ∈ allow | deny | ask | prompt | unavailable."""
@@ -235,7 +274,7 @@ def decide(perms: dict, probe: dict, dont_ask: bool, servers: list[str] | None =
         parts = split_compound(probe["cmd"])
         if parts is None:
             return unmatched[0], "substitution/subshell — not statically matched"
-        verdicts = [_part_verdict(perms, p) for p in parts]
+        verdicts = [_path_verdict(perms, p, _part_verdict(perms, p), settings_dir, cwd) for p in parts]
         for level in ("deny", "ask"):
             if level in verdicts:
                 return level, "part %r" % parts[verdicts.index(level)]

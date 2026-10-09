@@ -51,8 +51,9 @@ Load the claude-in-chrome tools. One subagent (`Agent`) per page group — items
 groups that mutate shared state run in sequence, independent groups in parallel. Each subagent's brief: the
 URLs, the items verbatim, the fixtures by id, "open a new tab, never reuse an existing one", "never trigger
 a JS alert / confirm", and the return per item — what the page showed (exact text / state), a screenshot
-saved to `<artifact without .md>/<item #>.png` (copied out of the browser tool's temp dir as it lands), the
-request and status where the item depends on one, `pass` / `fail` / `blocked`.
+saved to `<artifact without .md>/<item #>.png` (copied out of the browser tool's temp dir as it lands:
+`mkdir -p <dir>`, then `cat <saved path> > <dest>` — `cp` from it is denied), the request and status where
+the item depends on one, `pass` / `fail` / `blocked`.
 
 Re-check every subagent's evidence against the condition before recording it. Write each item to the
 artifact as it lands. **On a fail, capture while the state is live**: failing request + body, FE console,

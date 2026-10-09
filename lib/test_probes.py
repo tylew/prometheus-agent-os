@@ -63,6 +63,41 @@ class BashPatternTest(unittest.TestCase):
         self.assertTrue(probes.bash_pattern_matches('python3 "*/lib/registry.py" *', cmd))
 
 
+class PathCheckTest(unittest.TestCase):
+    perms = {"allow": ["Bash(cp * /state/reviews/*)", "Read", "Read(//shots/**)", "Read(//both/**)",
+                       "Edit(//state/reviews/**)"],
+             "deny": ["Read(//both/secret/**)"], "additionalDirectories": ["/state"]}
+
+    def d(self, cmd):
+        return probes.decide(self.perms, bash(cmd), True, None, "/", "/ws")[0]
+
+    def test_cp_source_needs_a_working_dir(self):
+        self.assertEqual(self.d("cp /state/a.png /state/reviews/x/1.png"), "allow")
+        self.assertEqual(self.d("cp -p /ws/a.png /state/reviews/x/1.png"), "allow")
+        self.assertEqual(self.d("cp /shots/s-1.png /state/reviews/x/1.png"), "deny")
+        self.assertEqual(self.d("cp /state/a.png /elsewhere/b.png /state/reviews/x/"), "deny")
+
+    def test_cat_redirect_needs_scoped_read_and_edit(self):
+        self.assertEqual(self.d("cat /shots/s-1.png > /state/reviews/x/1.png"), "allow")
+        self.assertEqual(self.d("cat /state/a.png > /state/reviews/x/1.png"), "allow")
+        self.assertEqual(self.d("cat /elsewhere/shot.png > /state/reviews/x/1.png"), "deny")
+        self.assertEqual(self.d("cat /shots/s-1.png > /state/other.png"), "deny")
+        self.assertEqual(self.d("cat /both/secret/k > /state/reviews/x/1"), "deny")
+        self.assertEqual(self.d("cat /elsewhere/notes.md"), "deny")
+        self.assertEqual(self.d("cat /ws/notes.md"), "allow")
+
+    def test_bash_path_check_takes_either_spelling(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as base:
+            real = os.path.realpath(base)
+            os.mkdir(os.path.join(real, "r"))
+            os.symlink(os.path.join(real, "r"), os.path.join(real, "a"))
+            perms = {"allow": ["Read(/%s/r/**)" % real, "Edit(//state/**)"]}
+            for target in ("a", "r"):
+                cmd = "cat %s/%s/x.png > /state/x.png" % (real, target)
+                self.assertEqual(probes.decide(perms, bash(cmd), True, None, "/", "/ws")[0], "allow", target)
+
+
 class DecideTest(unittest.TestCase):
     perms = {"allow": ["Bash(git status *)", "Bash(ls *)", "Bash(git push *)", "Read", "mcp__shortcut",
                        "Edit(//state/reviews/**)", "Bash(gh pr *)"],
