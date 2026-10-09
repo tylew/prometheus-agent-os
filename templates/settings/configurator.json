@@ -30,6 +30,7 @@
       "Edit(/{workspace}/samples/**)",
       "Edit(/{workspace}/plugins/voltus-besstie/**)",
       "Bash(git push *)",
+      "Bash(git -C * push)",
       "Bash(git -C * push *)",
       "Bash(git commit -S *)",
       "Bash(gt *)"

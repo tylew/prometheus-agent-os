@@ -54,6 +54,8 @@ class BashPatternTest(unittest.TestCase):
         self.assertTrue(m("git -C * show *", "git -C /w/x show HEAD"))
         self.assertTrue(m("gh api repos/*/compare/*", "gh api repos/o/r/compare/a...b"))
         self.assertTrue(m("*/skills/dispatch/scripts/send.sh *", "/p/skills/dispatch/scripts/send.sh --role pm x"))
+        self.assertFalse(m("git -C * push *", "git -C /x push"))
+        self.assertFalse(m("*/skills/dispatch/scripts/send.sh *", "/p/skills/dispatch/scripts/send.sh"))
 
     def test_quoted_path_needs_the_quoted_rule(self):
         cmd = 'python3 "/p/lib/registry.py" field repo.slug --key besstie'

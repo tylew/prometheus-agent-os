@@ -7,8 +7,8 @@
 # Static matcher — what it models:
 #   precedence deny > ask > allow; unmatched = denied under dontAsk (launch arg or defaultMode), else "prompt".
 #   Bash: `Bash` / `Bash(*)` = all; `Bash(x)` exact; `*` anywhere = any run of characters; a trailing ` *` also
-#   matches the bare command; legacy `Bash(x:*)` = `Bash(x *)`. Compound commands split on unquoted
-#   && || ; | & and newlines: any part denied → deny, any part ask → ask, every part allowed → allow.
+#   matches the bare command only when the pattern has no other `*` (live-verified); legacy `Bash(x:*)` =
+#   `Bash(x *)`. Compound commands split on unquoted && || ; | & and newlines: any part denied → deny, any part ask → ask, every part allowed → allow.
 #   Tools: bare name = every call; `mcp__s` / `mcp__s__*` = every tool of server s; an MCP tool whose server
 #   is not in the role's --mcp-config is "unavailable" (counts as refused) — except a built-in server
 #   (BUILTIN_SERVERS), present in every session. Edit rules cover Write/MultiEdit/
@@ -147,7 +147,7 @@ def bash_pattern_matches(pattern: str | None, cmd: str) -> bool:
     pat = pattern.strip()
     if pat.endswith(":*"):
         pat = pat[:-2] + " *"
-    tail = pat.endswith(" *")
+    tail = pat.endswith(" *") and "*" not in pat[:-2]
     if tail:
         pat = pat[:-2]
     rx = ".*".join(re.escape(p) for p in pat.split("*"))
