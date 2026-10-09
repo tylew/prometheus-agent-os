@@ -209,9 +209,17 @@ def route(snap: dict, event: dict) -> str:
         if not targets:
             raise RouteError("no %s holds %s in %s" % (role, event["holds"], _tokens(unit)["unit"]))
     if event.get("item"):
-        targets = [p for p in targets if _tokens(p).get("item") == event["item"]] or targets
+        matched = [p for p in targets if _tokens(p).get("item") == event["item"]]
+        if event.get("strict") and not matched:
+            raise RouteError("no %s for %s in %s — open one (open-tab.sh … --item %s)"
+                             % (role, event["item"], _tokens(unit)["unit"], event["item"]))
+        targets = matched or targets
     if not targets:
         raise RouteError("no %s pane in %s" % (role, _tokens(unit)["unit"]))
+    if event.get("strict") and len(targets) > 1:
+        raise RouteError("%d %s panes in %s (%s) — name one with --item or --pr, or --pane"
+                         % (len(targets), role, _tokens(unit)["unit"],
+                            ", ".join("%s=%s" % (p["pane_id"], _tokens(p).get("item") or "-") for p in targets)))
     return targets[0]["pane_id"]
 
 
@@ -226,13 +234,16 @@ def enqueue(st: dict, pane_id: str, line: str, details: dict | None = None,
 # ------------------------------------------------------------------------- send
 
 def send(snap: dict, st: dict, message: str, *, pane_id: str | None = None,
-         role: str | None = None, unit: str | None = None, pr: str | None = None) -> str:
-    """Agent-to-agent: tag with sender role@unit, resolve the target, queue it."""
+         role: str | None = None, unit: str | None = None, pr: str | None = None,
+         item: str | None = None) -> str:
+    """Agent-to-agent: tag with sender role@unit, resolve the target, queue it. Strict: several panes of the
+    role (a planner per story) need --item / --pr; an --item no pane holds is an error, never a fallback."""
     me_role = os.environ.get("PROMETHEUS_ROLE", "operator")
     my_unit = unit_of_pane(snap, os.environ.get("HERDR_PANE_ID", "")) or \
         unit_of_workspace(snap, os.environ.get("HERDR_WORKSPACE_ID", ""))
     my_label = _tokens(my_unit).get("unit") if my_unit else "control"
-    event = {"to_pane": pane_id, "role": role or "pm", "unit": unit or (my_label if my_unit else None), "holds": pr}
+    event = {"to_pane": pane_id, "role": role or "pm", "unit": unit or (my_label if my_unit else None), "holds": pr,
+             "item": item, "strict": True}
     if event["role"] in CONTROL:
         event["unit"] = None
     target = route(snap, event)
@@ -739,6 +750,7 @@ def main(argv: list[str]) -> int:
     g.add_argument("--role", choices=list(ROLES))
     s.add_argument("--unit")
     s.add_argument("--pr", help="owner/repo#n: the --role tab whose pr token holds it")
+    s.add_argument("--item", help="sc-<id> or a batch slug: the --role tab whose item token it is")
     s.add_argument("message", nargs="+")
     rp = sub.add_parser("report")
     rp.add_argument("--needs-you", action="store_true")
@@ -778,7 +790,7 @@ def main(argv: list[str]) -> int:
     with locked_state() as st:
         if a.cmd == "send":
             try:
-                target = send(snap, st, " ".join(a.message), pane_id=a.pane, role=a.role, unit=a.unit, pr=a.pr)
+                target = send(snap, st, " ".join(a.message), pane_id=a.pane, role=a.role, unit=a.unit, pr=a.pr, item=a.item)
             except RouteError as exc:
                 print("send: %s" % exc, file=sys.stderr)
                 return 1

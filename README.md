@@ -23,8 +23,8 @@ control workspace "Prometheus" (operator)
   └─ runner / configurator tabs, opened by the seat only
 epic workspace "epic-<id>-<slug>" (one per epic)
   ├─ tab pm                 project-manager — owns the epic; never carries an operator question
-  ├─ tab planner-sc-<id>    one story to Ready (research, BDD spec, definition of ready); asks in its own tab
-  ├─ tab planner-<batch>    discovery: a goal into preliminary issues
+  ├─ tab plan-sc-<id>    one story to Ready (research, BDD spec, definition of ready); asks in its own tab
+  ├─ tab plan-<slug>    discovery: a goal into preliminary issues
   ├─ tab impl-sc-<id>       implementor — analysis, the IDR, failing tests first, code; stops, never asks
   ├─ tab review-idr-sc-<id> reviewer — the IDR checked against the story before any code
   ├─ tab review-<pr>        reviewer, fresh per round

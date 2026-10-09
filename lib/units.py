@@ -361,6 +361,42 @@ def configure(workspace_id: str, slug: str, issue: str) -> dict:
     return {"pane": pane_id, "label": label, "proposal": proposal, "brief": send_brief(pane_id, brief)}
 
 
+def plan(workspace_id: str, item: str, ask: str, context: list[str] | None = None) -> dict:
+    """One planner per issue: a `plan-<item>` tab in the unit workspace — `plan-sc-<id>` takes that story to
+    Ready, `plan-<slug>` turns a new issue into stories (discovery) — with its brief, like `config-<slug>`."""
+    item = item.lower().strip()
+    if not re.fullmatch(r"sc-\d+", item):
+        item = re.sub(r"[^a-z0-9-]+", "-", item).strip("-")[:40].strip("-")
+    if not item:
+        raise ValueError("plan: give a story (sc-<id>) or a slug naming the issue")
+    label = "plan-%s" % item
+    if _tab_by_label(workspace_id, label):
+        raise ValueError("%s is already open — message it: send.sh --role planner --item %s" % (label, item))
+    snap = _snap()
+    ws = next((w for w in snap.get("workspaces", []) if w.get("workspace_id") == workspace_id), {})
+    tok = dispatch._tokens(ws)
+    mode = "ready" if item.startswith("sc-") else "discovery"
+    brief = os.path.join(dispatch.state_dir(), "briefs", "%s.md" % label)
+    os.makedirs(os.path.dirname(brief), exist_ok=True)
+    lines = ["# %s" % label, "",
+             "- **Mode:** %s" % mode,
+             "- **Unit:** %s · **epic:** %s · **project:** %s" % (tok.get("unit", "?"), tok.get("epic", "?"),
+                                                                  tok.get("project", "?"))]
+    if mode == "ready":
+        lines.append("- **Story:** %s — research it, take it to Ready (`prometheus:stories`)" % item)
+    else:
+        lines.append("- **Issue:** %s — research it, then draft the stories it needs (discovery)" % item)
+    lines += ["", "## The ask (the operator's words verbatim where the PM has them)", ask, ""]
+    if context:
+        lines += ["## Context files", *["- %s" % c for c in context], ""]
+    lines += ["## Report to", "Your PM: `send.sh --role pm \"%s: <one line> — <file>\"`. Questions for the "
+              "operator go in your own tab (`AskUserQuestion`), never through the PM." % label, ""]
+    with open(brief, "w") as fh:
+        fh.write("\n".join(lines))
+    pane_id = open_tab(workspace_id, label, "planner", item=item)
+    return {"pane": pane_id, "label": label, "mode": mode, "brief": send_brief(pane_id, brief)}
+
+
 def quick(workspace_id: str, slug: str, ask: str) -> dict:
     """One quick work item: a `quick-<slug>` runner tab beside the seat, its exports folder, its brief."""
     slug = re.sub(r"[^a-z0-9-]+", "-", slug.lower()).strip("-")
@@ -554,6 +590,11 @@ def main(argv: list[str]) -> int:
     cf.add_argument("workspace")
     cf.add_argument("slug")
     cf.add_argument("issue", nargs="+")
+    pl = sub.add_parser("plan", help="open a plan-<item> planner tab with its brief (sc-<id> or an issue slug)")
+    pl.add_argument("workspace")
+    pl.add_argument("item")
+    pl.add_argument("--context", action="append", default=[], help="a file the planner reads first; repeatable")
+    pl.add_argument("ask", nargs="+")
     q = sub.add_parser("quick")
     q.add_argument("workspace")
     q.add_argument("slug")
@@ -599,6 +640,8 @@ def main(argv: list[str]) -> int:
             print(refresh(a.workspace, a.label, a.role, a.brief))
         elif a.cmd == "configure":
             print(json.dumps(configure(a.workspace, a.slug, " ".join(a.issue))))
+        elif a.cmd == "plan":
+            print(json.dumps(plan(a.workspace, a.item, " ".join(a.ask), a.context)))
         elif a.cmd == "quick":
             print(json.dumps(quick(a.workspace, a.slug, " ".join(a.ask))))
         elif a.cmd == "respawn":

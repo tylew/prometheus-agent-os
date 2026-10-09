@@ -105,6 +105,21 @@ class SendDeliverTest(Base):
         with d.locked_state() as st:
             self.assertEqual(st["outbox"]["wA:p1"][0]["line"], "[prometheus] from implementor@sc-1-a: done: report at /x")
 
+    def test_several_planners_need_an_item_and_an_unknown_item_is_refused(self):
+        os.environ.update(PROMETHEUS_ROLE="pm", HERDR_WORKSPACE_ID="wA")
+        s = snap()
+        s["panes"] += [{"pane_id": "wA:p7", "workspace_id": "wA", "agent_status": "idle",
+                        "tokens": {"role": "planner", "item": "sc-1"}},
+                       {"pane_id": "wA:p8", "workspace_id": "wA", "agent_status": "idle",
+                        "tokens": {"role": "planner", "item": "db-per-copy"}}]
+        with d.locked_state() as st:
+            with self.assertRaisesRegex(d.RouteError, "2 planner panes"):
+                d.send(s, st, "hi", role="planner")
+            self.assertEqual(d.send(s, st, "hi", role="planner", item="db-per-copy"), "wA:p8")
+            with self.assertRaisesRegex(d.RouteError, "no planner for sc-9"):
+                d.send(s, st, "hi", role="planner", item="sc-9")
+            self.assertEqual(d.send(s, st, "hi", role="implementor"), "wA:p2")
+
     def test_blocked_target_is_held_then_delivered(self):
         sent = []
         with d.locked_state() as st:

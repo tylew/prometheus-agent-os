@@ -16,7 +16,7 @@ close-tab.sh <workspace-id> <label>
 - **Worktree first** — create the item's worktree completely (branch, `gt track`, the project's worktree
   setup — `branching`) before `open-tab.sh --worktree <abs>`, which links the registry's `worktree_links`
   (e.g. `js/node_modules`) into it. The tab starts in that worktree, so the implementor's plain `git` / `gt` act on it.
-- **Labels** — `impl-<item-slug>`, `review-<pr#>`, `validator-sc-<id>` (the end of a story, `templates/validator-brief.md`), `closeout-sc-<id>` (vantage's closeout, `--worktree <the project's base checkout>`), `planner-<story>` (`--item sc-<id>`: one story to ready, its stops and stack-or-fresh) and `planner-<batch>` (`--item <batch-slug>`: discovery). Labels may repeat across units; routing uses pane ids.
+- **Labels** — `impl-<item-slug>`, `review-<pr#>`, `validator-sc-<id>` (the end of a story, `templates/validator-brief.md`), `closeout-sc-<id>` (vantage's closeout, `--worktree <the project's base checkout>`), `plan-sc-<id>` (one story to ready, its stops and stack-or-fresh) and `plan-<slug>` (a new issue: discovery) — both opened only with `scripts/plan.sh <sc-<id> | slug> [--context <file>] "<ask>"`, which writes and sends the brief, like the seat's `config-<slug>`; one planner per issue. Labels may repeat across units; routing uses pane ids.
 - **Launch** — `herdr agent start` with `lib/launch.sh <role> --args`: merged settings (other workflow plugins off
   for the session), `--name <label>`, and for implementor / reviewer `--permission-mode dontAsk` with
   `templates/settings/<role>.json`; role env comes from the tab. Returns once the agent takes input. Pass the

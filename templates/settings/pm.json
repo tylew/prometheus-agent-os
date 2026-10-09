@@ -1,5 +1,5 @@
 {
-  "$comment": "Project manager additions to launch.json. Not dontAsk: the operator may approve in the tab. unit-tokens.sh is the PM's writer for its own unit's stage / stories / prs tokens; other roles do not get it.",
+  "$comment": "Project manager additions to launch.json. Not dontAsk: the operator may approve in the tab. unit-tokens.sh is the PM's writer for its own unit's stage / stories / prs tokens; other roles do not get it. plan.sh opens one plan-<item> planner tab per issue.",
   "extends": [
     "delivery",
     "kb-writer"
@@ -9,7 +9,9 @@
       "Bash(unit-tokens.sh *)",
       "Bash(*/skills/dispatch/scripts/unit-tokens.sh *)",
       "Bash(rounds.sh *)",
-      "Bash(*/skills/dispatch/scripts/rounds.sh *)"
+      "Bash(*/skills/dispatch/scripts/rounds.sh *)",
+      "Bash(plan.sh *)",
+      "Bash(*/skills/agent-tabs/scripts/plan.sh *)"
     ]
   }
 }

@@ -227,6 +227,20 @@ class UnitsTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "already open"):
             units.quick(ws, "battery-curves-csv", "again")
 
+    def test_plan_opens_one_planner_per_issue(self):
+        ws = units.create("epic-1-x", "epic", "besstie", ["sc-1"], [], epic="1")["workspace"]
+        a = units.plan(ws, "sc-1", "take it to ready")
+        b = units.plan(ws, "DB per copy!", "a database per copy", context=["/s/scope-1.md"])
+        self.assertEqual((a["label"], a["mode"], b["label"], b["mode"]),
+                         ("plan-sc-1", "ready", "plan-db-per-copy", "discovery"))
+        p = next(x for x in self.world()["panes"] if x["pane_id"] == b["pane"])
+        self.assertEqual(p["tokens"], {"role": "planner", "item": "db-per-copy"})
+        brief = open(os.path.join(self.tmp.name, "briefs", "plan-db-per-copy.md")).read()
+        self.assertIn("a database per copy", brief)
+        self.assertIn("/s/scope-1.md", brief)
+        with self.assertRaisesRegex(ValueError, "already open .*--item sc-1"):
+            units.plan(ws, "sc-1", "again")
+
     def test_close_refuses_busy_and_untagged(self):
         ws = units.create("sc-1-a", "story", "besstie", ["sc-1"], [])["workspace"]
         units.open_tab(ws, "impl-a", "implementor")

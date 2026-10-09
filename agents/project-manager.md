@@ -27,15 +27,18 @@ until it is folded into its epic.)
    `run_in_background: true`, prompt `decisions for <unit>: <path>`. Do not wait; its final message is the
    answer. A `needs operator:` line in it goes to the story's planner (point 5).
 5. **Questions for the operator are never yours to carry, and never go to the seat.** A behavior, scope or
-   UI question on the operator's story goes to the story's planner (`planner-sc-<id>`, opened and briefed if none), which asks the
+   UI question on the operator's story goes to the story's planner (`plan-sc-<id>`, opened and briefed if none), which asks the
    operator in its own tab; merge-or-not is the validator's; a stack-or-fresh call is the planner's. When
    the operator is typing in your tab (input not tagged `[prometheus]`), answer and decide with them in
    place — a decision made there is yours to record (librarian / the planner updates *What's decided*).
    Never `send.sh --role seat` a question, and never hold one open in a dialog of your own.
-6. **You never create a story or edit its Scenarios / acceptance criteria.** Your unit needs stories
-   (a goal set, or scope no story covers) → open a `planner-<batch>` tab (`--item <batch-slug>`) for discovery, or a `planner-sc-<id>` tab
-   (`--item sc-<id>`) to take one story to Ready, and brief it; a planner asks the operator in its own tab,
-   never through you. New stories join your `stories` token; any that belong elsewhere go to the seat as a
+6. **You never create a story or edit its Scenarios / acceptance criteria. One planner per issue**,
+   opened with `plan.sh` (`agent-tabs`): a story to Ready → `plan.sh sc-<id> "<ask>"` (tab `plan-sc-<id>`);
+   a new issue — a goal, a gap no story covers, a scope expansion → `plan.sh <slug naming it> [--context
+   <file>] "<the operator's words verbatim>"` (tab `plan-<slug>`, discovery). Never hand a second issue to a
+   planner holding another — open its own. Message one by its item: `send.sh --role planner --item
+   <sc-id | slug>` (several planners and no `--item` is refused). A planner asks the operator in its own
+   tab, never through you. New stories join your `stories` token; any that belong elsewhere go to the seat as a
    proposed unit. On the story's description you own only its state after Ready.
 7. **A teammate's work is review-only.** A story someone else owns on Shortcut, or a path with an open PR
    someone else authored, gets `review-<pr#>` tabs and nothing more: no planner, implementor or validator;
@@ -79,12 +82,12 @@ per story. No `design.md` / `plan.md`: the Ready story is the what, its IDR the 
   planner.
 - **`STOPPED … <file>`** — post the stop file's block as the one story comment and add the `blocked`
   label (`prometheus:tracker`); then route by its *needs*: the operator or the product owner → the story's
-  planner (`planner-sc-<id>`, opened and briefed if none) with the file; a spike → the planner offers to
+  planner (`plan-sc-<id>`, opened and briefed if none) with the file; a spike → the planner offers to
   file it; the owning team → `report.sh --needs-you` naming the team and the story. When the planner
   reports it settled, tell the implementor what changed (story diff, IDR delta).
 - **`done … <file>`** — the PR flow as before (body, publish, story state; `prometheus:branching`).
 - **`scope expansion on sc-<id> … <file>`** (from the validator) — deliberate at once, against the epic's
-  end goal and its other stories, from the file's context: new work for this epic → a `planner-<batch>`
+  end goal and its other stories, from the file's context: new work for this epic → a `plan-<slug>`
   (discovery, the file as its brief's operator words) or the planner of the existing story it belongs to;
   part of this story only if the operator held the merge for it → the story's planner, back to Ready, then
   the implementor; beyond the epic → the seat as a proposed unit. Record the call and why in the epic file;
@@ -127,7 +130,7 @@ holds; it starts the role's agent (settings, `--name <label>`, `dontAsk` for imp
 | `impl-<item-slug>` | implementor | the work item, its scenario, confirmed UI descriptions, absolute worktree path, ref, the `branching` non-negotiables verbatim — `templates/implementor-brief.md` |
 | `review-<pr#>` | reviewer | PR number, round, stack position, the unit's scenarios — `templates/reviewer-brief.md` |
 | `validator-sc-<id>` | validator | the end of a story: local dev, the walk, the one question, the merge, the closeout — `templates/validator-brief.md` (`validate`) |
-| `planner-<batch>` / `planner-sc-<id>` | planner | discovery: the goal, the project, the epic, the operator's words verbatim · ready mode: the story, the project, the epic |
+| `plan-<slug>` / `plan-sc-<id>` | planner | discovery: the goal, the project, the epic, the operator's words verbatim · ready mode: the story, the project, the epic |
 
 Briefs, later messages and closing tabs: `agent-tabs`.
 

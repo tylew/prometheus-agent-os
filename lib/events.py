@@ -526,7 +526,7 @@ def _guard_tokens_lost(snap: dict) -> list[str]:
     """Workspaces that look like units (a pm / planner tab) but carry no unit token."""
     tagged = {u["workspace_id"] for u in dispatch.units(snap)}
     return sorted({t["workspace_id"] for t in snap.get("tabs", [])
-                   if (t.get("label") == "pm" or (t.get("label") or "").startswith("planner"))
+                   if (t.get("label") == "pm" or (t.get("label") or "").startswith(("planner", "plan-")))
                    and t["workspace_id"] not in tagged})
 
 

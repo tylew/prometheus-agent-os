@@ -457,5 +457,5 @@ if __name__ == "__main__":
 
 class GuardPlannerTabsTest(unittest.TestCase):
     def test_story_planner_tab_marks_an_untagged_unit(self):
-        snap = {"workspaces": [], "tabs": [{"workspace_id": "w9", "label": "planner-sc-110005"}], "panes": []}
+        snap = {"workspaces": [], "tabs": [{"workspace_id": "w9", "label": "plan-sc-110005"}], "panes": []}
         self.assertEqual(ev._guard_tokens_lost(snap), ["w9"])
